@@ -4,13 +4,13 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-module dyaml.testreader;
+module dyaml.tests.reader;
 
 
 version(unittest)
 {
 
-import dyaml.testcommon;
+import dyaml.tests.common;
 import dyaml.reader;
 
 

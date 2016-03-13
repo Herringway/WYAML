@@ -4,7 +4,7 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-module dyaml.testconstructor;
+module dyaml.tests.constructor;
 
 
 version(unittest)
@@ -17,7 +17,7 @@ import std.string;
 import std.typecons;
 
 import dyaml.tag;
-import dyaml.testcommon;
+import dyaml.tests.common;
 
 
 ///Expected results of loading test inputs.

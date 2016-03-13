@@ -4,7 +4,7 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-module dyaml.testemitter;
+module dyaml.tests.emitter;
 
 
 version(unittest)
@@ -17,7 +17,7 @@ import std.typecons;
 
 import dyaml.dumper;
 import dyaml.event;
-import dyaml.testcommon;
+import dyaml.tests.common;
 import dyaml.token;
 
 

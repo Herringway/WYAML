@@ -4,7 +4,7 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-module dyaml.testinputoutput;
+module dyaml.tests.inputoutput;
 
 
 version(unittest)
@@ -14,7 +14,7 @@ import std.array;
 import std.file;
 import std.system;
 
-import dyaml.testcommon;
+import dyaml.tests.common;
 
 
 alias std.system.endian endian;

@@ -4,7 +4,7 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-module dyaml.testerrors;
+module dyaml.tests.errors;
 
 
 version(unittest)
@@ -12,7 +12,7 @@ version(unittest)
 
 import std.file;
 
-import dyaml.testcommon;
+import dyaml.tests.common;
 
 
 /// Loader error unittest from file stream.
