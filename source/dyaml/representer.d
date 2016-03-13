@@ -595,91 +595,91 @@ Node representPairs(ref Node node, Representer representer) @system
 //Unittests
 //These should really all be encapsulated in unittests.
 private:
+version(unittest) {
+    import dyaml.dumper;
 
-import dyaml.dumper;
-
-struct MyStruct
-{
-    int x, y, z;
-
-    int opCmp(ref const MyStruct s) const pure @safe nothrow
+    struct MyStruct
     {
-        if(x != s.x){return x - s.x;}
-        if(y != s.y){return y - s.y;}
-        if(z != s.z){return z - s.z;}
-        return 0;
-    }
-}
+        int x, y, z;
 
-Node representMyStruct(ref Node node, Representer representer) @system
-{
-    //The node is guaranteed to be MyStruct as we add representer for MyStruct.
-    auto value = node.as!MyStruct;
-    //Using custom scalar format, x:y:z.
-    auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
-    //Representing as a scalar, with custom tag to specify this data type.
-    return representer.representScalar("!mystruct.tag", scalar);
-}
-
-Node representMyStructSeq(ref Node node, Representer representer) @safe
-{
-    auto value = node.as!MyStruct;
-    auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
-    return representer.representSequence("!mystruct.tag", nodes);
-}
-
-Node representMyStructMap(ref Node node, Representer representer) @safe
-{
-    auto value = node.as!MyStruct;
-    auto pairs = [Node.Pair("x", value.x),
-                  Node.Pair("y", value.y),
-                  Node.Pair("z", value.z)];
-    return representer.representMapping("!mystruct.tag", pairs);
-}
-
-class MyClass
-{
-    int x, y, z;
-
-    this(int x, int y, int z) pure @safe nothrow
-    {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        int opCmp(ref const MyStruct s) const pure @safe nothrow
+        {
+            if(x != s.x){return x - s.x;}
+            if(y != s.y){return y - s.y;}
+            if(z != s.z){return z - s.z;}
+            return 0;
+        }
     }
 
-    override int opCmp(Object o) pure @safe nothrow
+    Node representMyStruct(ref Node node, Representer representer) @system
     {
-        MyClass s = cast(MyClass)o;
-        if(s is null){return -1;}
-        if(x != s.x){return x - s.x;}
-        if(y != s.y){return y - s.y;}
-        if(z != s.z){return z - s.z;}
-        return 0;
+        //The node is guaranteed to be MyStruct as we add representer for MyStruct.
+        auto value = node.as!MyStruct;
+        //Using custom scalar format, x:y:z.
+        auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
+        //Representing as a scalar, with custom tag to specify this data type.
+        return representer.representScalar("!mystruct.tag", scalar);
     }
 
-    ///Useful for Node.as!string .
-    override string toString() @trusted
+    Node representMyStructSeq(ref Node node, Representer representer) @safe
     {
-        return format("MyClass(%s, %s, %s)", x, y, z);
+        auto value = node.as!MyStruct;
+        auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
+        return representer.representSequence("!mystruct.tag", nodes);
     }
+
+    Node representMyStructMap(ref Node node, Representer representer) @safe
+    {
+        auto value = node.as!MyStruct;
+        auto pairs = [Node.Pair("x", value.x),
+                      Node.Pair("y", value.y),
+                      Node.Pair("z", value.z)];
+        return representer.representMapping("!mystruct.tag", pairs);
+    }
+
+    class MyClass
+    {
+        int x, y, z;
+
+        this(int x, int y, int z) pure @safe nothrow
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        override int opCmp(Object o) pure @safe nothrow
+        {
+            MyClass s = cast(MyClass)o;
+            if(s is null){return -1;}
+            if(x != s.x){return x - s.x;}
+            if(y != s.y){return y - s.y;}
+            if(z != s.z){return z - s.z;}
+            return 0;
+        }
+
+        ///Useful for Node.as!string .
+        override string toString() @trusted
+        {
+            return format("MyClass(%s, %s, %s)", x, y, z);
+        }
+    }
+
+    //Same as representMyStruct.
+    Node representMyClass(ref Node node, Representer representer) @system
+    {
+        //The node is guaranteed to be MyClass as we add representer for MyClass.
+        auto value = node.as!MyClass;
+        //Using custom scalar format, x:y:z.
+        auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
+        //Representing as a scalar, with custom tag to specify this data type.
+        return representer.representScalar("!myclass.tag", scalar);
+    }
+
 }
-
-//Same as representMyStruct.
-Node representMyClass(ref Node node, Representer representer) @system
-{
-    //The node is guaranteed to be MyClass as we add representer for MyClass.
-    auto value = node.as!MyClass;
-    //Using custom scalar format, x:y:z.
-    auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
-    //Representing as a scalar, with custom tag to specify this data type.
-    return representer.representScalar("!myclass.tag", scalar);
-}
-
-import std.stream;
-
 unittest
 {
+    import std.stream;
     foreach(r; [&representMyStruct,
                 &representMyStructSeq,
                 &representMyStructMap])
@@ -694,6 +694,7 @@ unittest
 
 unittest
 {
+    import std.stream;
     auto dumper = Dumper(new MemoryStream());
     auto representer = new Representer;
     representer.addRepresenter!MyClass(&representMyClass);
