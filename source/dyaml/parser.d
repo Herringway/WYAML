@@ -106,7 +106,7 @@ private alias ParserException Error;
 
 /// Generates events from tokens provided by a Scanner.
 ///
-/// While Parser receives tokens with non-const character slices, the events it 
+/// While Parser receives tokens with non-const character slices, the events it
 /// produces are immutable strings, which are usually the same slices, cast to string.
 /// Parser is the last layer of D:YAML that may possibly do any modifications to these
 /// slices.
@@ -114,7 +114,7 @@ final class Parser
 {
     private:
         ///Default tag handle shortcuts and replacements.
-        static TagDirective[] defaultTagDirectives_ = 
+        static TagDirective[] defaultTagDirectives_ =
             [TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:")];
 
         ///Scanner providing YAML tokens.
@@ -371,7 +371,7 @@ final class Parser
                         enforce(h != handle, new Error("Duplicate tag handle: " ~ handle,
                                                        token.startMark));
                     }
-                    tagDirectives_ ~= 
+                    tagDirectives_ ~=
                         TagDirective(handle, cast(string)value[token.valueDivider .. $]);
                 }
                 // Any other directive type is ignored (only YAML and TAG are in YAML
@@ -422,7 +422,7 @@ final class Parser
             {
                 const token = scanner_.getToken();
                 state_ = popState();
-                return aliasEvent(token.startMark, token.endMark, 
+                return aliasEvent(token.startMark, token.endMark,
                                   Anchor(cast(string)token.value));
             }
 

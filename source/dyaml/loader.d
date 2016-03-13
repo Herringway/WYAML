@@ -131,7 +131,7 @@ struct Loader
             name_ = filename;
             try
             {
-                this(std.file.read(filename)); 
+                this(std.file.read(filename));
             }
             catch(FileException e)
             {
@@ -293,7 +293,7 @@ struct Loader
         Node[] loadAll() @trusted
         {
             Node[] nodes;
-            foreach(ref node; this) 
+            foreach(ref node; this)
             {
                 nodes.assumeSafeAppend();
                 nodes ~= node;
