@@ -276,25 +276,6 @@ struct Node
             // User defined type or plain string.
             else                              { value_ = Value(value); }
         }
-        unittest
-        {
-            {
-                auto node = Node(42);
-                assert(node.isScalar && !node.isSequence &&
-                       !node.isMapping && !node.isUserType);
-                assert(node.as!int == 42 && node.as!float == 42.0f && node.as!string == "42");
-                assert(!node.isUserType);
-            }
-
-            {
-                auto node = Node(new class{int a = 5;});
-                assert(node.isUserType);
-            }
-            {
-                auto node = Node("string");
-                assert(node.as!string == "string");
-            }
-        }
 
         /** Construct a node from an _array.
          *
@@ -343,20 +324,6 @@ struct Node
                 value_ = Value(nodes);
             }
         }
-        unittest
-        {
-            with(Node([1, 2, 3]))
-            {
-                assert(!isScalar() && isSequence && !isMapping && !isUserType);
-                assert(length == 3);
-                assert(opIndex(2).as!int == 3);
-            }
-
-            // Will be emitted as a sequence (default for arrays)
-            auto seq = Node([1, 2, 3, 4, 5]);
-            // Will be emitted as a set (overriden tag)
-            auto set = Node([1, 2, 3, 4, 5], "tag:yaml.org,2002:set");
-        }
 
         /** Construct a node from an associative _array.
          *
@@ -392,25 +359,6 @@ struct Node
             Node.Pair[] pairs;
             foreach(key, ref value; array){pairs ~= Pair(key, value);}
             value_ = Value(pairs);
-        }
-        unittest
-        {
-            int[string] aa;
-            aa["1"] = 1;
-            aa["2"] = 2;
-            with(Node(aa))
-            {
-                assert(!isScalar() && !isSequence && isMapping && !isUserType);
-                assert(length == 2);
-                assert(opIndex("2").as!int == 2);
-            }
-
-            // Will be emitted as an unordered mapping (default for mappings)
-            auto map   = Node([1 : "a", 2 : "b"]);
-            // Will be emitted as an ordered map (overriden tag)
-            auto omap  = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:omap");
-            // Will be emitted as pairs (overriden tag)
-            auto pairs = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:pairs");
         }
 
         /** Construct a node from arrays of _keys and _values.
@@ -464,22 +412,6 @@ struct Node
             Node.Pair[] pairs;
             foreach(i; 0 .. keys.length){pairs ~= Pair(keys[i], values[i]);}
             value_ = Value(pairs);
-        }
-        unittest
-        {
-            with(Node(["1", "2"], [1, 2]))
-            {
-                assert(!isScalar() && !isSequence && isMapping && !isUserType);
-                assert(length == 2);
-                assert(opIndex("2").as!int == 2);
-            }
-
-            // Will be emitted as an unordered mapping (default for mappings)
-            auto map   = Node([1, 2], ["a", "b"]);
-            // Will be emitted as an ordered map (overriden tag)
-            auto omap  = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:omap");
-            // Will be emitted as pairs (overriden tag)
-            auto pairs = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:pairs");
         }
 
         /// Is this node valid (initialized)?
@@ -538,18 +470,6 @@ struct Node
         bool opEquals(T)(const auto ref T rhs) const @safe
         {
             return equals!(Yes.useTag)(rhs);
-        }
-        ///
-        unittest
-        {
-            auto node = Node(42);
-
-            assert(node == 42);
-            assert(node != "42");
-            assert(node != "43");
-
-            auto node2 = Node(YAMLNull());
-            assert(node2 == YAMLNull());
         }
 
         /// Shortcut for get().
@@ -660,11 +580,6 @@ struct Node
                                 ". Expected: " ~ typeid(T).toString(), startMark_);
             }
             assert(false, "This code should never be reached");
-        }
-        unittest
-        {
-            assertThrown!NodeException(Node("42").get!int);
-            Node(YAMLNull()).get!YAMLNull;
         }
 
         /// Ditto.
@@ -791,44 +706,6 @@ struct Node
             }
             throw new Error("Trying to index a " ~ nodeTypeString ~ " node", startMark_);
         }
-        ///
-        unittest
-        {
-            writeln("D:YAML Node opIndex unittest");
-            alias Node.Value Value;
-            alias Node.Pair Pair;
-
-            Node narray = Node([11, 12, 13, 14]);
-            Node nmap   = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
-
-            assert(narray[0].as!int == 11);
-            assert(null !is collectException(narray[42]));
-            assert(nmap["11"].as!int == 11);
-            assert(nmap["14"].as!int == 14);
-        }
-        unittest
-        {
-            writeln("D:YAML Node opIndex unittest");
-            alias Node.Value Value;
-            alias Node.Pair Pair;
-
-            Node narray = Node([11, 12, 13, 14]);
-            Node nmap   = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
-
-            assert(narray[0].as!int == 11);
-            assert(null !is collectException(narray[42]));
-            assert(nmap["11"].as!int == 11);
-            assert(nmap["14"].as!int == 14);
-            assert(null !is collectException(nmap["42"]));
-
-            narray.add(YAMLNull());
-            nmap.add(YAMLNull(), "Nothing");
-            assert(narray[4].as!YAMLNull == YAMLNull());
-            assert(nmap[YAMLNull()].as!string == "Nothing");
-
-            assertThrown!NodeException(nmap[11]);
-            assertThrown!NodeException(nmap[14]);
-        }
 
         /** Determine if a collection contains specified value.
          *
@@ -860,59 +737,6 @@ struct Node
             return contains_!(T, Yes.key, "containsKey")(rhs);
         }
 
-        // Unittest for contains() and containsKey().
-        unittest
-        {
-            writeln("D:YAML Node contains/containsKey unittest");
-            auto seq = Node([1, 2, 3, 4, 5]);
-            assert(seq.contains(3));
-            assert(seq.contains(5));
-            assert(!seq.contains("5"));
-            assert(!seq.contains(6));
-            assert(!seq.contains(float.nan));
-            assertThrown!NodeException(seq.containsKey(5));
-
-            auto seq2 = Node(["1", "2"]);
-            assert(seq2.contains("1"));
-            assert(!seq2.contains(1));
-
-            auto map = Node(["1", "2", "3", "4"], [1, 2, 3, 4]);
-            assert(map.contains(1));
-            assert(!map.contains("1"));
-            assert(!map.contains(5));
-            assert(!map.contains(float.nan));
-            assert(map.containsKey("1"));
-            assert(map.containsKey("4"));
-            assert(!map.containsKey(1));
-            assert(!map.containsKey("5"));
-
-            assert(!seq.contains(YAMLNull()));
-            assert(!map.contains(YAMLNull()));
-            assert(!map.containsKey(YAMLNull()));
-            seq.add(YAMLNull());
-            map.add("Nothing", YAMLNull());
-            assert(seq.contains(YAMLNull()));
-            assert(map.contains(YAMLNull()));
-            assert(!map.containsKey(YAMLNull()));
-            map.add(YAMLNull(), "Nothing");
-            assert(map.containsKey(YAMLNull()));
-
-            auto map2 = Node([1, 2, 3, 4], [1, 2, 3, 4]);
-            assert(!map2.contains("1"));
-            assert(map2.contains(1));
-            assert(!map2.containsKey("1"));
-            assert(map2.containsKey(1));
-
-            // scalar
-            assertThrown!NodeException(Node(1).contains(4));
-            assertThrown!NodeException(Node(1).containsKey(4));
-
-            auto mapNan = Node([1.0, 2, double.nan], [1, double.nan, 5]);
-
-            assert(mapNan.contains(double.nan));
-            assert(mapNan.containsKey(double.nan));
-        }
-
         /// Assignment (shallow copy) by value.
         void opAssign(Node rhs) @safe nothrow
         {
@@ -929,14 +753,6 @@ struct Node
             tag_            = rhs.tag_;
             scalarStyle     = rhs.scalarStyle;
             collectionStyle = rhs.collectionStyle;
-        }
-        // Unittest for opAssign().
-        unittest
-        {
-            auto seq = Node([1, 2, 3, 4, 5]);
-            auto assigned = seq;
-            assert(seq == assigned,
-                   "Node.opAssign() doesn't produce an equivalent copy");
         }
 
         /** Set element at specified index in a collection.
@@ -992,37 +808,6 @@ struct Node
 
             throw new Error("Trying to index a " ~ nodeTypeString ~ " node", startMark_);
         }
-        unittest
-        {
-            writeln("D:YAML Node opIndexAssign unittest");
-
-            with(Node([1, 2, 3, 4, 3]))
-            {
-                opIndexAssign(42, 3);
-                assert(length == 5);
-                assert(opIndex(3).as!int == 42);
-
-                opIndexAssign(YAMLNull(), 0);
-                assert(opIndex(0) == YAMLNull());
-            }
-            with(Node(["1", "2", "3"], [4, 5, 6]))
-            {
-                opIndexAssign(42, "3");
-                opIndexAssign(123, 456);
-                assert(length == 4);
-                assert(opIndex("3").as!int == 42);
-                assert(opIndex(456).as!int == 123);
-
-                opIndexAssign(43, 3);
-                //3 and "3" should be different
-                assert(length == 5);
-                assert(opIndex("3").as!int == 42);
-                assert(opIndex(3).as!int == 43);
-
-                opIndexAssign(YAMLNull(), "2");
-                assert(opIndex("2") == YAMLNull());
-            }
-        }
 
         /** Foreach over a sequence, getting each element as T.
          *
@@ -1053,31 +838,6 @@ struct Node
                 if(result){break;}
             }
             return result;
-        }
-        unittest
-        {
-            writeln("D:YAML Node opApply unittest 1");
-
-            alias Node.Value Value;
-            alias Node.Pair Pair;
-
-            Node n1 = Node(Value(cast(long)11));
-            Node n2 = Node(Value(cast(long)12));
-            Node n3 = Node(Value(cast(long)13));
-            Node n4 = Node(Value(cast(long)14));
-            Node narray = Node([n1, n2, n3, n4]);
-
-            int[] array, array2;
-            foreach(int value; narray)
-            {
-                array ~= value;
-            }
-            foreach(Node node; narray)
-            {
-                array2 ~= node.as!int;
-            }
-            assert(array == [11, 12, 13, 14]);
-            assert(array2 == [11, 12, 13, 14]);
         }
 
         /** Foreach over a mapping, getting each key/value as K/V.
@@ -1122,56 +882,6 @@ struct Node
             }
             return result;
         }
-        unittest
-        {
-            writeln("D:YAML Node opApply unittest 2");
-
-            alias Node.Value Value;
-            alias Node.Pair Pair;
-
-            Node n1 = Node(cast(long)11);
-            Node n2 = Node(cast(long)12);
-            Node n3 = Node(cast(long)13);
-            Node n4 = Node(cast(long)14);
-
-            Node k1 = Node("11");
-            Node k2 = Node("12");
-            Node k3 = Node("13");
-            Node k4 = Node("14");
-
-            Node nmap1 = Node([Pair(k1, n1),
-                               Pair(k2, n2),
-                               Pair(k3, n3),
-                               Pair(k4, n4)]);
-
-            int[string] expected = ["11" : 11,
-                                    "12" : 12,
-                                    "13" : 13,
-                                    "14" : 14];
-            int[string] array;
-            foreach(string key, int value; nmap1)
-            {
-                array[key] = value;
-            }
-            assert(array == expected);
-
-            Node nmap2 = Node([Pair(k1, Node(cast(long)5)),
-                               Pair(k2, Node(true)),
-                               Pair(k3, Node(cast(real)1.0)),
-                               Pair(k4, Node("yarly"))]);
-
-            foreach(string key, Node value; nmap2)
-            {
-                switch(key)
-                {
-                    case "11": assert(value.as!int    == 5      ); break;
-                    case "12": assert(value.as!bool   == true   ); break;
-                    case "13": assert(value.as!float  == 1.0    ); break;
-                    case "14": assert(value.as!string == "yarly"); break;
-                    default:   assert(false);
-                }
-            }
-        }
 
         /** Add an element to a sequence.
          *
@@ -1196,16 +906,6 @@ struct Node
             static if(is(Unqual!T == Node)){nodes ~= value;}
             else                           {nodes ~= Node(value);}
             value_ = Value(nodes);
-        }
-        unittest
-        {
-            writeln("D:YAML Node add unittest 1");
-
-            with(Node([1, 2, 3, 4]))
-            {
-                add(5.0f);
-                assert(opIndex(4).as!float == 5.0f);
-            }
         }
 
         /** Add a key-value pair to a mapping.
@@ -1233,15 +933,6 @@ struct Node
             auto pairs = get!(Node.Pair[])();
             pairs ~= Pair(key, value);
             value_ = Value(pairs);
-        }
-        unittest
-        {
-            writeln("D:YAML Node add unittest 2");
-            with(Node([1, 2], [3, 4]))
-            {
-                add(5, "6");
-                assert(opIndex(5).as!string == "6");
-            }
         }
 
         /** Determine whether a key is in a mapping, and access its value.
@@ -1274,18 +965,6 @@ struct Node
                 return &(get!(Node.Pair[])[idx].value);
             }
         }
-        unittest
-        {
-            writeln(`D:YAML Node opBinaryRight!"in" unittest`);
-            auto mapping = Node(["foo", "baz"], ["bar", "qux"]);
-            assert("bad" !in mapping && ("bad" in mapping) is null);
-            Node* foo = "foo" in mapping;
-            assert(foo !is null);
-            assert(*foo == Node("bar"));
-            assert(foo.get!string == "bar");
-            *foo = Node("newfoo");
-            assert(mapping["foo"] == Node("newfoo"));
-        }
 
         /** Remove first (if any) occurence of a value in a collection.
          *
@@ -1302,31 +981,6 @@ struct Node
         void remove(T)(T rhs) @trusted
         {
             remove_!(T, No.key, "remove")(rhs);
-        }
-        unittest
-        {
-            writeln("D:YAML Node remove unittest");
-            with(Node([1, 2, 3, 4, 3]))
-            {
-                remove(3);
-                assert(length == 4);
-                assert(opIndex(2).as!int == 4);
-                assert(opIndex(3).as!int == 3);
-
-                add(YAMLNull());
-                assert(length == 5);
-                remove(YAMLNull());
-                assert(length == 4);
-            }
-            with(Node(["1", "2", "3"], [4, 5, 6]))
-            {
-                remove(4);
-                assert(length == 2);
-                add("nullkey", YAMLNull());
-                assert(length == 3);
-                remove(YAMLNull());
-                assert(length == 2);
-            }
         }
 
         /** Remove element at the specified index of a collection.
@@ -1351,29 +1005,6 @@ struct Node
         {
             remove_!(T, Yes.key, "removeAt")(index);
         }
-        unittest
-        {
-            writeln("D:YAML Node removeAt unittest");
-            with(Node([1, 2, 3, 4, 3]))
-            {
-                removeAt(3);
-                assertThrown!NodeException(removeAt("3"));
-                assert(length == 4);
-                assert(opIndex(3).as!int == 3);
-            }
-            with(Node(["1", "2", "3"], [4, 5, 6]))
-            {
-                // no integer 2 key, so don't remove anything
-                removeAt(2);
-                assert(length == 3);
-                removeAt("2");
-                assert(length == 2);
-                add(YAMLNull(), "nullval");
-                assert(length == 3);
-                removeAt(YAMLNull());
-                assert(length == 2);
-            }
-        }
 
         /// Compare with another _node.
         int opCmp(ref const Node node) const @safe
@@ -1387,10 +1018,6 @@ struct Node
             const tagHash = tag_.isNull ? 0 : tag_.toHash();
             // Variant toHash is not const at the moment, so we need to const-cast.
             return tagHash + value_.toHash();
-        }
-        unittest
-        {
-            writeln("Node(42).toHash(): ", Node(42).toHash());
         }
 
     package:
@@ -1816,6 +1443,394 @@ struct Node
             }
             throw new Error("Trying to index a " ~ nodeTypeString ~ " node", startMark_);
         }
+}
+
+unittest
+{
+    {
+        auto node = Node(42);
+        assert(node.isScalar && !node.isSequence &&
+               !node.isMapping && !node.isUserType);
+        assert(node.as!int == 42 && node.as!float == 42.0f && node.as!string == "42");
+        assert(!node.isUserType);
+    }
+
+    {
+        auto node = Node(new class{int a = 5;});
+        assert(node.isUserType);
+    }
+    {
+        auto node = Node("string");
+        assert(node.as!string == "string");
+    }
+}
+
+unittest
+{
+    with(Node([1, 2, 3]))
+    {
+        assert(!isScalar() && isSequence && !isMapping && !isUserType);
+        assert(length == 3);
+        assert(opIndex(2).as!int == 3);
+    }
+
+    // Will be emitted as a sequence (default for arrays)
+    auto seq = Node([1, 2, 3, 4, 5]);
+    // Will be emitted as a set (overriden tag)
+    auto set = Node([1, 2, 3, 4, 5], "tag:yaml.org,2002:set");
+}
+
+unittest
+{
+    int[string] aa;
+    aa["1"] = 1;
+    aa["2"] = 2;
+    with(Node(aa))
+    {
+        assert(!isScalar() && !isSequence && isMapping && !isUserType);
+        assert(length == 2);
+        assert(opIndex("2").as!int == 2);
+    }
+
+    // Will be emitted as an unordered mapping (default for mappings)
+    auto map   = Node([1 : "a", 2 : "b"]);
+    // Will be emitted as an ordered map (overriden tag)
+    auto omap  = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:omap");
+    // Will be emitted as pairs (overriden tag)
+    auto pairs = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:pairs");
+}
+
+unittest
+{
+    with(Node(["1", "2"], [1, 2]))
+    {
+        assert(!isScalar() && !isSequence && isMapping && !isUserType);
+        assert(length == 2);
+        assert(opIndex("2").as!int == 2);
+    }
+
+    // Will be emitted as an unordered mapping (default for mappings)
+    auto map   = Node([1, 2], ["a", "b"]);
+    // Will be emitted as an ordered map (overriden tag)
+    auto omap  = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:omap");
+    // Will be emitted as pairs (overriden tag)
+    auto pairs = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:pairs");
+}
+
+unittest
+{
+    auto node = Node(42);
+
+    assert(node == 42);
+    assert(node != "42");
+    assert(node != "43");
+
+    auto node2 = Node(YAMLNull());
+    assert(node2 == YAMLNull());
+}
+
+unittest
+{
+    assertThrown!NodeException(Node("42").get!int);
+    Node(YAMLNull()).get!YAMLNull;
+}
+
+unittest
+{
+    writeln("D:YAML Node opIndex unittest");
+    alias Node.Value Value;
+    alias Node.Pair Pair;
+
+    Node narray = Node([11, 12, 13, 14]);
+    Node nmap   = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
+
+    assert(narray[0].as!int == 11);
+    assert(null !is collectException(narray[42]));
+    assert(nmap["11"].as!int == 11);
+    assert(nmap["14"].as!int == 14);
+}
+unittest
+{
+    writeln("D:YAML Node opIndex unittest");
+    alias Node.Value Value;
+    alias Node.Pair Pair;
+
+    Node narray = Node([11, 12, 13, 14]);
+    Node nmap   = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
+
+    assert(narray[0].as!int == 11);
+    assert(null !is collectException(narray[42]));
+    assert(nmap["11"].as!int == 11);
+    assert(nmap["14"].as!int == 14);
+    assert(null !is collectException(nmap["42"]));
+
+    narray.add(YAMLNull());
+    nmap.add(YAMLNull(), "Nothing");
+    assert(narray[4].as!YAMLNull == YAMLNull());
+    assert(nmap[YAMLNull()].as!string == "Nothing");
+
+    assertThrown!NodeException(nmap[11]);
+    assertThrown!NodeException(nmap[14]);
+}
+
+// Unittest for opAssign().
+unittest
+{
+    auto seq = Node([1, 2, 3, 4, 5]);
+    auto assigned = seq;
+    assert(seq == assigned,
+           "Node.opAssign() doesn't produce an equivalent copy");
+}
+
+// Unittest for contains() and containsKey().
+unittest
+{
+    writeln("D:YAML Node contains/containsKey unittest");
+    auto seq = Node([1, 2, 3, 4, 5]);
+    assert(seq.contains(3));
+    assert(seq.contains(5));
+    assert(!seq.contains("5"));
+    assert(!seq.contains(6));
+    assert(!seq.contains(float.nan));
+    assertThrown!NodeException(seq.containsKey(5));
+
+    auto seq2 = Node(["1", "2"]);
+    assert(seq2.contains("1"));
+    assert(!seq2.contains(1));
+
+    auto map = Node(["1", "2", "3", "4"], [1, 2, 3, 4]);
+    assert(map.contains(1));
+    assert(!map.contains("1"));
+    assert(!map.contains(5));
+    assert(!map.contains(float.nan));
+    assert(map.containsKey("1"));
+    assert(map.containsKey("4"));
+    assert(!map.containsKey(1));
+    assert(!map.containsKey("5"));
+
+    assert(!seq.contains(YAMLNull()));
+    assert(!map.contains(YAMLNull()));
+    assert(!map.containsKey(YAMLNull()));
+    seq.add(YAMLNull());
+    map.add("Nothing", YAMLNull());
+    assert(seq.contains(YAMLNull()));
+    assert(map.contains(YAMLNull()));
+    assert(!map.containsKey(YAMLNull()));
+    map.add(YAMLNull(), "Nothing");
+    assert(map.containsKey(YAMLNull()));
+
+    auto map2 = Node([1, 2, 3, 4], [1, 2, 3, 4]);
+    assert(!map2.contains("1"));
+    assert(map2.contains(1));
+    assert(!map2.containsKey("1"));
+    assert(map2.containsKey(1));
+
+    // scalar
+    assertThrown!NodeException(Node(1).contains(4));
+    assertThrown!NodeException(Node(1).containsKey(4));
+
+    auto mapNan = Node([1.0, 2, double.nan], [1, double.nan, 5]);
+
+    assert(mapNan.contains(double.nan));
+    assert(mapNan.containsKey(double.nan));
+}
+
+unittest
+{
+    writeln("D:YAML Node opIndexAssign unittest");
+
+    with(Node([1, 2, 3, 4, 3]))
+    {
+        opIndexAssign(42, 3);
+        assert(length == 5);
+        assert(opIndex(3).as!int == 42);
+
+        opIndexAssign(YAMLNull(), 0);
+        assert(opIndex(0) == YAMLNull());
+    }
+    with(Node(["1", "2", "3"], [4, 5, 6]))
+    {
+        opIndexAssign(42, "3");
+        opIndexAssign(123, 456);
+        assert(length == 4);
+        assert(opIndex("3").as!int == 42);
+        assert(opIndex(456).as!int == 123);
+
+        opIndexAssign(43, 3);
+        //3 and "3" should be different
+        assert(length == 5);
+        assert(opIndex("3").as!int == 42);
+        assert(opIndex(3).as!int == 43);
+
+        opIndexAssign(YAMLNull(), "2");
+        assert(opIndex("2") == YAMLNull());
+    }
+}
+
+unittest
+{
+    writeln("D:YAML Node opApply unittest 1");
+
+    alias Node.Value Value;
+    alias Node.Pair Pair;
+
+    Node n1 = Node(Value(cast(long)11));
+    Node n2 = Node(Value(cast(long)12));
+    Node n3 = Node(Value(cast(long)13));
+    Node n4 = Node(Value(cast(long)14));
+    Node narray = Node([n1, n2, n3, n4]);
+
+    int[] array, array2;
+    foreach(int value; narray)
+    {
+        array ~= value;
+    }
+    foreach(Node node; narray)
+    {
+        array2 ~= node.as!int;
+    }
+    assert(array == [11, 12, 13, 14]);
+    assert(array2 == [11, 12, 13, 14]);
+}
+
+unittest
+{
+    writeln("D:YAML Node opApply unittest 2");
+
+    alias Node.Value Value;
+    alias Node.Pair Pair;
+
+    Node n1 = Node(cast(long)11);
+    Node n2 = Node(cast(long)12);
+    Node n3 = Node(cast(long)13);
+    Node n4 = Node(cast(long)14);
+
+    Node k1 = Node("11");
+    Node k2 = Node("12");
+    Node k3 = Node("13");
+    Node k4 = Node("14");
+
+    Node nmap1 = Node([Pair(k1, n1),
+                       Pair(k2, n2),
+                       Pair(k3, n3),
+                       Pair(k4, n4)]);
+
+    int[string] expected = ["11" : 11,
+                            "12" : 12,
+                            "13" : 13,
+                            "14" : 14];
+    int[string] array;
+    foreach(string key, int value; nmap1)
+    {
+        array[key] = value;
+    }
+    assert(array == expected);
+
+    Node nmap2 = Node([Pair(k1, Node(cast(long)5)),
+                       Pair(k2, Node(true)),
+                       Pair(k3, Node(cast(real)1.0)),
+                       Pair(k4, Node("yarly"))]);
+
+    foreach(string key, Node value; nmap2)
+    {
+        switch(key)
+        {
+            case "11": assert(value.as!int    == 5      ); break;
+            case "12": assert(value.as!bool   == true   ); break;
+            case "13": assert(value.as!float  == 1.0    ); break;
+            case "14": assert(value.as!string == "yarly"); break;
+            default:   assert(false);
+        }
+    }
+}
+
+unittest
+{
+    writeln("D:YAML Node add unittest 1");
+
+    with(Node([1, 2, 3, 4]))
+    {
+        add(5.0f);
+        assert(opIndex(4).as!float == 5.0f);
+    }
+}
+
+unittest
+{
+    writeln("D:YAML Node add unittest 2");
+    with(Node([1, 2], [3, 4]))
+    {
+        add(5, "6");
+        assert(opIndex(5).as!string == "6");
+    }
+}
+
+unittest
+{
+    writeln(`D:YAML Node opBinaryRight!"in" unittest`);
+    auto mapping = Node(["foo", "baz"], ["bar", "qux"]);
+    assert("bad" !in mapping && ("bad" in mapping) is null);
+    Node* foo = "foo" in mapping;
+    assert(foo !is null);
+    assert(*foo == Node("bar"));
+    assert(foo.get!string == "bar");
+    *foo = Node("newfoo");
+    assert(mapping["foo"] == Node("newfoo"));
+}
+
+unittest
+{
+    writeln("D:YAML Node remove unittest");
+    with(Node([1, 2, 3, 4, 3]))
+    {
+        remove(3);
+        assert(length == 4);
+        assert(opIndex(2).as!int == 4);
+        assert(opIndex(3).as!int == 3);
+
+        add(YAMLNull());
+        assert(length == 5);
+        remove(YAMLNull());
+        assert(length == 4);
+    }
+    with(Node(["1", "2", "3"], [4, 5, 6]))
+    {
+        remove(4);
+        assert(length == 2);
+        add("nullkey", YAMLNull());
+        assert(length == 3);
+        remove(YAMLNull());
+        assert(length == 2);
+    }
+}
+
+unittest
+{
+    writeln("D:YAML Node removeAt unittest");
+    with(Node([1, 2, 3, 4, 3]))
+    {
+        removeAt(3);
+        assertThrown!NodeException(removeAt("3"));
+        assert(length == 4);
+        assert(opIndex(3).as!int == 3);
+    }
+    with(Node(["1", "2", "3"], [4, 5, 6]))
+    {
+        // no integer 2 key, so don't remove anything
+        removeAt(2);
+        assert(length == 3);
+        removeAt("2");
+        assert(length == 2);
+        add(YAMLNull(), "nullval");
+        assert(length == 3);
+        removeAt(YAMLNull());
+        assert(length == 2);
+    }
+}
+
+unittest
+{
+    writeln("Node(42).toHash(): ", Node(42).toHash());
 }
 
 package:

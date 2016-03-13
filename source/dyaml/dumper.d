@@ -80,38 +80,6 @@ import dyaml.tagdirective;
  */
 struct Dumper
 {
-    unittest
-    {
-        auto node = Node([1, 2, 3, 4, 5]);
-        Dumper(new MemoryStream()).dump(node);
-    }
-
-    unittest
-    {
-        auto node1 = Node([1, 2, 3, 4, 5]);
-        auto node2 = Node("This document contains only one string");
-        Dumper(new MemoryStream()).dump(node1, node2);
-    }
-
-    unittest
-    {
-        import std.stream;
-        auto stream = new MemoryStream();
-        auto node = Node([1, 2, 3, 4, 5]);
-        Dumper(stream).dump(node);
-    }
-
-    unittest
-    {
-        auto node = Node([1, 2, 3, 4, 5]);
-        auto representer = new Representer();
-        auto resolver = new Resolver();
-        auto dumper = Dumper(new MemoryStream());
-        dumper.representer = representer;
-        dumper.resolver = resolver;
-        dumper.dump(node);
-    }
-
     private:
         //Resolver to resolve tags.
         Resolver resolver_;
@@ -357,4 +325,36 @@ struct Dumper
                                         ~ name_ ~ " : " ~ e.msg);
             }
         }
+}
+
+unittest
+{
+    auto node = Node([1, 2, 3, 4, 5]);
+    Dumper(new MemoryStream()).dump(node);
+}
+
+unittest
+{
+    auto node1 = Node([1, 2, 3, 4, 5]);
+    auto node2 = Node("This document contains only one string");
+    Dumper(new MemoryStream()).dump(node1, node2);
+}
+
+unittest
+{
+    import std.stream;
+    auto stream = new MemoryStream();
+    auto node = Node([1, 2, 3, 4, 5]);
+    Dumper(stream).dump(node);
+}
+
+unittest
+{
+    auto node = Node([1, 2, 3, 4, 5]);
+    auto representer = new Representer();
+    auto resolver = new Resolver();
+    auto dumper = Dumper(new MemoryStream());
+    dumper.representer = representer;
+    dumper.resolver = resolver;
+    dumper.dump(node);
 }

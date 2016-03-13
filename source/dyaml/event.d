@@ -72,17 +72,14 @@ struct Event
     EventID id = EventID.Invalid;
     ///Style of scalar event, if this is a scalar event.
     ScalarStyle scalarStyle = ScalarStyle.Invalid;
-    union
-    {
-        ///Should the tag be implicitly resolved?
-        bool implicit;
-        /**
-         * Is this document event explicit?
-         *
-         * Used if this is a DocumentStart or DocumentEnd.
-         */
-        bool explicitDocument;
-    }
+    ///Should the tag be implicitly resolved?
+    bool implicit;
+    /**
+     * Is this document event explicit?
+     *
+     * Used if this is a DocumentStart or DocumentEnd.
+     */
+    alias explicitDocument = implicit;
     ///TODO figure this out - Unknown, used by PyYAML with Scalar events.
     bool implicit_2;
     ///Encoding of the stream, if this is a StreamStart.

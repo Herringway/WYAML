@@ -162,11 +162,6 @@ struct Loader
         {
             return Loader(cast(ubyte[])data);
         }
-        ///
-        unittest
-        {
-            assert(Loader.fromString(cast(char[])"42").load().as!int == 42);
-        }
 
         /** Construct a Loader to load YAML from a buffer.
          *
@@ -397,4 +392,9 @@ unittest
         import std.stdio;
         writeln(color, " is ", value, " in HTML/CSS");
     }
+}
+
+unittest
+{
+    assert(Loader.fromString(cast(char[])"42").load().as!int == 42);
 }
