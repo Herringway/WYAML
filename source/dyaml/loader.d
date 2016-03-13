@@ -168,25 +168,6 @@ struct Loader
             assert(Loader.fromString(cast(char[])"42").load().as!int == 42);
         }
 
-        import std.stream;
-        deprecated("Loader(Stream) is deprecated. Use Loader(ubyte[]) instead.")
-        this(Stream stream) @safe
-        {
-            try
-            {
-                import dyaml.streamcompat;
-                auto streamBytes  = streamToBytesGC(stream);
-                reader_           = new Reader(streamBytes);
-                scanner_          = new Scanner(reader_);
-                parser_           = new Parser(scanner_);
-            }
-            catch(YAMLException e)
-            {
-                throw new YAMLException("Unable to open stream %s for YAML loading: %s"
-                                        .format(name_, e.msg));
-            }
-        }
-
         /** Construct a Loader to load YAML from a buffer.
          *
          * Params: yamlData = Buffer with YAML data to load. This may be e.g. a file
