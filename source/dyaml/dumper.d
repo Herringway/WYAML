@@ -12,7 +12,7 @@
 module dyaml.dumper;
 
 
-import std.stream;
+import std.range.interfaces;
 import std.typecons;
 
 import dyaml.anchor;
@@ -87,7 +87,7 @@ struct Dumper
         Representer representer_;
 
         //Stream to write to.
-        Stream stream_;
+        OutputRange!(ubyte[]) stream_;
         //True if this Dumper owns stream_ and needs to destroy it in the destructor.
         bool weOwnStream_ = false;
 
@@ -119,7 +119,7 @@ struct Dumper
         @disable int opCmp(ref Dumper);
 
         ///Construct a Dumper writing to a _stream. This is useful to e.g. write to memory.
-        this(Stream stream) @safe
+        this(OutputRange!(ubyte[]) stream) @safe
         {
             resolver_    = new Resolver();
             representer_ = new Representer();
@@ -306,24 +306,24 @@ struct Dumper
             }
         }
 }
-
+version(unittest) import std.outbuffer;
 unittest
 {
     auto node = Node([1, 2, 3, 4, 5]);
-    Dumper(new MemoryStream()).dump(node);
+    Dumper(outputRangeObject!(ubyte[])(new OutBuffer())).dump(node);
 }
 
 unittest
 {
     auto node1 = Node([1, 2, 3, 4, 5]);
     auto node2 = Node("This document contains only one string");
-    Dumper(new MemoryStream()).dump(node1, node2);
+    Dumper(outputRangeObject!(ubyte[])(new OutBuffer())).dump(node1, node2);
 }
 
 unittest
 {
     import std.stream;
-    auto stream = new MemoryStream();
+    auto stream = outputRangeObject!(ubyte[])(new OutBuffer());
     auto node = Node([1, 2, 3, 4, 5]);
     Dumper(stream).dump(node);
 }
@@ -333,7 +333,7 @@ unittest
     auto node = Node([1, 2, 3, 4, 5]);
     auto representer = new Representer();
     auto resolver = new Resolver();
-    auto dumper = Dumper(new MemoryStream());
+    auto dumper = Dumper(outputRangeObject!(ubyte[])(new OutBuffer()));
     dumper.representer = representer;
     dumper.resolver = resolver;
     dumper.dump(node);

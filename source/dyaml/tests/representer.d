@@ -12,6 +12,8 @@ version(unittest)
 
 import std.path;
 import std.exception;
+import std.outbuffer;
+import std.range;
 import std.typecons;
 
 import dyaml.tests.common;
@@ -48,21 +50,21 @@ void testRepresenterTypes(bool verbose, string codeFilename)
             }
         }
 
-        auto emitStream  = new MemoryStream;
+        auto emitStream  = new OutBuffer;
         auto representer = new Representer;
         representer.addRepresenter!TestClass(&representClass);
         representer.addRepresenter!TestStruct(&representStruct);
-        auto dumper = Dumper(emitStream);
+        auto dumper = Dumper(outputRangeObject!(ubyte[])(emitStream));
         dumper.representer = representer;
         dumper.encoding    = encoding;
         dumper.dump(expectedNodes);
 
-        output = cast(string)emitStream.data;
+        output = emitStream.toString;
         auto constructor = new Constructor;
         constructor.addConstructorMapping("!tag1", &constructClass);
         constructor.addConstructorScalar("!tag2", &constructStruct);
 
-        auto loader        = Loader(emitStream.data.dup);
+        auto loader        = Loader(emitStream.toBytes);
         loader.name        = "TEST";
         loader.constructor = constructor;
         readNodes          = loader.loadAll();

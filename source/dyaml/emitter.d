@@ -18,7 +18,6 @@ import std.conv;
 import std.exception;
 import std.format;
 import std.range;
-import std.stream;
 import std.string;
 import std.system;
 import std.typecons;
@@ -79,7 +78,7 @@ struct Emitter
             [TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:")];
 
         ///Stream to write to.
-        Stream stream_;
+        OutputRange!(ubyte[]) stream_;
         ///Encoding can be overriden by STREAM-START.
         Encoding encoding_ = Encoding.UTF_8;
 
@@ -166,10 +165,8 @@ struct Emitter
          *          indent    = Indentation width.
          *          lineBreak = Line break character/s.
          */
-        this(Stream stream, const bool canonical, const int indent, const int width,
+        this(OutputRange!(ubyte[]) stream, const bool canonical, const int indent, const int width,
              const LineBreak lineBreak) @trusted
-        in{assert(stream.writeable, "Can't emit YAML to a non-writable stream");}
-        body
         {
             states_.reserve(32);
             indents_.reserve(32);
@@ -236,23 +233,19 @@ struct Emitter
         ///Write a string to the file/stream.
         void writeString(const string str) @system
         {
-            try final switch(encoding_)
+            final switch(encoding_)
             {
                 case Encoding.UTF_8:
-                    stream_.writeExact(str.ptr, str.length * char.sizeof);
+                    stream_.put(cast(ubyte[])str);
                     break;
                 case Encoding.UTF_16:
                     const buffer = to!wstring(str);
-                    stream_.writeExact(buffer.ptr, buffer.length * wchar.sizeof);
+                    stream_.put(cast(ubyte[])buffer);
                     break;
                 case Encoding.UTF_32:
                     const buffer = to!dstring(str);
-                    stream_.writeExact(buffer.ptr, buffer.length * dchar.sizeof);
+                    stream_.put(cast(ubyte[])buffer);
                     break;
-            }
-            catch(WriteException e)
-            {
-                throw new Error("Unable to write to stream: " ~ e.msg);
             }
         }
 
@@ -423,7 +416,6 @@ struct Emitter
                 writeIndicator("...", Yes.needWhitespace);
                 writeIndent();
             }
-            stream_.flush();
             state_ = &expectDocumentStart!(No.first);
         }
 
@@ -1171,30 +1163,29 @@ struct Emitter
         ///Start the YAML stream (write the unicode byte order mark).
         void writeStreamStart() @system
         {
-            immutable(ubyte)[] bom;
+            ubyte[] bom;
             //Write BOM (always, even for UTF-8)
             final switch(encoding_)
             {
                 case Encoding.UTF_8:
-                    bom = ByteOrderMarks[BOM.UTF8];
+                    bom = [0xEF, 0xBB, 0xBF];
                     break;
                 case Encoding.UTF_16:
                     bom = std.system.endian == Endian.littleEndian
-                          ? ByteOrderMarks[BOM.UTF16LE]
-                          : ByteOrderMarks[BOM.UTF16BE];
+                          ? [0xFF, 0xFE]
+                          : [0xFE, 0xFF];
                     break;
                 case Encoding.UTF_32:
                     bom = std.system.endian == Endian.littleEndian
-                          ? ByteOrderMarks[BOM.UTF32LE]
-                          : ByteOrderMarks[BOM.UTF32BE];
+                          ? [0xFF, 0xFE, 0x00, 0x00]
+                          : [0x00, 0x00, 0xFE, 0xFF];
                     break;
             }
-
-            enforce(stream_.write(bom) == bom.length, new Error("Unable to write to stream"));
+            stream_.put(bom);
         }
 
         ///End the YAML stream.
-        void writeStreamEnd() @system {stream_.flush();}
+        void writeStreamEnd() @system {}
 
         ///Write an indicator (e.g. ":", "[", ">", etc.).
         void writeIndicator(const string indicator,

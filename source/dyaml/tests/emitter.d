@@ -12,6 +12,7 @@ version(unittest)
 
 import std.algorithm;
 import std.file;
+import std.outbuffer;
 import std.range;
 import std.typecons;
 
@@ -83,17 +84,17 @@ void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilena
     //Must exist due to Anchor, Tags reference counts.
     auto loader = Loader(dataFilename);
     auto events = cast(Event[])loader.parse();
-    auto emitStream = new MemoryStream;
-    Dumper(emitStream).emit(events);
+    auto emitStream = new OutBuffer;
+    Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(events);
 
     if(verbose)
     {
         writeln(dataFilename);
         writeln("ORIGINAL:\n", readText(dataFilename));
-        writeln("OUTPUT:\n", cast(string)emitStream.data);
+        writeln("OUTPUT:\n", emitStream.toString);
     }
 
-    auto loader2        = Loader(emitStream.data.dup);
+    auto loader2        = Loader(emitStream.toBytes());
     loader2.name        = "TEST";
     loader2.constructor = new Constructor;
     loader2.resolver    = new Resolver;
@@ -114,16 +115,16 @@ void testEmitterOnCanonical(bool verbose, string canonicalFilename)
     auto events = cast(Event[])loader.parse();
     foreach(canonical; [false, true])
     {
-        auto emitStream = new MemoryStream;
-        auto dumper = Dumper(emitStream);
+        auto emitStream = new OutBuffer;
+        auto dumper = Dumper(outputRangeObject!(ubyte[])(emitStream));
         dumper.canonical = canonical;
         dumper.emit(events);
         if(verbose)
         {
             writeln("OUTPUT (canonical=", canonical, "):\n",
-                    cast(string)emitStream.data);
+                    emitStream.toString());
         }
-        auto loader2        = Loader(emitStream.data.dup);
+        auto loader2        = Loader(emitStream.toBytes());
         loader2.name        = "TEST";
         loader2.constructor = new Constructor;
         loader2.resolver    = new Resolver;
@@ -174,15 +175,15 @@ void testEmitterStyles(bool verbose, string dataFilename, string canonicalFilena
                     }
                     styledEvents ~= event;
                 }
-                auto emitStream = new MemoryStream;
-                Dumper(emitStream).emit(styledEvents);
+                auto emitStream = new OutBuffer;
+                Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(styledEvents);
                 if(verbose)
                 {
                     writeln("OUTPUT (", filename, ", ", to!string(flowStyle), ", ",
                             to!string(style), ")");
-                    writeln(emitStream.data);
+                    writeln(emitStream.toString);
                 }
-                auto loader2        = Loader(emitStream.data.dup);
+                auto loader2        = Loader(emitStream.toBytes());
                 loader2.name        = "TEST";
                 loader2.constructor = new Constructor;
                 loader2.resolver    = new Resolver;

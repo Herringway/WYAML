@@ -26,12 +26,21 @@ alias std.system.endian endian;
 /// Returns: UTF-16 byte order mark.
 wchar bom16(bool wrong = false) pure
 {
-    wchar little  = *(cast(wchar*)ByteOrderMarks[BOM.UTF16LE]);
-    wchar big     = *(cast(wchar*)ByteOrderMarks[BOM.UTF16BE]);
+    wchar little  = cast(wchar)0xFEFF;
+    wchar big     = cast(wchar)0xFFFE;
     if(!wrong){return endian == Endian.littleEndian ? little : big;}
     return endian == Endian.littleEndian ? big : little;
 }
-
+unittest {
+    import std.string;
+    import std.bitmanip;
+    auto val = bom16();
+    assert(bom16(true) == val.swapEndian);
+    if (endian == Endian.bigEndian)
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0xFE, 0xFF]);
+    else
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0xFF, 0xFE]);
+}
 /// Get an UTF-32 byte order mark.
 ///
 /// Params:  wrong = Get the incorrect BOM for this system.
@@ -39,10 +48,20 @@ wchar bom16(bool wrong = false) pure
 /// Returns: UTF-32 byte order mark.
 dchar bom32(bool wrong = false) pure
 {
-    dchar little = *(cast(dchar*)ByteOrderMarks[BOM.UTF32LE]);
-    dchar big    = *(cast(dchar*)ByteOrderMarks[BOM.UTF32BE]);
+    dchar little = cast(dchar)0x0000FEFF;
+    dchar big    = cast(dchar)0xFFFE0000;
     if(!wrong){return endian == Endian.littleEndian ? little : big;}
     return endian == Endian.littleEndian ? big : little;
+}
+unittest {
+    import std.string;
+    import std.bitmanip;
+    auto val = bom32();
+    assert(bom32(true) == val.swapEndian);
+    if (endian == Endian.bigEndian)
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0x00, 0x00, 0xFE, 0xFF]);
+    else
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0xFF, 0xFE, 0x00, 0x00]);
 }
 
 /// Unicode input unittest. Tests various encodings.

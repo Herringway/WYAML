@@ -11,8 +11,7 @@ version(unittest)
 
 public import std.conv;
 public import std.stdio;
-public import std.stream;
-public import dyaml.all;
+public import dyaml;
 
 import core.exception;
 import std.algorithm;
@@ -23,8 +22,6 @@ import std.path;
 import std.typecons;
 
 package:
-
-alias std.stream.File File;
 
 /**
  * Run an unittest.

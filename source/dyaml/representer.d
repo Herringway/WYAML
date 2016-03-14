@@ -679,12 +679,12 @@ version(unittest) {
 }
 unittest
 {
-    import std.stream;
+    import std.outbuffer, std.range;
     foreach(r; [&representMyStruct,
                 &representMyStructSeq,
                 &representMyStructMap])
     {
-        auto dumper = Dumper(new MemoryStream());
+        auto dumper = Dumper(outputRangeObject!(ubyte[])(new OutBuffer()));
         auto representer = new Representer;
         representer.addRepresenter!MyStruct(r);
         dumper.representer = representer;
@@ -694,8 +694,8 @@ unittest
 
 unittest
 {
-    import std.stream;
-    auto dumper = Dumper(new MemoryStream());
+    import std.outbuffer, std.range;
+    auto dumper = Dumper(outputRangeObject!(ubyte[])(new OutBuffer()));
     auto representer = new Representer;
     representer.addRepresenter!MyClass(&representMyClass);
     dumper.representer = representer;
