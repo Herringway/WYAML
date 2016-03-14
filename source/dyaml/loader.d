@@ -135,8 +135,9 @@ struct Loader
             }
             catch(FileException e)
             {
-                throw new YAMLException("Unable to open file %s for YAML loading: %s"
-                                        .format(filename, e.msg));
+                e.msg = "Unable to open file %s for YAML loading: %s"
+                                        .format(filename, e.msg);
+                throw e;
             }
         }
 
@@ -190,8 +191,9 @@ struct Loader
             }
             catch(YAMLException e)
             {
-                throw new YAMLException("Unable to open %s for YAML loading: %s"
-                                        .format(name_, e.msg));
+                e.msg = "Unable to open %s for YAML loading: %s"
+                                        .format(name_, e.msg);
+                throw e;
             }
         }
 
