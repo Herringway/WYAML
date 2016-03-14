@@ -118,26 +118,6 @@ struct Dumper
         @disable bool opEquals(ref Dumper);
         @disable int opCmp(ref Dumper);
 
-        /**
-         * Construct a Dumper writing to a file.
-         *
-         * Params: filename = File name to write to.
-         *
-         * Throws: YAMLException if the file can not be dumped to (e.g. cannot be opened).
-         */
-        this(string filename) @trusted
-        {
-            name_ = filename;
-            try{this(new File(filename, FileMode.OutNew));}
-            catch(StreamException e)
-            {
-                throw new YAMLException("Unable to open file " ~ filename ~
-                                        " for YAML dumping: " ~ e.msg);
-            }
-            // need to destroy the File we constructed.
-            weOwnStream_ = true;
-        }
-
         ///Construct a Dumper writing to a _stream. This is useful to e.g. write to memory.
         this(Stream stream) @safe
         {
