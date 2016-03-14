@@ -12,7 +12,7 @@
 module dyaml.dumper;
 
 
-import std.range.interfaces;
+import std.range;
 import std.typecons;
 
 import dyaml.anchor;
@@ -28,6 +28,10 @@ import dyaml.serializer;
 import dyaml.tagdirective;
 
 
+
+auto dumper(T)(T range) if(isOutputRange!(T, ubyte[])) {
+    return Dumper(outputRangeObject!(ubyte[])(range));
+}
 /**
  * Dumps YAML documents to files or streams.
  *
