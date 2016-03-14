@@ -13,6 +13,7 @@ version(unittest)
 import std.array;
 import std.file;
 import std.system;
+import std.bitmanip;
 
 import dyaml.tests.common;
 
@@ -26,14 +27,13 @@ alias std.system.endian endian;
 /// Returns: UTF-16 byte order mark.
 wchar bom16(bool wrong = false) pure
 {
-    wchar little  = cast(wchar)0xFEFF;
-    wchar big     = cast(wchar)0xFFFE;
-    if(!wrong){return endian == Endian.littleEndian ? little : big;}
-    return endian == Endian.littleEndian ? big : little;
+    wchar bom = cast(wchar)0xFFFE;
+    if (!wrong)
+        return bom.swapEndian();
+    return bom;
 }
 unittest {
     import std.string;
-    import std.bitmanip;
     auto val = bom16();
     assert(bom16(true) == val.swapEndian);
     if (endian == Endian.bigEndian)
@@ -48,14 +48,13 @@ unittest {
 /// Returns: UTF-32 byte order mark.
 dchar bom32(bool wrong = false) pure
 {
-    dchar little = cast(dchar)0x0000FEFF;
-    dchar big    = cast(dchar)0xFFFE0000;
-    if(!wrong){return endian == Endian.littleEndian ? little : big;}
-    return endian == Endian.littleEndian ? big : little;
+    dchar bom = cast(dchar)0xFFFE0000;
+    if (!wrong)
+        return bom.swapEndian();
+    return bom;
 }
 unittest {
     import std.string;
-    import std.bitmanip;
     auto val = bom32();
     assert(bom32(true) == val.swapEndian);
     if (endian == Endian.bigEndian)
