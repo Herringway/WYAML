@@ -251,8 +251,9 @@ struct Loader
             }
             catch(YAMLException e)
             {
-                throw new YAMLException("Unable to load YAML from %s : %s"
-                                        .format(name_, e.msg));
+                e.msg = "Unable to load YAML from %s : %s"
+                                        .format(name_, e.msg);
+                throw e;
             }
         }
 
@@ -312,8 +313,9 @@ struct Loader
             }
             catch(YAMLException e)
             {
-                throw new YAMLException("Unable to load YAML from %s : %s "
-                                        .format(name_, e.msg));
+                e.msg = "Unable to load YAML from %s : %s "
+                                        .format(name_, e.msg);
+                throw e;
             }
         }
 
@@ -333,8 +335,9 @@ struct Loader
             }
             catch(YAMLException e)
             {
-                throw new YAMLException("Unable to scan YAML from stream " ~
-                                        name_ ~ " : " ~ e.msg);
+                e.msg = "Unable to scan YAML from stream " ~
+                                        name_ ~ " : " ~ e.msg;
+                throw e;
             }
         }
 
@@ -347,8 +350,9 @@ struct Loader
             }
             catch(YAMLException e)
             {
-                throw new YAMLException("Unable to scan YAML from stream " ~
-                                        name_ ~ " : " ~ e.msg);
+                e.msg = "Unable to scan YAML from stream " ~
+                                        name_ ~ " : " ~ e.msg;
+                throw e;
             }
         }
 
@@ -367,8 +371,9 @@ struct Loader
             }
             catch(YAMLException e)
             {
-                throw new YAMLException("Unable to parse YAML from stream %s : %s "
-                                        .format(name_, e.msg));
+                e.msg = "Unable to parse YAML from stream %s : %s "
+                                        .format(name_, e.msg);
+                throw e;
             }
         }
 
