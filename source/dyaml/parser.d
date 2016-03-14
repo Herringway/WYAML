@@ -102,8 +102,6 @@ class ParserException : MarkedYAMLException
     mixin MarkedExceptionCtors;
 }
 
-private alias ParserException Error;
-
 /// Generates events from tokens provided by a Scanner.
 ///
 /// While Parser receives tokens with non-const character slices, the events it
@@ -294,7 +292,7 @@ final class Parser
 
                 auto tagDirectives = processDirectives();
                 enforce(scanner_.checkToken(TokenID.DocumentStart),
-                        new Error("Expected document start but found " ~
+                        new ParserException("Expected document start but found " ~
                                   scanner_.peekToken().idString,
                                   scanner_.peekToken().startMark));
 
@@ -353,10 +351,10 @@ final class Parser
                 if(token.directive == DirectiveType.YAML)
                 {
                     enforce(YAMLVersion_ is null,
-                            new Error("Duplicate YAML directive", token.startMark));
+                            new ParserException("Duplicate YAML directive", token.startMark));
                     const minor = value.split(".")[0];
                     enforce(minor == "1",
-                            new Error("Incompatible document (version 1.x is required)",
+                            new ParserException("Incompatible document (version 1.x is required)",
                                       token.startMark));
                     YAMLVersion_ = cast(string)value;
                 }
@@ -368,7 +366,7 @@ final class Parser
                     {
                         // handle
                         const h = pair.handle;
-                        enforce(h != handle, new Error("Duplicate tag handle: " ~ handle,
+                        enforce(h != handle, new ParserException("Duplicate tag handle: " ~ handle,
                                                        token.startMark));
                     }
                     tagDirectives_ ~=
@@ -530,7 +528,7 @@ final class Parser
             }
 
             const token = scanner_.peekToken();
-            throw new Error("While parsing a " ~ (block ? "block" : "flow") ~ " node",
+            throw new ParserException("While parsing a " ~ (block ? "block" : "flow") ~ " node",
                             startMark, "expected node content, but found: "
                             ~ token.idString, token.startMark);
         }
@@ -642,7 +640,7 @@ final class Parser
                 }
                 //handle must be in tagDirectives_
                 enforce(replacement !is null,
-                        new Error("While parsing a node", startMark,
+                        new ParserException("While parsing a node", startMark,
                                   "found undefined tag handle: " ~ handle, tagMark));
                 return replacement ~ suffix;
             }
@@ -677,7 +675,7 @@ final class Parser
             if(!scanner_.checkToken(TokenID.BlockEnd))
             {
                 const token = scanner_.peekToken();
-                throw new Error("While parsing a block collection", marks_.back,
+                throw new ParserException("While parsing a block collection", marks_.back,
                                 "expected block end, but found " ~ token.idString,
                                 token.startMark);
             }
@@ -742,7 +740,7 @@ final class Parser
             if(!scanner_.checkToken(TokenID.BlockEnd))
             {
                 const token = scanner_.peekToken();
-                throw new Error("While parsing a block mapping", marks_.back,
+                throw new ParserException("While parsing a block mapping", marks_.back,
                                 "expected block end, but found: " ~ token.idString,
                                 token.startMark);
             }
@@ -803,7 +801,7 @@ final class Parser
                     else
                     {
                         const token = scanner_.peekToken();
-                        throw new Error("While parsing a flow sequence", marks_.back,
+                        throw new ParserException("While parsing a flow sequence", marks_.back,
                                         "expected ',' or ']', but got: " ~
                                         token.idString, token.startMark);
                     }
@@ -911,7 +909,7 @@ final class Parser
                     else
                     {
                         const token = scanner_.peekToken();
-                        throw new Error("While parsing a flow mapping", marks_.back,
+                        throw new ParserException("While parsing a flow mapping", marks_.back,
                                         "expected ',' or '}', but got: " ~
                                         token.idString, token.startMark);
                     }

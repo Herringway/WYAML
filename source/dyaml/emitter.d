@@ -51,8 +51,6 @@ class EmitterException : YAMLException
     mixin ExceptionCtors;
 }
 
-private alias EmitterException Error;
-
 //Stores results of analysis of a scalar, determining e.g. what scalar style to use.
 align(4) struct ScalarAnalysis
 {
@@ -317,7 +315,7 @@ struct Emitter
         bool eventTypeIs(in EventID id) const pure @trusted
         {
             enforce(!event_.isNull,
-                    new Error("Expected an event, but no event is available."));
+                    new EmitterException("Expected an event, but no event is available."));
             return event_.id == id;
         }
 
@@ -331,7 +329,7 @@ struct Emitter
         void expectStreamStart() @trusted
         {
             enforce(eventTypeIs(EventID.StreamStart),
-                    new Error("Expected StreamStart, but got " ~ event_.idString));
+                    new EmitterException("Expected StreamStart, but got " ~ event_.idString));
 
             encoding_ = event_.encoding;
             writeStreamStart();
@@ -341,7 +339,7 @@ struct Emitter
         ///Expect nothing, throwing if we still have something.
         void expectNothing() const @trusted
         {
-            throw new Error("Expected nothing, but got " ~ event_.idString);
+            throw new EmitterException("Expected nothing, but got " ~ event_.idString);
         }
 
         //Document handlers.
@@ -350,7 +348,7 @@ struct Emitter
         void expectDocumentStart(Flag!"first" first)() @trusted
         {
             enforce(eventTypeIs(EventID.DocumentStart) || eventTypeIs(EventID.StreamEnd),
-                    new Error("Expected DocumentStart or StreamEnd, but got "
+                    new EmitterException("Expected DocumentStart or StreamEnd, but got "
                               ~ event_.idString));
 
             if(event_.id == EventID.DocumentStart)
@@ -417,7 +415,7 @@ struct Emitter
         void expectDocumentEnd() @trusted
         {
             enforce(eventTypeIs(EventID.DocumentEnd),
-                    new Error("Expected DocumentEnd, but got " ~ event_.idString));
+                    new EmitterException("Expected DocumentEnd, but got " ~ event_.idString));
 
             writeIndent();
             if(event_.explicitDocument)
@@ -490,14 +488,14 @@ struct Emitter
                      }
                      break;
                 default:
-                     throw new Error("Expected Alias, Scalar, SequenceStart or "
+                     throw new EmitterException("Expected Alias, Scalar, SequenceStart or "
                                      "MappingStart, but got: " ~ event_.idString);
             }
         }
         ///Handle an alias.
         void expectAlias() @trusted
         {
-            enforce(!event_.anchor.isNull(), new Error("Anchor is not specified for alias"));
+            enforce(!event_.anchor.isNull(), new EmitterException("Anchor is not specified for alias"));
             processAnchor("*");
             state_ = popState();
         }
@@ -824,7 +822,7 @@ struct Emitter
                 return;
             }
 
-            enforce(!tag.isNull(), new Error("Tag is not specified"));
+            enforce(!tag.isNull(), new EmitterException("Tag is not specified"));
             if(preparedTag_ is null){preparedTag_ = prepareTag(tag);}
             if(preparedTag_ !is null && preparedTag_ != "")
             {
@@ -880,7 +878,7 @@ struct Emitter
         static string prepareVersion(const string YAMLVersion) @trusted
         {
             enforce(YAMLVersion.split(".")[0] == "1",
-                    new Error("Unsupported YAML version: " ~ YAMLVersion));
+                    new EmitterException("Unsupported YAML version: " ~ YAMLVersion));
             return YAMLVersion;
         }
 
@@ -900,12 +898,12 @@ struct Emitter
         static string prepareTagHandle(const string handle) @trusted
         {
             enforce(handle !is null && handle != "",
-                    new Error("Tag handle must not be empty"));
+                    new EmitterException("Tag handle must not be empty"));
 
             if(handle.length > 1) foreach(const dchar c; handle[1 .. $ - 1])
             {
                 enforce(isAlphaNum(c) || "-_"d.canFind(c),
-                        new Error("Invalid character: " ~ to!string(c)  ~
+                        new EmitterException("Invalid character: " ~ to!string(c)  ~
                                   " in tag handle " ~ handle));
             }
             return handle;
@@ -915,7 +913,7 @@ struct Emitter
         static string prepareTagPrefix(const string prefix) @trusted
         {
             enforce(prefix !is null && prefix != "",
-                    new Error("Tag prefix must not be empty"));
+                    new EmitterException("Tag prefix must not be empty"));
 
             auto appender = appender!string();
             const offset = prefix[0] == '!' ? 1 : 0;
@@ -945,7 +943,7 @@ struct Emitter
         ///Prepare tag for output.
         string prepareTag(in Tag tag) @trusted
         {
-            enforce(!tag.isNull(), new Error("Tag must not be empty"));
+            enforce(!tag.isNull(), new EmitterException("Tag must not be empty"));
 
             string tagString = tag.get;
             if(tagString == "!"){return tagString;}
@@ -993,12 +991,12 @@ struct Emitter
         static string prepareAnchor(const Anchor anchor) @trusted
         {
             enforce(!anchor.isNull() && anchor.get != "",
-                    new Error("Anchor must not be empty"));
+                    new EmitterException("Anchor must not be empty"));
             const str = anchor.get;
             foreach(const dchar c; str)
             {
                 enforce(isAlphaNum(c) || "-_"d.canFind(c),
-                        new Error("Invalid character: " ~ to!string(c) ~ " in anchor: " ~ str));
+                        new EmitterException("Invalid character: " ~ to!string(c) ~ " in anchor: " ~ str));
             }
             return str;
         }

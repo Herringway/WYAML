@@ -47,8 +47,6 @@ package class ConstructorException : YAMLException
     }
 }
 
-private alias ConstructorException Error;
-
 /** Constructs YAML values.
  *
  * Each YAML scalar, sequence or mapping has a tag specifying its data type.
@@ -314,7 +312,7 @@ final class Constructor
                         is(T == Node.Pair[]) ? "mapping"  :
                                                "ERROR";
             enforce((tag in *delegates!T) !is null,
-                    new Error("No constructor function from " ~ type ~
+                    new ConstructorException("No constructor function from " ~ type ~
                               " for tag " ~ tag.get(), start, end));
 
             Node node = Node(value);
@@ -334,7 +332,7 @@ final class Constructor
             }
             catch(Exception e)
             {
-                throw new Error("Error constructing " ~ typeid(T).toString()
+                throw new ConstructorException("Error constructing " ~ typeid(T).toString()
                                 ~ ":\n" ~ e.msg, start, end);
             }
         }
