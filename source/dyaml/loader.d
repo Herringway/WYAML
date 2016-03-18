@@ -9,7 +9,6 @@ module dyaml.loader;
 
 
 import std.exception;
-import std.file;
 import std.string;
 
 import dyaml.composer;
@@ -119,50 +118,6 @@ struct Loader
         @disable this();
         @disable int opCmp(ref Loader);
         @disable bool opEquals(ref Loader);
-
-        /** Construct a Loader to load YAML from a file.
-         *
-         * Params:  filename = Name of the file to load from.
-         *
-         * Throws:  YAMLException if the file could not be opened or read.
-         */
-        this(string filename) @trusted
-        {
-            name_ = filename;
-            try
-            {
-                this(std.file.read(filename));
-            }
-            catch(FileException e)
-            {
-                e.msg = "Unable to open file %s for YAML loading: %s"
-                                        .format(filename, e.msg);
-                throw e;
-            }
-        }
-
-        deprecated("Loader.fromString(string) is deprecated. Use Loader.fromString(char[]) instead.")
-        static Loader fromString(string data)
-        {
-            return Loader(cast(ubyte[])data.dup);
-        }
-
-        /** Construct a Loader to load YAML from a string (char []).
-         *
-         * Params:  data = String to load YAML from. $(B will) be overwritten during
-         *                 parsing as D:YAML reuses memory. Use data.dup if you don't
-         *                 want to modify the original string.
-         *
-         * Returns: Loader loading YAML from given string.
-         *
-         * Throws:
-         *
-         * YAMLException if data could not be read (e.g. a decoding error)
-         */
-        static Loader fromString(char[] data) @safe
-        {
-            return Loader(cast(ubyte[])data);
-        }
 
         /** Construct a Loader to load YAML from a buffer.
          *
@@ -392,7 +347,7 @@ unittest
                         "green: '#00ff00'\n"
                         "blue:  '#0000ff'".dup;
 
-    auto colors = Loader.fromString(yaml_input).load();
+    auto colors = Loader(yaml_input).load();
 
     foreach(string color, string value; colors)
     {
@@ -403,5 +358,5 @@ unittest
 
 unittest
 {
-    assert(Loader.fromString(cast(char[])"42").load().as!int == 42);
+    assert(Loader(cast(char[])"42").load().as!int == 42);
 }

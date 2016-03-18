@@ -38,7 +38,7 @@ void testImplicitResolver(bool verbose, string dataFilename, string detectFilena
     }
 
     correctTag = readText(detectFilename).strip();
-    node = Loader(dataFilename).load();
+    node = Loader(read(dataFilename)).load();
     assert(node.isSequence);
     foreach(ref Node scalar; node)
     {

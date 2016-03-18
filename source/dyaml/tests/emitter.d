@@ -82,7 +82,7 @@ bool compareEvents(Event[] events1, Event[] events2)
 void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilename)
 {
     //Must exist due to Anchor, Tags reference counts.
-    auto loader = Loader(dataFilename);
+    auto loader = Loader(read(dataFilename));
     auto events = cast(Event[])loader.parse();
     auto emitStream = new OutBuffer;
     Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(events);
@@ -111,7 +111,7 @@ void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilena
 void testEmitterOnCanonical(bool verbose, string canonicalFilename)
 {
     //Must exist due to Anchor, Tags reference counts.
-    auto loader = Loader(canonicalFilename);
+    auto loader = Loader(read(canonicalFilename));
     auto events = cast(Event[])loader.parse();
     foreach(canonical; [false, true])
     {
@@ -146,7 +146,7 @@ void testEmitterStyles(bool verbose, string dataFilename, string canonicalFilena
     foreach(filename; [dataFilename, canonicalFilename])
     {
         //must exist due to Anchor, Tags reference counts
-        auto loader = Loader(canonicalFilename);
+        auto loader = Loader(read(canonicalFilename));
         auto events = cast(Event[])loader.parse();
         foreach(flowStyle; [CollectionStyle.Block, CollectionStyle.Flow])
         {

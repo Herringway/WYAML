@@ -60,7 +60,7 @@ void testLoaderErrorString(bool verbose, string errorFilename)
 ///          errorFilename = File name to read from.
 void testLoaderErrorFilename(bool verbose, string errorFilename)
 {
-    try { auto nodes = Loader(errorFilename).loadAll(); }
+    try { auto nodes = Loader(read(errorFilename)).loadAll(); }
     catch(YAMLException e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }
@@ -76,7 +76,7 @@ void testLoaderErrorFilename(bool verbose, string errorFilename)
 ///          errorFilename = File name to read from.
 void testLoaderErrorSingle(bool verbose, string errorFilename)
 {
-    try { auto nodes = Loader(errorFilename).load(); }
+    try { auto nodes = Loader(read(errorFilename)).load(); }
     catch(YAMLException e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }

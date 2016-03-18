@@ -15,6 +15,7 @@ import std.exception;
 import std.path;
 import std.string;
 import std.typecons;
+import std.file;
 
 import dyaml.tag;
 import dyaml.tests.common;
@@ -401,7 +402,7 @@ void testConstructor(bool verbose, string dataFilename, string codeDummy)
     constructor.addConstructorMapping("!tag1", &constructClass);
     constructor.addConstructorScalar("!tag2", &constructStruct);
 
-    auto loader        = Loader(dataFilename);
+    auto loader        = Loader(read(dataFilename));
     loader.constructor = constructor;
     loader.resolver    = new Resolver;
 
