@@ -23,7 +23,6 @@ import std.utf;
 
 import tinyendian;
 
-import dyaml.fastcharsearch;
 import dyaml.encoding;
 import dyaml.exception;
 import dyaml.nogcutil;
@@ -303,8 +302,6 @@ pure nothrow @nogc:
         /// Params:  length = Number of characters to move position forward.
         void forward(size_t length) @safe
         {
-            mixin FastCharSearch!"\n\u0085\u2028\u2029"d search;
-
             while(length > 0)
             {
                 auto asciiToTake = min(upcomingASCII_, length);
@@ -341,7 +338,7 @@ pure nothrow @nogc:
                 const c = decodeValidUTF8NoGC(buffer_, bufferOffset_);
 
                 // New line. (can compare with '\n' without decoding since it's ASCII)
-                if(search.canFind(c) || (c == '\r' && buffer_[bufferOffset_] != '\n'))
+                if(c.among('\n', '\u0085', '\u2028', '\u2029') || (c == '\r' && buffer_[bufferOffset_] != '\n'))
                 {
                     ++line_;
                     column_ = 0;
@@ -379,7 +376,6 @@ pure nothrow @nogc:
             }
 
             // UTF-8
-            mixin FastCharSearch!"\n\u0085\u2028\u2029"d search;
             assert(bufferOffset_ < buffer_.length,
                    "Attempted to decode past the end of YAML buffer");
             assert(buffer_[bufferOffset_] >= 0x80,
@@ -388,7 +384,7 @@ pure nothrow @nogc:
             const c = decodeValidUTF8NoGC(buffer_, bufferOffset_);
 
             // New line. (can compare with '\n' without decoding since it's ASCII)
-            if(search.canFind(c) || (c == '\r' && buffer_[bufferOffset_] != '\n'))
+            if(c.among('\n', '\u0085', '\u2028', '\u2029') || (c == '\r' && buffer_[bufferOffset_] != '\n'))
             {
                 ++line_;
                 column_ = 0;

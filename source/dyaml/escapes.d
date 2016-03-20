@@ -7,7 +7,7 @@
 
 module dyaml.escapes;
 
-
+private import std.meta;
 package:
 
 ///Translation table from YAML escapes to dchars.
@@ -17,12 +17,14 @@ immutable dchar[dchar] toEscapes;
 // ///Translation table from prefixes of escaped hexadecimal format characters to their lengths.
 // immutable uint[dchar]  escapeHexCodes;
 
+alias escapeSeqs = AliasSeq!('0', 'a', 'b', 't', '\t', 'n', 'v', 'f', 'r', 'e', ' ',
+                             '\"', '\\', 'N', '_', 'L', 'P');
 /// All YAML escapes.
-immutable dchar[] escapes = ['0', 'a', 'b', 't', '\t', 'n', 'v', 'f', 'r', 'e', ' ',
-                             '\"', '\\', 'N', '_', 'L', 'P'];
+immutable dchar[] escapes = [escapeSeqs];
 
+alias escapeHexSeq = AliasSeq!('x', 'u', 'U');
 /// YAML hex codes specifying the length of the hex number.
-immutable dchar[] escapeHexCodeList = ['x', 'u', 'U'];
+immutable dchar[] escapeHexCodeList = [escapeHexSeq];
 
 /// Covert a YAML escape to a dchar.
 ///
