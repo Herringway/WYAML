@@ -12,25 +12,25 @@ version(unittest)
 
 import dyaml.tests.common;
 import dyaml.reader;
+import std.algorithm;
 
 
 // Try reading entire file through Reader, expecting an error (the file is invalid).
 //
 // Params:  verbose = Print verbose output?
 //          data    = Stream to read.
-void runReader(const bool verbose, void[] fileData)
+void runReader(const bool verbose, ubyte[] fileData)
 {
     try
     {
         auto reader = new Reader(cast(ubyte[])fileData);
         while(reader.peek() != '\0') { reader.forward(); }
+        assert(false, "Expected an exception");
     }
     catch(ReaderException e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }
-        return;
     }
-    assert(false, "Expected an exception");
 }
 
 
@@ -41,7 +41,7 @@ void runReader(const bool verbose, void[] fileData)
 void testStreamError(bool verbose, string errorFilename)
 {
     import std.file;
-    runReader(verbose, std.file.read(errorFilename));
+    runReader(verbose, cast(ubyte[])std.file.read(errorFilename));
 }
 
 unittest

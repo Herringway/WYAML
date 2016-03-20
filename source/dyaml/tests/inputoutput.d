@@ -90,18 +90,20 @@ void testUnicodeInput(bool verbose, string unicodeFilename)
 void testUnicodeInputErrors(bool verbose, string unicodeFilename)
 {
     string data = readText(unicodeFilename);
-    foreach(buffer; [cast(void[])(data.to!(wchar[])),
-                     cast(void[])(data.to!(dchar[])),
-                     cast(void[])(bom16(true) ~ data.to!(wchar[])),
-                     cast(void[])(bom32(true) ~ data.to!(dchar[]))])
+    foreach(buffer; [cast(ubyte[])(data.to!(wchar[])),
+                     cast(ubyte[])(data.to!(dchar[])),
+                     cast(ubyte[])(bom16(true) ~ data.to!(wchar[])),
+                     cast(ubyte[])(bom32(true) ~ data.to!(dchar[]))])
     {
-        try { Loader(buffer).load(); }
+        try {
+            Loader(buffer).load();
+            assert(false, "Expected an exception");
+        }
         catch(YAMLException e)
         {
             if(verbose) { writeln(typeid(e).toString(), "\n", e); }
             continue;
         }
-        assert(false, "Expected an exception");
     }
 }
 
