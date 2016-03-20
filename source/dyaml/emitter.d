@@ -29,7 +29,6 @@ import dyaml.encoding;
 import dyaml.escapes;
 import dyaml.event;
 import dyaml.exception;
-import dyaml.flags;
 import dyaml.linebreak;
 import dyaml.queue;
 import dyaml.style;
@@ -49,7 +48,17 @@ class EmitterException : YAMLException
 {
     mixin ExceptionCtors;
 }
-
+enum ScalarFlags {
+    none = 0,
+    empty = 1<<0,
+    multiline = 1<<1,
+    allowFlowPlain = 1<<2,
+    allowBlockPlain = 1<<3,
+    allowSingleQuoted = 1<<4,
+    allowDoubleQuoted = 1<<5,
+    allowBlock = 1<<6,
+    isNull = 1<<7
+}
 //Stores results of analysis of a scalar, determining e.g. what scalar style to use.
 align(4) struct ScalarAnalysis
 {
@@ -57,8 +66,7 @@ align(4) struct ScalarAnalysis
     string scalar;
 
     ///Analysis results.
-    Flags!("empty", "multiline", "allowFlowPlain", "allowBlockPlain",
-           "allowSingleQuoted", "allowDoubleQuoted", "allowBlock", "isNull") flags;
+    BitFlags!ScalarFlags flags;
 }
 
 alias unicodeNewLines = AliasSeq!('\u0085', '\u2028', '\u2029');
@@ -178,7 +186,7 @@ struct Emitter
             if(width > bestIndent_ * 2)  {bestWidth_ = width;}
             bestLineBreak_ = lineBreak;
 
-            analysis_.flags.isNull = true;
+            analysis_.flags |= ScalarFlags.isNull;
         }
 
         ///Destroy the emitter.
@@ -724,14 +732,14 @@ struct Emitter
 
             if(scalar)
             {
-                if(analysis_.flags.isNull){analysis_ = analyzeScalar(event_.value);}
+                if(analysis_.flags & ScalarFlags.isNull){analysis_ = analyzeScalar(event_.value);}
                 length += analysis_.scalar.length;
             }
 
             if(length >= 128){return false;}
 
             return id == EventID.Alias ||
-                   (scalar && !analysis_.flags.empty && !analysis_.flags.multiline) ||
+                   (scalar && !(analysis_.flags & ScalarFlags.empty) && !(analysis_.flags & ScalarFlags.multiline)) ||
                    checkEmptySequence() ||
                    checkEmptyMapping();
         }
@@ -739,7 +747,7 @@ struct Emitter
         ///Process and write a scalar.
         void processScalar() @trusted
         {
-            if(analysis_.flags.isNull){analysis_ = analyzeScalar(event_.value);}
+            if(analysis_.flags & ScalarFlags.isNull){analysis_ = analyzeScalar(event_.value);}
             if(style_ == ScalarStyle.Invalid)
             {
                 style_ = chooseScalarStyle();
@@ -762,7 +770,7 @@ struct Emitter
                 case ScalarStyle.Literal:      writeLiteral();      break;
                 case ScalarStyle.Plain:        writePlain();        break;
             }
-            analysis_.flags.isNull = true;
+            analysis_.flags |= ScalarFlags.isNull;
             style_ = ScalarStyle.Invalid;
         }
 
@@ -824,7 +832,7 @@ struct Emitter
         ///Determine style to write the current scalar in.
         ScalarStyle chooseScalarStyle() @trusted
         {
-            if(analysis_.flags.isNull){analysis_ = analyzeScalar(event_.value);}
+            if(analysis_.flags & ScalarFlags.isNull){analysis_ = analyzeScalar(event_.value);}
 
             const style          = event_.scalarStyle;
             const invalidOrPlain = style == ScalarStyle.Invalid || style == ScalarStyle.Plain;
@@ -832,11 +840,11 @@ struct Emitter
             const singleQuoted   = style == ScalarStyle.SingleQuoted;
             const doubleQuoted   = style == ScalarStyle.DoubleQuoted;
 
-            const allowPlain     = flowLevel_ > 0 ? analysis_.flags.allowFlowPlain
-                                                  : analysis_.flags.allowBlockPlain;
+            const allowPlain     = flowLevel_ > 0 ? analysis_.flags & ScalarFlags.allowFlowPlain
+                                                  : analysis_.flags & ScalarFlags.allowBlockPlain;
             //simple empty or multiline scalars can't be written in plain style
             const simpleNonPlain = (context_ == Context.MappingSimpleKey) &&
-                                   (analysis_.flags.empty || analysis_.flags.multiline);
+                                   (analysis_.flags & ScalarFlags.empty || analysis_.flags & ScalarFlags.multiline);
 
             if(doubleQuoted || canonical_)
             {
@@ -849,14 +857,14 @@ struct Emitter
             }
 
             if(block && flowLevel_ == 0 && context_ != Context.MappingSimpleKey &&
-               analysis_.flags.allowBlock)
+               analysis_.flags & ScalarFlags.allowBlock)
             {
                 return style;
             }
 
             if((invalidOrPlain || singleQuoted) &&
-               analysis_.flags.allowSingleQuoted &&
-               !(context_ == Context.MappingSimpleKey && analysis_.flags.multiline))
+               analysis_.flags & ScalarFlags.allowSingleQuoted &&
+               !(context_ == Context.MappingSimpleKey && analysis_.flags & ScalarFlags.multiline))
             {
                 return ScalarStyle.SingleQuoted;
             }
@@ -994,19 +1002,13 @@ struct Emitter
         static ScalarAnalysis analyzeScalar(string scalar) @safe
         {
             ScalarAnalysis analysis;
-            analysis.flags.isNull = false;
+            analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.isNull);
             analysis.scalar = scalar;
 
             //Empty scalar is a special case.
-            with(analysis.flags) if(scalar is null || scalar == "")
+            if(scalar is null || scalar == "")
             {
-                empty             = true;
-                multiline         = false;
-                allowFlowPlain    = false;
-                allowBlockPlain   = true;
-                allowSingleQuoted = true;
-                allowDoubleQuoted = true;
-                allowBlock        = false;
+                analysis.flags = ScalarFlags.empty | ScalarFlags.allowBlockPlain | ScalarFlags.allowSingleQuoted | ScalarFlags.allowDoubleQuoted;
                 return analysis;
             }
 
@@ -1105,48 +1107,67 @@ struct Emitter
                                        scalar[index + 2].among(newLines, '\r', '\0', ' ');
             }
 
-            with(analysis.flags)
+            //Let's decide what styles are allowed.
+            analysis.flags = ScalarFlags.allowFlowPlain | ScalarFlags.allowBlockPlain | ScalarFlags.allowSingleQuoted
+                           | ScalarFlags.allowDoubleQuoted | ScalarFlags.allowBlock;
+
+            //Leading and trailing whitespaces are bad for plain scalars.
+            if(leadingSpace || leadingBreak || trailingSpace || trailingBreak)
             {
-                //Let's decide what styles are allowed.
-                allowFlowPlain = allowBlockPlain = allowSingleQuoted
-                               = allowDoubleQuoted = allowBlock = true;
-
-                //Leading and trailing whitespaces are bad for plain scalars.
-                if(leadingSpace || leadingBreak || trailingSpace || trailingBreak)
-                {
-                    allowFlowPlain = allowBlockPlain = false;
-                }
-
-                //We do not permit trailing spaces for block scalars.
-                if(trailingSpace){allowBlock = false;}
-
-                //Spaces at the beginning of a new line are only acceptable for block
-                //scalars.
-                if(breakSpace)
-                {
-                    allowFlowPlain = allowBlockPlain = allowSingleQuoted = false;
-                }
-
-                //Spaces followed by breaks, as well as special character are only
-                //allowed for double quoted scalars.
-                if(spaceBreak || specialCharacters)
-                {
-                    allowFlowPlain = allowBlockPlain = allowSingleQuoted = allowBlock = false;
-                }
-
-                //Although the plain scalar writer supports breaks, we never emit
-                //multiline plain scalars.
-                if(lineBreaks){allowFlowPlain = allowBlockPlain = false;}
-
-                //Flow indicators are forbidden for flow plain scalars.
-                if(flowIndicators){allowFlowPlain = false;}
-
-                //Block indicators are forbidden for block plain scalars.
-                if(blockIndicators){allowBlockPlain = false;}
-
-                empty = false;
-                multiline = lineBreaks;
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowFlowPlain);
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowBlockPlain);
             }
+
+            //We do not permit trailing spaces for block scalars.
+            if(trailingSpace)
+            {
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowBlock);
+            }
+
+            //Spaces at the beginning of a new line are only acceptable for block
+            //scalars.
+            if(breakSpace)
+            {
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowFlowPlain);
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowBlockPlain);
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowSingleQuoted);
+            }
+
+            //Spaces followed by breaks, as well as special character are only
+            //allowed for double quoted scalars.
+            if(spaceBreak || specialCharacters)
+            {
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowFlowPlain);
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowBlockPlain);
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowSingleQuoted);
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowBlock);
+            }
+
+            //Although the plain scalar writer supports breaks, we never emit
+            //multiline plain scalars.
+            if(lineBreaks)
+            {
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowFlowPlain);
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowBlockPlain);
+            }
+
+            //Flow indicators are forbidden for flow plain scalars.
+            if(flowIndicators)
+            {
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowFlowPlain);
+            }
+
+            //Block indicators are forbidden for block plain scalars.
+            if(blockIndicators)
+            {
+                analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.allowBlockPlain);
+            }
+
+            analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.empty);
+            if (lineBreaks)
+                analysis.flags |= ScalarFlags.multiline;
+            else
+                analysis.flags &= BitFlags!ScalarFlags(ScalarFlags.multiline);
 
             return analysis;
         }
