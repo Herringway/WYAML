@@ -177,7 +177,7 @@ pure nothrow @nogc:
         }
 
         /// Optimized version of peek() for the case where peek index is 0.
-        dchar peek() @safe
+        dchar front() @safe
         {
             if(upcomingASCII_ > 0)            { return buffer_[bufferOffset_]; }
             if(characterCount_ <= charIndex_) { return '\0'; }
@@ -199,13 +199,9 @@ pure nothrow @nogc:
             return characterCount_ > (charIndex_ + index) ? buffer_[bufferOffset_ + index] : '\0';
         }
 
-        /// Optimized version of peekByte() for the case where peek byte index is 0.
-        char peekByte() @safe
-        {
-            return characterCount_ > charIndex_ ? buffer_[bufferOffset_] : '\0';
+        bool empty() @safe const {
+            return characterCount_ <= charIndex_;
         }
-
-
         /// Get specified number of characters starting at current position.
         ///
         /// Note: This gets only a "view" into the internal buffer, which will be
@@ -280,8 +276,8 @@ pure nothrow @nogc:
         ///          or if invalid data is read.
         dchar get() @safe
         {
-            const result = peek();
-            forward();
+            const result = front();
+            popFront();
             return result;
         }
 
@@ -353,7 +349,7 @@ pure nothrow @nogc:
         }
 
         /// Move current position forward by one character.
-        void forward() @trusted
+        void popFront() @trusted
         {
             ++charIndex_;
             lastDecodedBufferOffset_ = bufferOffset_;
@@ -993,7 +989,7 @@ void testPeekPrefixForward(R)()
     writeln(typeid(R).toString() ~ ": peek/prefix/forward unittest");
     ubyte[] data = ByteOrderMarks[BOM.UTF8] ~ cast(ubyte[])"data";
     auto reader = new R(data);
-    assert(reader.peek() == 'd');
+    assert(reader.front == 'd');
     assert(reader.peek(1) == 'a');
     assert(reader.peek(2) == 't');
     assert(reader.peek(3) == 'a');
@@ -1015,7 +1011,7 @@ void testUTF(R)()
         ubyte[] bytes = ByteOrderMarks[bom] ~
                         (cast(ubyte[])data)[0 .. data.length * T.sizeof];
         auto reader = new R(bytes);
-        assert(reader.peek() == 'd');
+        assert(reader.front == 'd');
         assert(reader.peek(1) == 'a');
         assert(reader.peek(2) == 't');
         assert(reader.peek(3) == 'a');
@@ -1031,7 +1027,7 @@ void test1Byte(R)()
     ubyte[] data = [97];
 
     auto reader = new R(data);
-    assert(reader.peek() == 'a');
+    assert(reader.front == 'a');
     assert(reader.peek(1) == '\0');
     // assert(collectException(reader.peek(2)));
 }

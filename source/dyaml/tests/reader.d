@@ -24,7 +24,7 @@ void runReader(const bool verbose, ubyte[] fileData)
     try
     {
         auto reader = new Reader(cast(ubyte[])fileData);
-        while(reader.peek() != '\0') { reader.forward(); }
+        while(reader.front != '\0') { reader.popFront(); }
         assert(false, "Expected an exception");
     }
     catch(ReaderException e)

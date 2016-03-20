@@ -294,7 +294,7 @@ final class Scanner
             unwindIndent(reader_.column);
 
             // Get the next character.
-            const dchar c = reader_.peekByte();
+            const dchar c = reader_.front;
 
             // Fetch the token.
             if(c == '\0')            { return fetchStreamEnd();     }
@@ -519,7 +519,7 @@ final class Scanner
             ++flowLevel_;
 
             Mark startMark = reader_.mark;
-            reader_.forward();
+            reader_.popFront();
             tokens_.push(simpleToken!id(startMark, reader_.mark));
         }
 
@@ -537,7 +537,7 @@ final class Scanner
             --flowLevel_;
 
             Mark startMark = reader_.mark;
-            reader_.forward();
+            reader_.popFront();
             tokens_.push(simpleToken!id(startMark, reader_.mark));
         }
 
@@ -554,7 +554,7 @@ final class Scanner
             allowSimpleKey_ = true;
 
             Mark startMark = reader_.mark;
-            reader_.forward();
+            reader_.popFront();
             tokens_.push(flowEntryToken(startMark, reader_.mark));
         }
 
@@ -588,7 +588,7 @@ final class Scanner
             allowSimpleKey_ = true;
 
             Mark startMark = reader_.mark;
-            reader_.forward();
+            reader_.popFront();
             tokens_.push(blockEntryToken(startMark, reader_.mark));
         }
 
@@ -603,7 +603,7 @@ final class Scanner
             allowSimpleKey_ = (flowLevel_ == 0);
 
             Mark startMark = reader_.mark;
-            reader_.forward();
+            reader_.popFront();
             tokens_.push(keyToken(startMark, reader_.mark));
         }
 
@@ -656,7 +656,7 @@ final class Scanner
 
             // Add VALUE.
             Mark startMark = reader_.mark;
-            reader_.forward();
+            reader_.popFront();
             tokens_.push(valueToken(startMark, reader_.mark));
         }
 
@@ -746,7 +746,7 @@ final class Scanner
         ///Check if the next token is DIRECTIVE:        ^ '%' ...
         bool checkDirective() @safe
         {
-            return reader_.peekByte() == '%' && reader_.column == 0;
+            return reader_.front == '%' && reader_.column == 0;
         }
 
         /// Check if the next token is DOCUMENT-START:   ^ '---' (' '|'\n')
@@ -754,7 +754,7 @@ final class Scanner
         {
             // Check one char first, then all 3, to prevent reading outside the buffer.
             return reader_.column     == 0     &&
-                   reader_.peekByte() == '-'   &&
+                   reader_.front == '-'   &&
                    reader_.prefix(3)  == "---" &&
                    reader_.peek(3).among(allWhiteSpace);
         }
@@ -764,7 +764,7 @@ final class Scanner
         {
             // Check one char first, then all 3, to prevent reading outside the buffer.
             return reader_.column     == 0     &&
-                   reader_.peekByte() == '.'   &&
+                   reader_.front == '.'   &&
                    reader_.prefix(3)  == "..." &&
                    reader_.peek(3).among(allWhiteSpace);
         }
@@ -807,7 +807,7 @@ final class Scanner
         /// independent.
         bool checkPlain() @safe
         {
-            const c = reader_.peek();
+            const c = reader_.front;
             if(!c.among(allWhiteSpacePlusQuotesAndSlashes, curlyBraces, squareBrackets, '-', '?', ',', '#', '&', '*', '!', '|', '>', '%', '@', '`'))
             {
                 return true;
@@ -819,7 +819,7 @@ final class Scanner
         /// Move to the next non-space character.
         void findNextNonSpace() @safe
         {
-            while(reader_.peekByte() == ' ') { reader_.forward(); }
+            while(reader_.skipOver(' ')) {}
         }
 
         /// Scan a string of alphanumeric or "-_" characters.
@@ -831,7 +831,7 @@ final class Scanner
         void scanAlphaNumericToSlice(string name)(const Mark startMark) @system
         {
             size_t length = 0;
-            dchar c = reader_.peek();
+            dchar c = reader_.front;
             while(c.isAlphaNum || c.among('-', '_')) { c = reader_.peek(++length); }
 
             if(length == 0)
@@ -848,7 +848,7 @@ final class Scanner
         /// Scan and throw away all characters until next line break.
         void scanToNextBreak() @safe
         {
-            while(!reader_.peek().among(allBreaks)) { reader_.popFront(); }
+            while(!reader_.front.among(allBreaks)) { reader_.popFront(); }
         }
 
         /// Scan all characters until next line break.
@@ -892,7 +892,7 @@ final class Scanner
             {
                 findNextNonSpace();
 
-                if(reader_.peekByte() == '#') { scanToNextBreak(); }
+                if(reader_.front == '#') { scanToNextBreak(); }
                 if(scanLineBreak() != '\0')
                 {
                     if(flowLevel_ == 0) { allowSimpleKey_ = true; }
@@ -909,7 +909,7 @@ final class Scanner
         {
             Mark startMark = reader_.mark;
             // Skip the '%'.
-            reader_.forward();
+            reader_.popFront();
 
             // Scan directive name
             reader_.sliceBuilder.begin();
@@ -955,9 +955,9 @@ final class Scanner
             scanAlphaNumericToSlice!"a directive"(startMark);
             if(error_) { return; }
 
-            if(reader_.peek().among(allWhiteSpace)) { return; }
+            if(reader_.front.among(allWhiteSpace)) { return; }
             error("While scanning a directive", startMark,
-                  expected("alphanumeric, '-' or '_'", reader_.peek()), reader_.mark);
+                  expected("alphanumeric, '-' or '_'", reader_.front), reader_.mark);
         }
 
         /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
@@ -973,23 +973,23 @@ final class Scanner
             scanYAMLDirectiveNumberToSlice(startMark);
             if(error_) { return; }
 
-            if(reader_.peekByte() != '.')
+            if(reader_.front != '.')
             {
                 error("While scanning a directive", startMark,
-                      expected("digit or '.'", reader_.peek()), reader_.mark);
+                      expected("digit or '.'", reader_.front), reader_.mark);
                 return;
             }
             // Skip the '.'.
-            reader_.forward();
+            reader_.popFront();
 
             reader_.sliceBuilder.write('.');
             scanYAMLDirectiveNumberToSlice(startMark);
             if(error_) { return; }
 
-            if(!reader_.peek().among(allWhiteSpace))
+            if(!reader_.front.among(allWhiteSpace))
             {
                 error("While scanning a directive", startMark,
-                      expected("digit or '.'", reader_.peek()), reader_.mark);
+                      expected("digit or '.'", reader_.front), reader_.mark);
             }
         }
 
@@ -1001,10 +1001,10 @@ final class Scanner
         /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanYAMLDirectiveNumberToSlice(const Mark startMark) @system
         {
-            if(!isDigit(reader_.peek()))
+            if(!isDigit(reader_.front))
             {
                 error("While scanning a directive", startMark,
-                      expected("digit", reader_.peek()), reader_.mark);
+                      expected("digit", reader_.front), reader_.mark);
                 return;
             }
 
@@ -1046,9 +1046,9 @@ final class Scanner
         {
             scanTagHandleToSlice!"directive"(startMark);
             if(error_) { return; }
-            if(reader_.peekByte() == ' ') { return; }
+            if(reader_.front == ' ') { return; }
             error("While scanning a directive handle", startMark,
-                  expected("' '", reader_.peek()), reader_.mark);
+                  expected("' '", reader_.front), reader_.mark);
         }
 
         /// Scan prefix of a tag directive.
@@ -1060,9 +1060,9 @@ final class Scanner
         void scanTagDirectivePrefixToSlice(const Mark startMark) @system
         {
             scanTagURIToSlice!"directive"(startMark);
-            if(reader_.peek().among(allWhiteSpace)) { return; }
+            if(reader_.front.among(allWhiteSpace)) { return; }
             error("While scanning a directive prefix", startMark,
-                  expected("' '", reader_.peek()), reader_.mark);
+                  expected("' '", reader_.front), reader_.mark);
         }
 
         /// Scan (and ignore) ignored line after a directive.
@@ -1071,14 +1071,14 @@ final class Scanner
         void scanDirectiveIgnoredLine(const Mark startMark) @safe
         {
             findNextNonSpace();
-            if(reader_.peekByte() == '#') { scanToNextBreak(); }
-            if(searchAllBreaks.canFind(reader_.peek()))
+            if(reader_.front == '#') { scanToNextBreak(); }
+            if(reader_.front.among(allBreaks))
             {
                 scanLineBreak();
                 return;
             }
             error("While scanning a directive", startMark,
-                  expected("comment or a line break", reader_.peek()), reader_.mark);
+                  expected("comment or a line break", reader_.front), reader_.mark);
         }
 
 
@@ -1106,13 +1106,12 @@ final class Scanner
             char[] value = reader_.sliceBuilder.finish();
             if(error_)   { return Token.init; }
 
-            if(!reader_.peek().among(allWhiteSpace) &&
-               !reader_.peekByte().among('?', ':', ',', ']', '}', '%', '@'))
+            if(!reader_.front.among(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'))
             {
                 enum anchorCtx = "While scanning an anchor";
                 enum aliasCtx  = "While scanning an alias";
                 error(i == '*' ? aliasCtx : anchorCtx, startMark,
-                      expected("alphanumeric, '-' or '_'", reader_.peek()), reader_.mark);
+                      expected("alphanumeric, '-' or '_'", reader_.front), reader_.mark);
                 return Token.init;
             }
 
@@ -1148,17 +1147,17 @@ final class Scanner
                 handleEnd = 0;
                 scanTagURIToSlice!"tag"(startMark);
                 if(error_) { return Token.init; }
-                if(reader_.peekByte() != '>')
+                if(reader_.front != '>')
                 {
                     error("While scanning a tag", startMark,
-                          expected("'>'", reader_.peek()), reader_.mark);
+                          expected("'>'", reader_.front), reader_.mark);
                     return Token.init;
                 }
-                reader_.forward();
+                reader_.popFront();
             }
             else if(c.among(allWhiteSpace))
             {
-                reader_.forward();
+                reader_.popFront();
                 handleEnd = 0;
                 reader_.sliceBuilder.write('!');
             }
@@ -1186,7 +1185,7 @@ final class Scanner
                 }
                 else
                 {
-                    reader_.forward();
+                    reader_.popFront();
                     reader_.sliceBuilder.write('!');
                     handleEnd = cast(uint)reader_.sliceBuilder.length;
                 }
@@ -1195,13 +1194,13 @@ final class Scanner
                 if(error_) { return Token.init; }
             }
 
-            if(reader_.peek().among(allWhiteSpace))
+            if(reader_.front.among(allWhiteSpace))
             {
                 char[] slice = reader_.sliceBuilder.finish();
                 return tagToken(startMark, reader_.mark, slice, handleEnd);
             }
 
-            error("While scanning a tag", startMark, expected("' '", reader_.peek()),
+            error("While scanning a tag", startMark, expected("' '", reader_.front),
                   reader_.mark);
             return Token.init;
         }
@@ -1214,7 +1213,7 @@ final class Scanner
             const startMark = reader_.mark;
 
             // Scan the header.
-            reader_.forward();
+            reader_.popFront();
 
             const indicators = scanBlockScalarIndicators(startMark);
             if(error_) { return Token.init; }
@@ -1251,10 +1250,10 @@ final class Scanner
             dchar lineBreak = cast(dchar)int.max;
 
             // Scan the inner part of the block scalar.
-            while(reader_.column == indent && reader_.peekByte() != '\0')
+            while(reader_.column == indent && reader_.front != '\0')
             {
                 breaksTransaction.commit();
-                const bool leadingNonSpace = !reader_.peekByte().among(whiteSpaces);
+                const bool leadingNonSpace = !reader_.front.among(whiteSpaces);
                 // This is where the 'interesting' non-whitespace data gets read.
                 scanToNextBreakToSlice();
                 lineBreak = scanLineBreak();
@@ -1271,13 +1270,13 @@ final class Scanner
                 // This will not run during the last iteration (see the if() vs the
                 // while()), hence breaksTransaction rollback (which happens after this
                 // loop) will never roll back data written in this if() block.
-                if(reader_.column == indent && reader_.peekByte() != '\0')
+                if(reader_.column == indent && reader_.front != '\0')
                 {
                     // Unfortunately, folding rules are ambiguous.
 
                     // This is the folding according to the specification:
                     if(style == ScalarStyle.Folded && lineBreak == '\n' &&
-                       leadingNonSpace && !reader_.peekByte().among(whiteSpaces))
+                       leadingNonSpace && !reader_.front.among(whiteSpaces))
                     {
                         // No breaks were scanned; no need to insert the space in the
                         // middle of slice.
@@ -1300,7 +1299,7 @@ final class Scanner
                     //{
                     //    if(startLen == endLen)
                     //    {
-                    //        if(!reader_.peekByte().among(' ', '\t'))
+                    //        if(!reader_.front.among(' ', '\t'))
                     //        {
                     //            reader_.sliceBuilder.write(' ');
                     //        }
@@ -1355,7 +1354,7 @@ final class Scanner
         {
             auto chomping = Chomping.Clip;
             int increment = int.min;
-            dchar c       = reader_.peek();
+            dchar c       = reader_.front;
 
             /// Indicators can be in any order.
             if(getChomping(c, chomping))
@@ -1391,8 +1390,8 @@ final class Scanner
         {
             if(!c.among(chompIndicators)) { return false; }
             chomping = c == '+' ? Chomping.Keep : Chomping.Strip;
-            reader_.forward();
-            c = reader_.peek();
+            reader_.popFront();
+            c = reader_.front;
             return true;
         }
 
@@ -1417,8 +1416,8 @@ final class Scanner
             assert(increment < 10 && increment >= 0, "Digit has invalid value");
             if(increment > 0)
             {
-                reader_.forward();
-                c = reader_.peek();
+                reader_.popFront();
+                c = reader_.front;
                 return true;
             }
             error("While scanning a block scalar", startMark,
@@ -1432,15 +1431,15 @@ final class Scanner
         void scanBlockScalarIgnoredLine(const Mark startMark) @safe
         {
             findNextNonSpace();
-            if(reader_.peekByte()== '#') { scanToNextBreak(); }
+            if(reader_.front == '#') { scanToNextBreak(); }
 
-            if(reader_.peek().among(allBreaks))
+            if(reader_.front.among(allBreaks))
             {
                 scanLineBreak();
                 return;
             }
             error("While scanning a block scalar", startMark,
-                  expected("comment or line break", reader_.peek()), reader_.mark);
+                  expected("comment or line break", reader_.front), reader_.mark);
         }
 
         /// Scan indentation in a block scalar, returning line breaks, max indent and end mark.
@@ -1452,15 +1451,15 @@ final class Scanner
             uint maxIndent;
             Mark endMark = reader_.mark;
 
-            while(reader_.peek().among(newLinesPlusSpaces))
+            while(reader_.front.among(newLinesPlusSpaces))
             {
-                if(reader_.peekByte() != ' ')
+                if(reader_.front != ' ')
                 {
                     reader_.sliceBuilder.write(scanLineBreak());
                     endMark = reader_.mark;
                     continue;
                 }
-                reader_.forward();
+                reader_.popFront();
                 maxIndent = max(reader_.column, maxIndent);
             }
 
@@ -1477,8 +1476,8 @@ final class Scanner
 
             for(;;)
             {
-                while(reader_.column < indent && reader_.peekByte() == ' ') { reader_.forward(); }
-                if(!reader_.peek().among(newLines))  { break; }
+                while(reader_.column < indent && reader_.front == ' ') { reader_.popFront(); }
+                if(!reader_.front.among(newLines))  { break; }
                 reader_.sliceBuilder.write(scanLineBreak());
                 endMark = reader_.mark;
             }
@@ -1500,14 +1499,14 @@ final class Scanner
             scanFlowScalarNonSpacesToSlice(quotes, startMark);
             if(error_) { return Token.init; }
 
-            while(reader_.peek() != quote)
+            while(reader_.front != quote)
             {
                 scanFlowScalarSpacesToSlice(startMark);
                 if(error_) { return Token.init; }
                 scanFlowScalarNonSpacesToSlice(quotes, startMark);
                 if(error_) { return Token.init; }
             }
-            reader_.forward();
+            reader_.popFront();
 
             auto slice = reader_.sliceBuilder.finish();
             return scalarToken(startMark, reader_.mark, slice, quotes);
@@ -1524,7 +1523,7 @@ final class Scanner
         {
             for(;;) with(ScalarStyle)
             {
-                dchar c = reader_.peek();
+                dchar c = reader_.front;
 
                 size_t numCodePoints = 0;
                 // This is an optimized way of writing:
@@ -1552,7 +1551,7 @@ final class Scanner
 
                 reader_.sliceBuilder.write(reader_.get(numCodePoints));
 
-                c = reader_.peek();
+                c = reader_.front;
                 if(quotes == SingleQuoted && c == '\'' && reader_.peek(1) == '\'')
                 {
                     reader_.forward(2);
@@ -1561,16 +1560,16 @@ final class Scanner
                 else if((quotes == DoubleQuoted && c == '\'') ||
                         (quotes == SingleQuoted && c.among('"', '\\')))
                 {
-                    reader_.forward();
+                    reader_.popFront();
                     reader_.sliceBuilder.write(c);
                 }
                 else if(quotes == DoubleQuoted && c == '\\')
                 {
-                    reader_.forward();
-                    c = reader_.peek();
+                    reader_.popFront();
+                    c = reader_.front;
                     if(c.among(dyaml.escapes.escapeSeqs))
                     {
-                        reader_.forward();
+                        reader_.popFront();
                         // Escaping has been moved to Parser as it can't be done in
                         // place (in a slice) in case of '\P' and '\L' (very uncommon,
                         // but we don't want to break the spec)
@@ -1580,7 +1579,7 @@ final class Scanner
                     else if(c.among(dyaml.escapes.escapeHexSeq))
                     {
                         const hexLength = dyaml.escapes.escapeHexLength(c);
-                        reader_.forward();
+                        reader_.popFront();
 
                         foreach(i; 0 .. hexLength) if(!reader_.peek(i).isHexDigit)
                         {
@@ -1694,10 +1693,10 @@ final class Scanner
                 }
 
                 // Skip any whitespaces.
-                while(reader_.peekByte().among(whiteSpaces)) { reader_.popFront(); }
+                while(reader_.front.among(whiteSpaces)) { reader_.popFront(); }
 
                 // Encountered a non-whitespace non-linebreak character, so we're done.
-                if (!reader_.peek().among(newLines)) break;
+                if (!reader_.front.among(newLines)) break;
 
                 const lineBreak = scanLineBreak();
                 anyBreaks = true;
@@ -1726,7 +1725,7 @@ final class Scanner
             alias Transaction = SliceBuilder.Transaction;
             Transaction spacesTransaction;
             // Stop at a comment.
-            while(reader_.peekByte() != '#')
+            while(reader_.front != '#')
             {
                 // Scan the entire plain scalar.
                 size_t length = 0;
@@ -1817,7 +1816,7 @@ final class Scanner
             char[] whitespaces = reader_.prefixBytes(length);
             reader_.forward(length);
 
-            dchar c = reader_.peek();
+            dchar c = reader_.front;
             // No newline after the spaces (if any)
             if(!c.among(newLines))
             {
@@ -1844,9 +1843,9 @@ final class Scanner
             alias Transaction = SliceBuilder.Transaction;
             auto transaction = Transaction(reader_.sliceBuilder);
             if(lineBreak != '\n') { reader_.sliceBuilder.write(lineBreak); }
-            while(reader_.peek().among(newLinesPlusSpaces))
+            while(reader_.front.among(newLinesPlusSpaces))
             {
-                if(reader_.peekByte() == ' ') { reader_.forward(); }
+                if(reader_.front == ' ') { reader_.popFront(); }
                 else
                 {
                     const lBreak = scanLineBreak();
@@ -1870,7 +1869,7 @@ final class Scanner
         /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanTagHandleToSlice(string name)(const Mark startMark) @system
         {
-            dchar c = reader_.peek();
+            dchar c = reader_.front;
             enum contextMsg = "While scanning a " ~ name;
             if(c != '!')
             {
@@ -1908,7 +1907,7 @@ final class Scanner
         void scanTagURIToSlice(string name)(const Mark startMark) @trusted
         {
             // Note: we do not check if URI is well-formed.
-            dchar c = reader_.peek();
+            dchar c = reader_.front;
             const startLen = reader_.sliceBuilder.length;
             {
                 uint length = 0;
@@ -1986,9 +1985,9 @@ final class Scanner
             }
 
             enum contextMsg = "While scanning a " ~ name;
-            while(reader_.peekByte() == '%')
+            while(reader_.front == '%')
             {
-                reader_.forward();
+                reader_.popFront();
                 if(bytesUsed == bytes.length)
                 {
                     bytesUsed = getDchar(bytes[], reader_);
@@ -2045,27 +2044,27 @@ final class Scanner
         dchar scanLineBreak() @safe
         {
             // Fast path for ASCII line breaks.
-            const b = reader_.peekByte();
+            const b = reader_.front;
             if(b < 0x80)
             {
                 if(b == '\n' || b == '\r')
                 {
                     if(reader_.prefix(2) == "\r\n") { reader_.forward(2); }
-                    else { reader_.forward(); }
+                    else { reader_.popFront(); }
                     return '\n';
                 }
                 return '\0';
             }
 
-            const c = reader_.peek();
+            const c = reader_.front;
             if(c == '\x85')
             {
-                reader_.forward();
+                reader_.popFront();
                 return '\n';
             }
             if(c == '\u2028' || c == '\u2029')
             {
-                reader_.forward();
+                reader_.popFront();
                 return c;
             }
             return '\0';
