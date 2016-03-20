@@ -756,7 +756,7 @@ final class Scanner
             return reader_.column     == 0     &&
                    reader_.front == '-'   &&
                    reader_.prefix(3)  == "---" &&
-                   reader_.peek(3).among(allWhiteSpace);
+                   reader_.peek(3).among!(allWhiteSpace);
         }
 
         /// Check if the next token is DOCUMENT-END:     ^ '...' (' '|'\n')
@@ -766,13 +766,13 @@ final class Scanner
             return reader_.column     == 0     &&
                    reader_.front == '.'   &&
                    reader_.prefix(3)  == "..." &&
-                   reader_.peek(3).among(allWhiteSpace);
+                   reader_.peek(3).among!(allWhiteSpace);
         }
 
         /// Check if the next token is BLOCK-ENTRY:      '-' (' '|'\n')
         bool checkBlockEntry() @safe
         {
-            return !!reader_.peek(1).among(allWhiteSpace);
+            return !!reader_.peek(1).among!(allWhiteSpace);
         }
 
         /// Check if the next token is KEY(flow context):    '?'
@@ -780,7 +780,7 @@ final class Scanner
         /// or KEY(block context):   '?' (' '|'\n')
         bool checkKey() @safe
         {
-            return flowLevel_ > 0 || reader_.peek(1).among(allWhiteSpace);
+            return flowLevel_ > 0 || reader_.peek(1).among!(allWhiteSpace);
         }
 
         /// Check if the next token is VALUE(flow context):  ':'
@@ -788,7 +788,7 @@ final class Scanner
         /// or VALUE(block context): ':' (' '|'\n')
         bool checkValue() @safe
         {
-            return flowLevel_ > 0 || reader_.peek(1).among(allWhiteSpace);
+            return flowLevel_ > 0 || reader_.peek(1).among!(allWhiteSpace);
         }
 
         /// Check if the next token is a plain scalar.
@@ -808,12 +808,12 @@ final class Scanner
         bool checkPlain() @safe
         {
             const c = reader_.front;
-            if(!c.among(allWhiteSpacePlusQuotesAndSlashes, curlyBraces, squareBrackets, '-', '?', ',', '#', '&', '*', '!', '|', '>', '%', '@', '`'))
+            if(!c.among!(allWhiteSpacePlusQuotesAndSlashes, curlyBraces, squareBrackets, '-', '?', ',', '#', '&', '*', '!', '|', '>', '%', '@', '`'))
             {
                 return true;
             }
-            return !reader_.peek(1).among(allWhiteSpace) &&
-                   (c == '-' || (flowLevel_ == 0 && (c == '?' || c == ':')));
+            return !reader_.peek(1).among!(allWhiteSpace) &&
+                   (c == '-' || (flowLevel_ == 0 && c.among!('?', ':')));
         }
 
         /// Move to the next non-space character.
@@ -832,7 +832,7 @@ final class Scanner
         {
             size_t length = 0;
             dchar c = reader_.front;
-            while(c.isAlphaNum || c.among('-', '_')) { c = reader_.peek(++length); }
+            while(c.isAlphaNum || c.among!('-', '_')) { c = reader_.peek(++length); }
 
             if(length == 0)
             {
@@ -848,7 +848,7 @@ final class Scanner
         /// Scan and throw away all characters until next line break.
         void scanToNextBreak() @safe
         {
-            while(!reader_.front.among(allBreaks)) { reader_.popFront(); }
+            while(!reader_.front.among!(allBreaks)) { reader_.popFront(); }
         }
 
         /// Scan all characters until next line break.
@@ -858,7 +858,7 @@ final class Scanner
         void scanToNextBreakToSlice() @system
         {
             uint length = 0;
-            while(!reader_.peek(length).among(allBreaks))
+            while(!reader_.peek(length).among!(allBreaks))
             {
                 ++length;
             }
@@ -955,7 +955,7 @@ final class Scanner
             scanAlphaNumericToSlice!"a directive"(startMark);
             if(error_) { return; }
 
-            if(reader_.front.among(allWhiteSpace)) { return; }
+            if(reader_.front.among!(allWhiteSpace)) { return; }
             error("While scanning a directive", startMark,
                   expected("alphanumeric, '-' or '_'", reader_.front), reader_.mark);
         }
@@ -986,7 +986,7 @@ final class Scanner
             scanYAMLDirectiveNumberToSlice(startMark);
             if(error_) { return; }
 
-            if(!reader_.front.among(allWhiteSpace))
+            if(!reader_.front.among!(allWhiteSpace))
             {
                 error("While scanning a directive", startMark,
                       expected("digit or '.'", reader_.front), reader_.mark);
@@ -1060,7 +1060,7 @@ final class Scanner
         void scanTagDirectivePrefixToSlice(const Mark startMark) @system
         {
             scanTagURIToSlice!"directive"(startMark);
-            if(reader_.front.among(allWhiteSpace)) { return; }
+            if(reader_.front.among!(allWhiteSpace)) { return; }
             error("While scanning a directive prefix", startMark,
                   expected("' '", reader_.front), reader_.mark);
         }
@@ -1072,7 +1072,7 @@ final class Scanner
         {
             findNextNonSpace();
             if(reader_.front == '#') { scanToNextBreak(); }
-            if(reader_.front.among(allBreaks))
+            if(reader_.front.among!(allBreaks))
             {
                 scanLineBreak();
                 return;
@@ -1106,7 +1106,7 @@ final class Scanner
             char[] value = reader_.sliceBuilder.finish();
             if(error_)   { return Token.init; }
 
-            if(!reader_.front.among(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'))
+            if(!reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'))
             {
                 enum anchorCtx = "While scanning an anchor";
                 enum aliasCtx  = "While scanning an alias";
@@ -1155,7 +1155,7 @@ final class Scanner
                 }
                 reader_.popFront();
             }
-            else if(c.among(allWhiteSpace))
+            else if(c.among!(allWhiteSpace))
             {
                 reader_.popFront();
                 handleEnd = 0;
@@ -1166,7 +1166,7 @@ final class Scanner
                 uint length = 1;
                 bool useHandle = false;
 
-                while(!c.among(allWhiteSpace))
+                while(!c.among!(allWhiteSpace))
                 {
                     if(c == '!')
                     {
@@ -1194,7 +1194,7 @@ final class Scanner
                 if(error_) { return Token.init; }
             }
 
-            if(reader_.front.among(allWhiteSpace))
+            if(reader_.front.among!(allWhiteSpace))
             {
                 char[] slice = reader_.sliceBuilder.finish();
                 return tagToken(startMark, reader_.mark, slice, handleEnd);
@@ -1253,7 +1253,7 @@ final class Scanner
             while(reader_.column == indent && reader_.front != '\0')
             {
                 breaksTransaction.commit();
-                const bool leadingNonSpace = !reader_.front.among(whiteSpaces);
+                const bool leadingNonSpace = !reader_.front.among!(whiteSpaces);
                 // This is where the 'interesting' non-whitespace data gets read.
                 scanToNextBreakToSlice();
                 lineBreak = scanLineBreak();
@@ -1276,7 +1276,7 @@ final class Scanner
 
                     // This is the folding according to the specification:
                     if(style == ScalarStyle.Folded && lineBreak == '\n' &&
-                       leadingNonSpace && !reader_.front.among(whiteSpaces))
+                       leadingNonSpace && !reader_.front.among!(whiteSpaces))
                     {
                         // No breaks were scanned; no need to insert the space in the
                         // middle of slice.
@@ -1299,7 +1299,7 @@ final class Scanner
                     //{
                     //    if(startLen == endLen)
                     //    {
-                    //        if(!reader_.front.among(' ', '\t'))
+                    //        if(!reader_.front.among!(' ', '\t'))
                     //        {
                     //            reader_.sliceBuilder.write(' ');
                     //        }
@@ -1369,7 +1369,7 @@ final class Scanner
                 if(gotIncrement) { getChomping(c, chomping); }
             }
 
-            if(c.among(allWhiteSpace))
+            if(c.among!(allWhiteSpace))
             {
                 return tuple(chomping, increment);
             }
@@ -1388,7 +1388,7 @@ final class Scanner
         /// chomping = Write the chomping value here, if detected.
         bool getChomping(ref dchar c, ref Chomping chomping) @safe
         {
-            if(!c.among(chompIndicators)) { return false; }
+            if(!c.among!(chompIndicators)) { return false; }
             chomping = c == '+' ? Chomping.Keep : Chomping.Strip;
             reader_.popFront();
             c = reader_.front;
@@ -1433,7 +1433,7 @@ final class Scanner
             findNextNonSpace();
             if(reader_.front == '#') { scanToNextBreak(); }
 
-            if(reader_.front.among(allBreaks))
+            if(reader_.front.among!(allBreaks))
             {
                 scanLineBreak();
                 return;
@@ -1451,7 +1451,7 @@ final class Scanner
             uint maxIndent;
             Mark endMark = reader_.mark;
 
-            while(reader_.front.among(newLinesPlusSpaces))
+            while(reader_.front.among!(newLinesPlusSpaces))
             {
                 if(reader_.front != ' ')
                 {
@@ -1477,7 +1477,7 @@ final class Scanner
             for(;;)
             {
                 while(reader_.column < indent && reader_.front == ' ') { reader_.popFront(); }
-                if(!reader_.front.among(newLines))  { break; }
+                if(!reader_.front.among!(newLines))  { break; }
                 reader_.sliceBuilder.write(scanLineBreak());
                 endMark = reader_.mark;
             }
@@ -1527,7 +1527,7 @@ final class Scanner
 
                 size_t numCodePoints = 0;
                 // This is an optimized way of writing:
-                // while(!reader_.peek(numCodePoints).among(allWhiteSpacePlusQuotesAndSlashes)) { ++numCodePoints; }
+                // while(!reader_.peek(numCodePoints).among!(allWhiteSpacePlusQuotesAndSlashes)) { ++numCodePoints; }
                 outer: for(size_t oldSliceLength;;)
                 {
                     // This will not necessarily make slice 32 chars longer, as not all
@@ -1543,7 +1543,7 @@ final class Scanner
                     {
                         // slice is UTF-8 - need to decode
                         const ch = slice[i] < 0x80 ? slice[i++] : decodeValidUTF8NoGC(slice, i);
-                        if(ch.among(allWhiteSpacePlusQuotesAndSlashes)) { break outer; }
+                        if(ch.among!(allWhiteSpacePlusQuotesAndSlashes)) { break outer; }
                         ++numCodePoints;
                     }
                     oldSliceLength = slice.length;
@@ -1558,7 +1558,7 @@ final class Scanner
                     reader_.sliceBuilder.write('\'');
                 }
                 else if((quotes == DoubleQuoted && c == '\'') ||
-                        (quotes == SingleQuoted && c.among('"', '\\')))
+                        (quotes == SingleQuoted && c.among!('"', '\\')))
                 {
                     reader_.popFront();
                     reader_.sliceBuilder.write(c);
@@ -1567,7 +1567,7 @@ final class Scanner
                 {
                     reader_.popFront();
                     c = reader_.front;
-                    if(c.among(dyaml.escapes.escapeSeqs))
+                    if(c.among!(dyaml.escapes.escapeSeqs))
                     {
                         reader_.popFront();
                         // Escaping has been moved to Parser as it can't be done in
@@ -1576,7 +1576,7 @@ final class Scanner
                         char[2] escapeSequence = ['\\', cast(char)c];
                         reader_.sliceBuilder.write(escapeSequence);
                     }
-                    else if(c.among(dyaml.escapes.escapeHexSeq))
+                    else if(c.among!(dyaml.escapes.escapeHexSeq))
                     {
                         const hexLength = dyaml.escapes.escapeHexLength(c);
                         reader_.popFront();
@@ -1607,7 +1607,7 @@ final class Scanner
                             return;
                         }
                     }
-                    else if(c.among(newLines))
+                    else if(c.among!(newLines))
                     {
                         scanLineBreak();
                         scanFlowScalarBreaksToSlice(startMark);
@@ -1635,7 +1635,7 @@ final class Scanner
         {
             // Increase length as long as we see whitespace.
             size_t length = 0;
-            while(reader_.peekByte(length).among(whiteSpaces)) { ++length; }
+            while(reader_.peekByte(length).among!(whiteSpaces)) { ++length; }
             auto whitespaces = reader_.prefixBytes(length);
 
             // Can check the last byte without striding because '\0' is ASCII
@@ -1648,7 +1648,7 @@ final class Scanner
             }
 
             // Spaces not followed by a line break.
-            if(!c.among(newLines))
+            if(!c.among!(newLines))
             {
                 reader_.forward(length);
                 reader_.sliceBuilder.write(whitespaces);
@@ -1685,7 +1685,7 @@ final class Scanner
                 // Instead of checking indentation, we check for document separators.
                 const prefix = reader_.prefix(3);
                 if((prefix == "---" || prefix == "...") &&
-                   reader_.peek(3).among(allWhiteSpace))
+                   reader_.peek(3).among!(allWhiteSpace))
                 {
                     error("While scanning a quoted scalar", startMark,
                           "found unexpected document separator", reader_.mark);
@@ -1693,10 +1693,10 @@ final class Scanner
                 }
 
                 // Skip any whitespaces.
-                while(reader_.front.among(whiteSpaces)) { reader_.popFront(); }
+                while(reader_.front.among!(whiteSpaces)) { reader_.popFront(); }
 
                 // Encountered a non-whitespace non-linebreak character, so we're done.
-                if (!reader_.front.among(newLines)) break;
+                if (!reader_.front.among!(newLines)) break;
 
                 const lineBreak = scanLineBreak();
                 anyBreaks = true;
@@ -1737,8 +1737,8 @@ final class Scanner
                     for(;;)
                     {
                         const cNext = reader_.peek(length + 1);
-                        if(c.among(allWhiteSpace) ||
-                           (c == ':' && cNext.among(allWhiteSpace)))
+                        if(c.among!(allWhiteSpace) ||
+                           (c == ':' && cNext.among!(allWhiteSpace)))
                         {
                             break;
                         }
@@ -1751,7 +1751,7 @@ final class Scanner
                     for(;;)
                     {
                         c = reader_.peek(length);
-                        if(c.among(allWhiteSpace, ',', ':', '?', squareBrackets, curlyBraces))
+                        if(c.among!(allWhiteSpace, ',', ':', '?', squareBrackets, curlyBraces))
                         {
                             break;
                         }
@@ -1761,8 +1761,7 @@ final class Scanner
 
                 // It's not clear what we should do with ':' in the flow context.
                 if(flowLevel_ > 0 && c == ':' &&
-                   !reader_.peek(length + 1).among(allWhiteSpace) &&
-                   !reader_.peek(length + 1).among(',', squareBrackets, curlyBraces))
+                   !reader_.peek(length + 1).among!(allWhiteSpace, ',', squareBrackets, curlyBraces))
                 {
                     // This is an error; throw the slice away.
                     spacesTransaction.commit();
@@ -1818,7 +1817,7 @@ final class Scanner
 
             dchar c = reader_.front;
             // No newline after the spaces (if any)
-            if(!c.among(newLines))
+            if(!c.among!(newLines))
             {
                 // We have spaces, but no newline.
                 if(whitespaces.length > 0) { reader_.sliceBuilder.write(whitespaces); }
@@ -1833,7 +1832,7 @@ final class Scanner
             {
                 const prefix = reader_.prefix(3);
                 return ("---" == prefix || "..." == prefix)
-                        && reader_.peek(3).among(allWhiteSpace);
+                        && reader_.peek(3).among!(allWhiteSpace);
             }
 
             if(end(reader_)) { return; }
@@ -1843,7 +1842,7 @@ final class Scanner
             alias Transaction = SliceBuilder.Transaction;
             auto transaction = Transaction(reader_.sliceBuilder);
             if(lineBreak != '\n') { reader_.sliceBuilder.write(lineBreak); }
-            while(reader_.front.among(newLinesPlusSpaces))
+            while(reader_.front.among!(newLinesPlusSpaces))
             {
                 if(reader_.front == ' ') { reader_.popFront(); }
                 else
@@ -1881,7 +1880,7 @@ final class Scanner
             c = reader_.peek(length);
             if(c != ' ')
             {
-                while(c.isAlphaNum || c.among('-', '_'))
+                while(c.isAlphaNum || c.among!('-', '_'))
                 {
                     ++length;
                     c = reader_.peek(length);
@@ -1911,7 +1910,7 @@ final class Scanner
             const startLen = reader_.sliceBuilder.length;
             {
                 uint length = 0;
-                while(c.isAlphaNum || c.among('-', ';', '/', '?', ':', '&', '@', '=', '+', '$', ',', '_', '.', '!', '~', '*', '\'', parentheses, squareBrackets, '%'))
+                while(c.isAlphaNum || c.among!('-', ';', '/', '?', ':', '&', '@', '=', '+', '$', ',', '_', '.', '!', '~', '*', '\'', parentheses, squareBrackets, '%'))
                 {
                     if(c == '%')
                     {

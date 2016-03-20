@@ -334,7 +334,7 @@ pure nothrow @nogc:
                 const c = decodeValidUTF8NoGC(buffer_, bufferOffset_);
 
                 // New line. (can compare with '\n' without decoding since it's ASCII)
-                if(c.among('\n', '\u0085', '\u2028', '\u2029') || (c == '\r' && buffer_[bufferOffset_] != '\n'))
+                if(c.among!('\n', '\u0085', '\u2028', '\u2029') || (c == '\r' && buffer_[bufferOffset_] != '\n'))
                 {
                     ++line_;
                     column_ = 0;
@@ -380,7 +380,7 @@ pure nothrow @nogc:
             const c = decodeValidUTF8NoGC(buffer_, bufferOffset_);
 
             // New line. (can compare with '\n' without decoding since it's ASCII)
-            if(c.among('\n', '\u0085', '\u2028', '\u2029') || (c == '\r' && buffer_[bufferOffset_] != '\n'))
+            if(c.among!('\n', '\u0085', '\u2028', '\u2029') || (c == '\r' && buffer_[bufferOffset_] != '\n'))
             {
                 ++line_;
                 column_ = 0;
