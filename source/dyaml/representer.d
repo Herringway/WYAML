@@ -527,7 +527,7 @@ Node representSysTime(ref Node node, Representer representer) @system
 Node representNodes(ref Node node, Representer representer) @safe
 {
     auto nodes = node.as!(Node[]);
-    if(node.tag_ == Tag("tag:yaml.org,2002:set"))
+    if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:set"))
     {
         ///YAML sets are mapping with null values.
         Node.Pair[] pairs;
@@ -574,13 +574,13 @@ Node representPairs(ref Node node, Representer representer) @system
         return nodes;
     }
 
-    if(node.tag_ == Tag("tag:yaml.org,2002:omap"))
+    if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:omap"))
     {
         enforce(!hasDuplicates(pairs),
                 new RepresenterException("Duplicate entry in an ordered map"));
         return representer.representSequence(node.tag_.get, mapToSequence(pairs));
     }
-    else if(node.tag_ == Tag("tag:yaml.org,2002:pairs"))
+    else if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:pairs"))
     {
         return representer.representSequence(node.tag_.get, mapToSequence(pairs));
     }

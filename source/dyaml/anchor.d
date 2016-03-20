@@ -7,7 +7,5 @@
 ///YAML anchor.
 module dyaml.anchor;
 
-import dyaml.zerostring;
-
-///YAML anchor (reference) struct. Encapsulates an anchor to save memory.
-alias ZeroString!"Anchor" Anchor;
+private import std.typecons;
+alias Anchor = Nullable!(string, "");

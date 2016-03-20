@@ -469,6 +469,10 @@ struct Node
         {
             return equals!(Yes.useTag)(rhs);
         }
+        bool opEquals(const ref Node rhs) const @safe
+        {
+            return equals!(Yes.useTag)(rhs);
+        }
 
         /// Shortcut for get().
         alias get as;
@@ -1013,7 +1017,7 @@ struct Node
         // Compute hash of the node.
         hash_t toHash() @safe nothrow const
         {
-            const tagHash = tag_.isNull ? 0 : tag_.toHash();
+            const tagHash = tag_.isNull ? 0 : hashOf(tag_.get());
             // Variant toHash is not const at the moment, so we need to const-cast.
             return tagHash + value_.toHash();
         }
@@ -1109,7 +1113,7 @@ struct Node
             static if(useTag)
             {
                 const tagCmp = tag_.isNull ? rhs.tag_.isNull ? 0 : -1
-                                           : rhs.tag_.isNull ? 1 : tag_.opCmp(rhs.tag_);
+                                           : rhs.tag_.isNull ? 1 : std.algorithm.cmp(tag_.get(), rhs.tag_.get());
                 if(tagCmp != 0){return tagCmp;}
             }
 

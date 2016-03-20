@@ -44,12 +44,13 @@ bool compareEvents(Event[] events1, Event[] events2)
             EventID.MappingStart,
             EventID.Alias,
             EventID.Scalar].canFind(e1.id)
+            && !e1.anchor.isNull && !e2.anchor.isNull
             && e1.anchor != e2.anchor)
         {
             return false;
         }
         //Different collection tag (if applicable).
-        if([EventID.SequenceStart, EventID.MappingStart].canFind(e1.id) && e1.tag != e2.tag)
+        if([EventID.SequenceStart, EventID.MappingStart].canFind(e1.id) && !e1.tag.isNull && !e2.tag.isNull && e1.tag != e2.tag)
         {
             return false;
         }
