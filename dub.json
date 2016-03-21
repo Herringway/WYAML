@@ -17,6 +17,11 @@
         {
             "name": "unittest",
             "targetType": "library"
+        },
+        {
+            "name": "verbose-test",
+            "targetType": "library",
+            "versions": ["verboseTest"]
         }
     ]
 }
