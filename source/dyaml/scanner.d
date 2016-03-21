@@ -18,6 +18,7 @@ import std.conv;
 import std.ascii : isAlphaNum, isDigit, isHexDigit;
 import std.exception;
 import std.meta;
+import std.range;
 import std.string;
 import std.typecons;
 import std.traits : Unqual;
@@ -89,8 +90,6 @@ final class Scanner
         /// 16 bytes on 64-bit.
         static struct SimpleKey
         {
-            /// Character index in reader where the key starts.
-            uint charIndex = uint.max;
             /// Index of the key token from start (first token scanned being 0).
             uint tokenIndex;
             /// Line the key starts at.
@@ -352,7 +351,7 @@ final class Scanner
             foreach(level, ref key; possibleSimpleKeys_)
             {
                 if(key.isNull) { continue; }
-                if(key.line != reader_.line || reader_.charIndex - key.charIndex > 1024)
+                if(key.line != reader_.line)
                 {
                     enforce(!key.required,
                             new ScannerException("While scanning a simple key",
@@ -381,7 +380,7 @@ final class Scanner
 
             const line   = reader_.line;
             const column = reader_.column;
-            const key    = SimpleKey(cast(uint)reader_.charIndex, tokenCount, line,
+            const key    = SimpleKey(tokenCount, line,
                                      cast(ushort)min(column, ushort.max), required);
 
             if(possibleSimpleKeys_.length <= flowLevel_)
@@ -460,7 +459,7 @@ final class Scanner
         /// Add STREAM-START token.
         void fetchStreamStart() @safe nothrow
         {
-            tokens_.push(streamStartToken(reader_.mark, reader_.mark, reader_.encoding));
+            tokens_.push(streamStartToken(reader_.mark, reader_.mark));
         }
 
         ///Add STREAM-END token.
@@ -501,7 +500,7 @@ final class Scanner
             allowSimpleKey_ = false;
 
             Mark startMark = reader_.mark;
-            reader_.forward(3);
+            reader_.popFrontN(3);
             tokens_.push(simpleToken!id(startMark, reader_.mark));
         }
 
@@ -741,8 +740,6 @@ final class Scanner
             tokens_.push(plain);
         }
 
-    pure nothrow @nogc:
-
         ///Check if the next token is DIRECTIVE:        ^ '%' ...
         bool checkDirective() @safe
         {
@@ -752,27 +749,31 @@ final class Scanner
         /// Check if the next token is DOCUMENT-START:   ^ '---' (' '|'\n')
         bool checkDocumentStart() @safe
         {
-            // Check one char first, then all 3, to prevent reading outside the buffer.
-            return reader_.column     == 0     &&
-                   reader_.front == '-'   &&
-                   reader_.prefix(3)  == "---" &&
-                   reader_.peek(3).among!(allWhiteSpace);
+            return checkSequence!"---";
         }
 
         /// Check if the next token is DOCUMENT-END:     ^ '...' (' '|'\n')
         bool checkDocumentEnd() @safe
         {
-            // Check one char first, then all 3, to prevent reading outside the buffer.
-            return reader_.column     == 0     &&
-                   reader_.front == '.'   &&
-                   reader_.prefix(3)  == "..." &&
-                   reader_.peek(3).among!(allWhiteSpace);
+            return checkSequence!"...";
+        }
+        bool checkSequence(string T)() @safe
+        {
+            if (reader_.column != 0)
+                return false;
+            auto readerCopy = reader_.save();
+            if (!readerCopy.startsWith(T))
+                return false;
+            readerCopy.popFront();
+            if (!readerCopy.front.among!allWhiteSpace)
+                return false;
+            return true;
         }
 
         /// Check if the next token is BLOCK-ENTRY:      '-' (' '|'\n')
         bool checkBlockEntry() @safe
         {
-            return !!reader_.peek(1).among!(allWhiteSpace);
+            return !!reader_.save().drop(1).front.among!(allWhiteSpace);
         }
 
         /// Check if the next token is KEY(flow context):    '?'
@@ -780,7 +781,7 @@ final class Scanner
         /// or KEY(block context):   '?' (' '|'\n')
         bool checkKey() @safe
         {
-            return flowLevel_ > 0 || reader_.peek(1).among!(allWhiteSpace);
+            return flowLevel_ > 0 || reader_.save().drop(1).front.among!(allWhiteSpace);
         }
 
         /// Check if the next token is VALUE(flow context):  ':'
@@ -788,7 +789,7 @@ final class Scanner
         /// or VALUE(block context): ':' (' '|'\n')
         bool checkValue() @safe
         {
-            return flowLevel_ > 0 || reader_.peek(1).among!(allWhiteSpace);
+            return flowLevel_ > 0 || reader_.save().drop(1).front.among!(allWhiteSpace);
         }
 
         /// Check if the next token is a plain scalar.
@@ -812,7 +813,7 @@ final class Scanner
             {
                 return true;
             }
-            return !reader_.peek(1).among!(allWhiteSpace) &&
+            return !reader_.save().drop(1).front.among!(allWhiteSpace) &&
                    (c == '-' || (flowLevel_ == 0 && c.among!('?', ':')));
         }
 
@@ -832,7 +833,7 @@ final class Scanner
         {
             size_t length = 0;
             dchar c = reader_.front;
-            while(c.isAlphaNum || c.among!('-', '_')) { c = reader_.peek(++length); }
+            while(c.isAlphaNum || c.among!('-', '_')) { c = reader_.save().drop(++length).front; }
 
             if(length == 0)
             {
@@ -842,7 +843,7 @@ final class Scanner
                 return;
             }
 
-            reader_.sliceBuilder.write(reader_.get(length));
+            reader_.sliceBuilder.write(reader_.take(length).array);
         }
 
         /// Scan and throw away all characters until next line break.
@@ -858,11 +859,11 @@ final class Scanner
         void scanToNextBreakToSlice() @system
         {
             uint length = 0;
-            while(!reader_.peek(length).among!(allBreaks))
+            while(!reader_.save().drop(length).front.among!(allBreaks))
             {
                 ++length;
             }
-            reader_.sliceBuilder.write(reader_.get(length));
+            reader_.sliceBuilder.write(reader_.take(length).array);
         }
 
 
@@ -1010,9 +1011,9 @@ final class Scanner
 
             // Already found the first digit in the enforce(), so set length to 1.
             uint length = 1;
-            while(reader_.peek(length).isDigit) { ++length; }
+            while(reader_.save().drop(length).front.isDigit) { ++length; }
 
-            reader_.sliceBuilder.write(reader_.get(length));
+            reader_.sliceBuilder.write(reader_.take(length).array);
         }
 
         /// Scan value of a tag directive.
@@ -1097,7 +1098,8 @@ final class Scanner
         Token scanAnchor(const TokenID id) @trusted
         {
             const startMark = reader_.mark;
-            const dchar i = reader_.get();
+            const dchar i = reader_.front;
+            reader_.popFront();
 
             reader_.sliceBuilder.begin();
             if(i == '*') { scanAlphaNumericToSlice!"an alias"(startMark); }
@@ -1132,7 +1134,7 @@ final class Scanner
         Token scanTag() @trusted
         {
             const startMark = reader_.mark;
-            dchar c = reader_.peek(1);
+            dchar c = reader_.save().drop(1).front;
 
             reader_.sliceBuilder.begin();
             scope(failure) { reader_.sliceBuilder.finish(); }
@@ -1142,7 +1144,7 @@ final class Scanner
 
             if(c == '<')
             {
-                reader_.forward(2);
+                reader_.popFrontN(2);
 
                 handleEnd = 0;
                 scanTagURIToSlice!"tag"(startMark);
@@ -1174,7 +1176,7 @@ final class Scanner
                         break;
                     }
                     ++length;
-                    c = reader_.peek(length);
+                    c = reader_.save().drop(length).front;
                 }
 
                 if(useHandle)
@@ -1491,7 +1493,8 @@ final class Scanner
         Token scanFlowScalar(const ScalarStyle quotes) @trusted
         {
             const startMark = reader_.mark;
-            const quote     = reader_.get();
+            const quote     = reader_.front;
+            reader_.popFront();
 
             reader_.sliceBuilder.begin();
             scope(exit) if(error_) { reader_.sliceBuilder.finish(); }
@@ -1526,35 +1529,14 @@ final class Scanner
                 dchar c = reader_.front;
 
                 size_t numCodePoints = 0;
-                // This is an optimized way of writing:
-                // while(!reader_.peek(numCodePoints).among!(allWhiteSpacePlusQuotesAndSlashes)) { ++numCodePoints; }
-                outer: for(size_t oldSliceLength;;)
-                {
-                    // This will not necessarily make slice 32 chars longer, as not all
-                    // code points are 1 char.
-                    const char[] slice = reader_.slice(numCodePoints + 32);
-                    if(slice.length == oldSliceLength)
-                    {
-                        error("While reading a flow scalar", startMark,
-                              "reached end of file", reader_.mark);
-                        return;
-                    }
-                    for(size_t i = oldSliceLength; i < slice.length;)
-                    {
-                        // slice is UTF-8 - need to decode
-                        const ch = slice[i] < 0x80 ? slice[i++] : decodeValidUTF8NoGC(slice, i);
-                        if(ch.among!(allWhiteSpacePlusQuotesAndSlashes)) { break outer; }
-                        ++numCodePoints;
-                    }
-                    oldSliceLength = slice.length;
-                }
+                while(!reader_.save().drop(numCodePoints).front.among!(allWhiteSpacePlusQuotesAndSlashes)) { ++numCodePoints; }
 
-                reader_.sliceBuilder.write(reader_.get(numCodePoints));
+                reader_.sliceBuilder.write(reader_.take(numCodePoints).array);
 
                 c = reader_.front;
-                if(quotes == SingleQuoted && c == '\'' && reader_.peek(1) == '\'')
+                if(quotes == SingleQuoted && c == '\'' && reader_.save().drop(1).front == '\'')
                 {
-                    reader_.forward(2);
+                    reader_.popFrontN(2);
                     reader_.sliceBuilder.write('\'');
                 }
                 else if((quotes == DoubleQuoted && c == '\'') ||
@@ -1581,14 +1563,14 @@ final class Scanner
                         const hexLength = dyaml.escapes.escapeHexLength(c);
                         reader_.popFront();
 
-                        foreach(i; 0 .. hexLength) if(!reader_.peek(i).isHexDigit)
+                        foreach(i; 0 .. hexLength) if(!reader_.save().drop(i).front.isHexDigit)
                         {
                             error("While scanning a double quoted scalar", startMark,
                                   expected("escape sequence of hexadecimal numbers",
-                                           reader_.peek(i)), reader_.mark);
+                                           reader_.save().drop(i).front), reader_.mark);
                             return;
                         }
-                        char[] hex = reader_.get(hexLength);
+                        dchar[] hex = reader_.take(hexLength).array;
                         char[2] escapeStart = ['\\', cast(char) c];
                         reader_.sliceBuilder.write(escapeStart);
                         reader_.sliceBuilder.write(hex);
@@ -1634,12 +1616,14 @@ final class Scanner
         void scanFlowScalarSpacesToSlice(const Mark startMark) @system
         {
             // Increase length as long as we see whitespace.
-            size_t length = 0;
-            while(reader_.peekByte(length).among!(whiteSpaces)) { ++length; }
-            auto whitespaces = reader_.prefixBytes(length);
+            char[] whitespaces;
+            while(reader_.front.among!(whiteSpaces)) {
+                whitespaces ~= reader_.front;
+                reader_.popFront();
+            }
 
             // Can check the last byte without striding because '\0' is ASCII
-            const c = reader_.peek(length);
+            const c = reader_.front;
             if(c == '\0')
             {
                 error("While scanning a quoted scalar", startMark,
@@ -1650,13 +1634,11 @@ final class Scanner
             // Spaces not followed by a line break.
             if(!c.among!(newLines))
             {
-                reader_.forward(length);
                 reader_.sliceBuilder.write(whitespaces);
                 return;
             }
 
             // There's a line break after the spaces.
-            reader_.forward(length);
             const lineBreak = scanLineBreak();
 
             if(lineBreak != '\n') { reader_.sliceBuilder.write(lineBreak); }
@@ -1683,9 +1665,8 @@ final class Scanner
             for(;;)
             {
                 // Instead of checking indentation, we check for document separators.
-                const prefix = reader_.prefix(3);
-                if((prefix == "---" || prefix == "...") &&
-                   reader_.peek(3).among!(allWhiteSpace))
+                if(reader_.save().startsWith("---", "...") &&
+                   reader_.save().drop(3).front.among!(allWhiteSpace))
                 {
                     error("While scanning a quoted scalar", startMark,
                           "found unexpected document separator", reader_.mark);
@@ -1733,10 +1714,10 @@ final class Scanner
                 // Moved the if() out of the loop for optimization.
                 if(flowLevel_ == 0)
                 {
-                    c = reader_.peek(length);
+                    c = reader_.save().drop(length).front;
                     for(;;)
                     {
-                        const cNext = reader_.peek(length + 1);
+                        const cNext = reader_.save().drop(length+1).front;
                         if(c.among!(allWhiteSpace) ||
                            (c == ':' && cNext.among!(allWhiteSpace)))
                         {
@@ -1750,7 +1731,7 @@ final class Scanner
                 {
                     for(;;)
                     {
-                        c = reader_.peek(length);
+                        c = reader_.save().drop(length).front;
                         if(c.among!(allWhiteSpace, ',', ':', '?', squareBrackets, curlyBraces))
                         {
                             break;
@@ -1761,12 +1742,12 @@ final class Scanner
 
                 // It's not clear what we should do with ':' in the flow context.
                 if(flowLevel_ > 0 && c == ':' &&
-                   !reader_.peek(length + 1).among!(allWhiteSpace, ',', squareBrackets, curlyBraces))
+                   !reader_.save().drop(length + 1).front.among!(allWhiteSpace, ',', squareBrackets, curlyBraces))
                 {
                     // This is an error; throw the slice away.
                     spacesTransaction.commit();
                     reader_.sliceBuilder.finish();
-                    reader_.forward(length);
+                    reader_.popFrontN(length);
                     error("While scanning a plain scalar", startMark,
                           "found unexpected ':' . Please check "
                           "http://pyyaml.org/wiki/YAMLColonInFlowContext for details.",
@@ -1778,7 +1759,7 @@ final class Scanner
 
                 allowSimpleKey_ = false;
 
-                reader_.sliceBuilder.write(reader_.get(length));
+                reader_.sliceBuilder.write(reader_.take(length).array);
 
                 endMark = reader_.mark;
 
@@ -1810,10 +1791,11 @@ final class Scanner
             // We just forbid them completely. Do not use tabs in YAML!
 
             // Get as many plain spaces as there are.
-            size_t length = 0;
-            while(reader_.peekByte(length) == ' ') { ++length; }
-            char[] whitespaces = reader_.prefixBytes(length);
-            reader_.forward(length);
+            char[] whitespaces;
+            while(reader_.front == ' ') {
+                whitespaces ~= reader_.front;
+                reader_.popFront();
+            }
 
             dchar c = reader_.front;
             // No newline after the spaces (if any)
@@ -1828,11 +1810,10 @@ final class Scanner
             const lineBreak = scanLineBreak();
             allowSimpleKey_ = true;
 
-            static bool end(Reader reader_) @safe pure nothrow @nogc
+            static bool end(Reader reader_)
             {
-                const prefix = reader_.prefix(3);
-                return ("---" == prefix || "..." == prefix)
-                        && reader_.peek(3).among!(allWhiteSpace);
+                return reader_.save().startsWith("---", "...")
+                        && reader_.save().drop(3).front.among!(allWhiteSpace);
             }
 
             if(end(reader_)) { return; }
@@ -1877,24 +1858,24 @@ final class Scanner
             }
 
             uint length = 1;
-            c = reader_.peek(length);
+            c = reader_.save().drop(length).front;
             if(c != ' ')
             {
                 while(c.isAlphaNum || c.among!('-', '_'))
                 {
                     ++length;
-                    c = reader_.peek(length);
+                    c = reader_.save().drop(length).front;
                 }
                 if(c != '!')
                 {
-                    reader_.forward(length);
+                    reader_.popFrontN(length);
                     error(contextMsg, startMark, expected("'!'", c), reader_.mark);
                     return;
                 }
                 ++length;
             }
 
-            reader_.sliceBuilder.write(reader_.get(length));
+            reader_.sliceBuilder.write(reader_.take(length).array);
         }
 
         /// Scan URI in a tag token.
@@ -1914,18 +1895,18 @@ final class Scanner
                 {
                     if(c == '%')
                     {
-                        auto chars = reader_.get(length);
+                        auto chars = reader_.take(length).array;
                         reader_.sliceBuilder.write(chars);
                         length = 0;
                         scanURIEscapesToSlice!name(startMark);
                         if(error_) { return; }
                     }
                     else { ++length; }
-                    c = reader_.peek(length);
+                    c = reader_.save().drop(length).front;
                 }
                 if(length > 0)
                 {
-                    auto chars = reader_.get(length);
+                    auto chars = reader_.take(length).array;
                     reader_.sliceBuilder.write(chars);
                     length = 0;
                 }
@@ -2004,7 +1985,7 @@ final class Scanner
                 // Converting 2 hexadecimal digits to a byte.
                 foreach(k; 0 .. 2)
                 {
-                    const dchar c = reader_.peek(k);
+                    const dchar c = reader_.save().drop(k).front;
                     if(!c.isHexDigit)
                     {
                         auto msg = expected("URI escape sequence of 2 hexadecimal "
@@ -2023,7 +2004,7 @@ final class Scanner
                 }
                 bytes[bytesUsed++] = b;
 
-                reader_.forward(2);
+                reader_.popFrontN(2);
             }
 
             bytesUsed = getDchar(bytes[0 .. bytesUsed], reader_);
@@ -2048,7 +2029,7 @@ final class Scanner
             {
                 if(b == '\n' || b == '\r')
                 {
-                    if(reader_.prefix(2) == "\r\n") { reader_.forward(2); }
+                    if(reader_.save().startsWith("\r\n")) { reader_.popFrontN(2); }
                     else { reader_.popFront(); }
                     return '\n';
                 }
@@ -2067,6 +2048,13 @@ final class Scanner
                 return c;
             }
             return '\0';
+            //switch(reader_.save().startsWith("\r\n", "\r", "\n", "\u0085", "\u2028"d, "\u2029"d)) {
+            //    default: return '\0';
+            //    case 1: reader_.popFrontN(2); return '\n';
+            //    case 2,3,4: reader_.popFront(); return '\n';
+            //    case 5: reader_.popFront(); return '\u2028';
+            //    case 6: reader_.popFront(); return '\u2029';
+            //}
         }
 }
 

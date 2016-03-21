@@ -330,7 +330,6 @@ struct Emitter
             enforce(eventTypeIs(EventID.StreamStart),
                     new EmitterException("Expected StreamStart, but got " ~ event_.idString));
 
-            encoding_ = event_.encoding;
             writeStreamStart();
             state_ = &expectDocumentStart!(Yes.first);
         }

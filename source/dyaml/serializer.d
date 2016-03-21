@@ -17,7 +17,6 @@ import std.typecons;
 
 import dyaml.anchor;
 import dyaml.emitter;
-import dyaml.encoding;
 import dyaml.event;
 import dyaml.exception;
 import dyaml.node;
@@ -68,7 +67,7 @@ struct Serializer
          *          YAMLVersion   = YAML version string.
          *          tagDirectives = Tag directives to emit.
          */
-        this(ref Emitter emitter, Resolver resolver, Encoding encoding,
+        this(ref Emitter emitter, Resolver resolver,
              const Flag!"explicitStart" explicitStart,
              const Flag!"explicitEnd" explicitEnd, string YAMLVersion,
              TagDirective[] tagDirectives) @trusted
@@ -80,7 +79,7 @@ struct Serializer
             YAMLVersion_   = YAMLVersion;
             tagDirectives_ = tagDirectives;
 
-            emitter_.emit(streamStartEvent(Mark(), Mark(), encoding));
+            emitter_.emit(streamStartEvent(Mark(), Mark()));
         }
 
         ///Destroy the Serializer.

@@ -258,7 +258,7 @@ final class Parser
         {
             const token = scanner_.getToken();
             state_ = &parseImplicitDocumentStart;
-            return streamStartEvent(token.startMark, token.endMark, token.encoding);
+            return streamStartEvent(token.startMark, token.endMark);
         }
 
         /// Parse implicit document start, unless explicit detected: if so, parse explicit.

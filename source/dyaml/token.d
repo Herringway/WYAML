@@ -11,7 +11,6 @@ module dyaml.token;
 
 import std.conv;
 
-import dyaml.encoding;
 import dyaml.exception;
 import dyaml.reader;
 import dyaml.style;
@@ -82,9 +81,6 @@ struct Token
     /// Style of scalar token, if this is a scalar token.
     ScalarStyle style;
     // 1B
-    /// Encoding, if this is a stream start token.
-    Encoding encoding;
-    // 1B
     /// Type of directive for directiveToken.
     DirectiveType directive;
     // 4B
@@ -108,7 +104,7 @@ static assert(Token.sizeof <= 32, "Token has unexpected size");
 Token directiveToken(const Mark start, const Mark end, char[] value,
                      DirectiveType directive, const uint nameEnd)
 {
-    return Token(value, start, end, TokenID.Directive, ScalarStyle.init, Encoding.init,
+    return Token(value, start, end, TokenID.Directive, ScalarStyle.init,
                  directive, nameEnd);
 }
 
@@ -127,9 +123,9 @@ Token simpleToken(TokenID id)(const Mark start, const Mark end)
 /// Params:  start    = Start position of the token.
 ///          end      = End position of the token.
 ///          encoding = Encoding of the stream.
-Token streamStartToken(const Mark start, const Mark end, const Encoding encoding)
+Token streamStartToken(const Mark start, const Mark end)
 {
-    return Token(null, start, end, TokenID.StreamStart, ScalarStyle.Invalid, encoding);
+    return Token(null, start, end, TokenID.StreamStart, ScalarStyle.Invalid);
 }
 
 /// Aliases for construction of simple token types.
@@ -153,7 +149,7 @@ alias simpleToken!(TokenID.FlowEntry)          flowEntryToken;
 Token simpleValueToken(TokenID id)(const Mark start, const Mark end, char[] value,
                                    const uint valueDivider = uint.max)
 {
-    return Token(value, start, end, id, ScalarStyle.Invalid, Encoding.init,
+    return Token(value, start, end, id, ScalarStyle.Invalid,
                  DirectiveType.init, valueDivider);
 }
 

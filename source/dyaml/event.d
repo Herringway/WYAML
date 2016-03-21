@@ -15,7 +15,6 @@ import std.conv;
 import std.typecons;
 
 import dyaml.anchor;
-import dyaml.encoding;
 import dyaml.exception;
 import dyaml.reader;
 import dyaml.tag;
@@ -82,8 +81,6 @@ struct Event
     alias explicitDocument = implicit;
     ///TODO figure this out - Unknown, used by PyYAML with Scalar events.
     bool implicit_2;
-    ///Encoding of the stream, if this is a StreamStart.
-    Encoding encoding;
     ///Collection style, if this is a SequenceStart or MappingStart.
     CollectionStyle collectionStyle = CollectionStyle.Invalid;
 
@@ -147,14 +144,13 @@ Event collectionStartEvent(EventID id)
  *          end      = End position of the event in the file/stream.
  *          encoding = Encoding of the stream.
  */
-Event streamStartEvent(const Mark start, const Mark end, const Encoding encoding)
+Event streamStartEvent(const Mark start, const Mark end)
     pure @trusted nothrow
 {
     Event result;
     result.startMark = start;
     result.endMark   = end;
     result.id        = EventID.StreamStart;
-    result.encoding  = encoding;
     return result;
 }
 
