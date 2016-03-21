@@ -33,8 +33,8 @@ void testRepresenterTypes(bool verbose, string codeFilename)
             new Exception("Unimplemented representer test: " ~ baseName));
 
     Node[] expectedNodes = expected[baseName];
-    foreach(encoding; [Encoding.UTF_8, Encoding.UTF_16, Encoding.UTF_32])
-    {
+    //foreach(encoding; [Encoding.UTF_8, Encoding.UTF_16, Encoding.UTF_32])
+    //{
         string output;
         Node[] readNodes;
 
@@ -56,7 +56,6 @@ void testRepresenterTypes(bool verbose, string codeFilename)
         representer.addRepresenter!TestStruct(&representStruct);
         auto dumper = Dumper(outputRangeObject!(ubyte[])(emitStream));
         dumper.representer = representer;
-        dumper.encoding    = encoding;
         dumper.dump(expectedNodes);
 
         output = emitStream.toString;
@@ -74,7 +73,7 @@ void testRepresenterTypes(bool verbose, string codeFilename)
         {
             assert(expectedNodes[n].equals!(No.useTag)(readNodes[n]));
         }
-    }
+    //}
 }
 
 unittest

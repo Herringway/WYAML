@@ -17,7 +17,6 @@ import std.typecons;
 
 import dyaml.anchor;
 import dyaml.emitter;
-import dyaml.encoding;
 import dyaml.event;
 import dyaml.exception;
 import dyaml.linebreak;
@@ -103,8 +102,6 @@ struct Dumper
         uint textWidth_ = 80;
         //Line break to use.
         LineBreak lineBreak_ = LineBreak.Unix;
-        //Character encoding to use.
-        Encoding encoding_ = Encoding.UTF_8;
         //YAML version string.
         string YAMLVersion_ = "1.1";
         //Tag directives to use.
@@ -184,12 +181,6 @@ struct Dumper
         @property void lineBreak(LineBreak lineBreak) pure @safe nothrow
         {
             lineBreak_ = lineBreak;
-        }
-
-        ///Set character _encoding to use. UTF-8 by default.
-        @property void encoding(Encoding encoding) pure @safe nothrow
-        {
-            encoding_ = encoding;
         }
 
         ///Always explicitly write document start?

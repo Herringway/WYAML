@@ -25,7 +25,6 @@ import std.typecons;
 import std.utf;
 
 import dyaml.anchor;
-import dyaml.encoding;
 import dyaml.escapes;
 import dyaml.event;
 import dyaml.exception;
@@ -87,8 +86,6 @@ struct Emitter
 
         ///Stream to write to.
         OutputRange!(ubyte[]) stream_;
-        ///Encoding can be overriden by STREAM-START.
-        Encoding encoding_ = Encoding.UTF_8;
 
         ///Stack of states.
         Array!(void delegate()) states_;
@@ -241,20 +238,20 @@ struct Emitter
         ///Write a string to the file/stream.
         void writeString(const string str) @system
         {
-            final switch(encoding_)
-            {
-                case Encoding.UTF_8:
+            //final switch(encoding_)
+            //{
+            //    case Encoding.UTF_8:
                     stream_.put(cast(ubyte[])str);
-                    break;
-                case Encoding.UTF_16:
-                    const buffer = to!wstring(str);
-                    stream_.put(cast(ubyte[])buffer);
-                    break;
-                case Encoding.UTF_32:
-                    const buffer = to!dstring(str);
-                    stream_.put(cast(ubyte[])buffer);
-                    break;
-            }
+            //        break;
+            //    case Encoding.UTF_16:
+            //        const buffer = to!wstring(str);
+            //        stream_.put(cast(ubyte[])buffer);
+            //        break;
+            //    case Encoding.UTF_32:
+            //        const buffer = to!dstring(str);
+            //        stream_.put(cast(ubyte[])buffer);
+            //        break;
+            //}
         }
 
         ///In some cases, we wait for a few next events before emitting.
@@ -1178,22 +1175,22 @@ struct Emitter
         {
             ubyte[] bom;
             //Write BOM (always, even for UTF-8)
-            final switch(encoding_)
-            {
-                case Encoding.UTF_8:
+            //final switch(encoding_)
+            //{
+            //    case Encoding.UTF_8:
                     bom = [0xEF, 0xBB, 0xBF];
-                    break;
-                case Encoding.UTF_16:
-                    bom = std.system.endian == Endian.littleEndian
-                          ? [0xFF, 0xFE]
-                          : [0xFE, 0xFF];
-                    break;
-                case Encoding.UTF_32:
-                    bom = std.system.endian == Endian.littleEndian
-                          ? [0xFF, 0xFE, 0x00, 0x00]
-                          : [0x00, 0x00, 0xFE, 0xFF];
-                    break;
-            }
+            //        break;
+            //    case Encoding.UTF_16:
+            //        bom = std.system.endian == Endian.littleEndian
+            //              ? [0xFF, 0xFE]
+            //              : [0xFE, 0xFF];
+            //        break;
+            //    case Encoding.UTF_32:
+            //        bom = std.system.endian == Endian.littleEndian
+            //              ? [0xFF, 0xFE, 0x00, 0x00]
+            //              : [0x00, 0x00, 0xFE, 0xFF];
+            //        break;
+            //}
             stream_.put(bom);
         }
 

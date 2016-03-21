@@ -24,7 +24,6 @@ import std.utf;
 
 import tinyendian;
 
-import dyaml.encoding;
 import dyaml.exception;
 import dyaml.nogcutil;
 
@@ -64,9 +63,6 @@ final class Reader
         // Current column in file.
         uint column_;
 
-        // Original Unicode encoding of the data.
-        Encoding encoding_;
-
         version(unittest)
         {
             // Endianness of the input before it was converted (for testing)
@@ -104,7 +100,6 @@ final class Reader
             }
 
             version(unittest) { endian_ = endianResult.endian; }
-            encoding_ = endianResult.encoding;
 
             auto utf8Result = toUTF8(endianResult.array, endianResult.encoding);
             const msg = utf8Result.errorMessage;
@@ -146,7 +141,6 @@ final class Reader
             output.characterCount_ = characterCount_;
             output.line_ = line_;
             output.column_ = column_;
-            output.encoding_ = encoding_;
             output.upcomingASCII_ = upcomingASCII_;
             output.lastDecodedBufferOffset_ = lastDecodedBufferOffset_;
             output.lastDecodedCharOffset_ = lastDecodedCharOffset_;
@@ -214,9 +208,6 @@ final class Reader
 
         /// Get current column number.
         uint column() const { return column_; }
-
-        /// Get encoding of the input buffer.
-        deprecated Encoding encoding() const { return encoding_; }
 
 private:
         // Update upcomingASCII_ (should be called forward()ing over a UTF-8 sequence)
