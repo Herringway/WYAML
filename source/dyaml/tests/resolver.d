@@ -10,7 +10,6 @@ module dyaml.tests.resolver;
 version(unittest)
 {
 
-import std.file;
 import std.string;
 
 import dyaml.tests.common;
@@ -25,7 +24,7 @@ import dyaml.tests.common;
  */
 void testImplicitResolver(bool verbose, string dataFilename, string detectFilename)
 {
-    string correctTag;
+    char[] correctTag;
     Node node;
 
     scope(failure)
@@ -38,7 +37,7 @@ void testImplicitResolver(bool verbose, string dataFilename, string detectFilena
     }
 
     correctTag = readText(detectFilename).strip();
-    node = Loader(read(dataFilename)).load();
+    node = Loader(readText!(char[])(dataFilename)).load();
     assert(node.isSequence);
     foreach(ref Node scalar; node)
     {

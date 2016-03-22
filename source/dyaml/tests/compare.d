@@ -12,7 +12,6 @@ version(unittest)
 
 import dyaml.tests.common;
 import dyaml.token;
-import std.file;
 
 /// Test parser by comparing output from parsing two equivalent YAML files.
 ///
@@ -21,8 +20,8 @@ import std.file;
 ///          canonicalFilename = Another file to parse, in canonical YAML format.
 void testParser(bool verbose, string dataFilename, string canonicalFilename)
 {
-    auto dataEvents = Loader(read(dataFilename)).parse();
-    auto canonicalEvents = Loader(read(canonicalFilename)).parse();
+    auto dataEvents = Loader(readText!(char[])(dataFilename)).parse();
+    auto canonicalEvents = Loader(readText!(char[])(canonicalFilename)).parse();
 
     assert(dataEvents.length == canonicalEvents.length);
 
@@ -40,8 +39,8 @@ void testParser(bool verbose, string dataFilename, string canonicalFilename)
 ///          canonicalFilename = Another file to load, in canonical YAML format.
 void testLoader(bool verbose, string dataFilename, string canonicalFilename)
 {
-    auto data = Loader(read(dataFilename)).loadAll();
-    auto canonical = Loader(read(canonicalFilename)).loadAll();
+    auto data = Loader(readText!(char[])(dataFilename)).loadAll();
+    auto canonical = Loader(readText!(char[])(canonicalFilename)).loadAll();
 
     assert(data.length == canonical.length, "Unequal node count");
     foreach(n; 0 .. data.length)

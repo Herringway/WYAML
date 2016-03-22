@@ -19,11 +19,11 @@ import std.algorithm;
 //
 // Params:  verbose = Print verbose output?
 //          data    = Stream to read.
-void runReader(const bool verbose, ubyte[] fileData)
+void runReader(const bool verbose, char[] fileData)
 {
     try
     {
-        auto reader = new Reader(cast(ubyte[])fileData);
+        auto reader = new Reader(fileData);
         while(reader.front != '\0') { reader.popFront(); }
         assert(false, "Expected an exception");
     }
@@ -41,7 +41,7 @@ void runReader(const bool verbose, ubyte[] fileData)
 void testStreamError(bool verbose, string errorFilename)
 {
     import std.file;
-    runReader(verbose, cast(ubyte[])std.file.read(errorFilename));
+    runReader(verbose, cast(char[])std.file.read(errorFilename));
 }
 
 unittest

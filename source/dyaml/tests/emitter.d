@@ -11,7 +11,6 @@ version(unittest)
 {
 
 import std.algorithm;
-import std.file;
 import std.outbuffer;
 import std.range;
 import std.typecons;
@@ -83,7 +82,7 @@ bool compareEvents(Event[] events1, Event[] events2)
 void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilename)
 {
     //Must exist due to Anchor, Tags reference counts.
-    auto loader = Loader(read(dataFilename));
+    auto loader = Loader(readText!(char[])(dataFilename));
     auto events = cast(Event[])loader.parse();
     auto emitStream = new OutBuffer;
     Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(events);
@@ -95,7 +94,7 @@ void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilena
         writeln("OUTPUT:\n", emitStream.toString);
     }
 
-    auto loader2        = Loader(emitStream.toBytes());
+    auto loader2        = Loader(emitStream.toString().dup);
     loader2.name        = "TEST";
     loader2.constructor = new Constructor;
     loader2.resolver    = new Resolver;
@@ -112,7 +111,7 @@ void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilena
 void testEmitterOnCanonical(bool verbose, string canonicalFilename)
 {
     //Must exist due to Anchor, Tags reference counts.
-    auto loader = Loader(read(canonicalFilename));
+    auto loader = Loader(readText!(char[])(canonicalFilename));
     auto events = cast(Event[])loader.parse();
     foreach(canonical; [false, true])
     {
@@ -125,7 +124,7 @@ void testEmitterOnCanonical(bool verbose, string canonicalFilename)
             writeln("OUTPUT (canonical=", canonical, "):\n",
                     emitStream.toString());
         }
-        auto loader2        = Loader(emitStream.toBytes());
+        auto loader2        = Loader(emitStream.toString().dup);
         loader2.name        = "TEST";
         loader2.constructor = new Constructor;
         loader2.resolver    = new Resolver;
@@ -147,7 +146,7 @@ void testEmitterStyles(bool verbose, string dataFilename, string canonicalFilena
     foreach(filename; [dataFilename, canonicalFilename])
     {
         //must exist due to Anchor, Tags reference counts
-        auto loader = Loader(read(canonicalFilename));
+        auto loader = Loader(readText!(char[])(canonicalFilename));
         auto events = cast(Event[])loader.parse();
         foreach(flowStyle; [CollectionStyle.Block, CollectionStyle.Flow])
         {
@@ -184,7 +183,7 @@ void testEmitterStyles(bool verbose, string dataFilename, string canonicalFilena
                             to!string(style), ")");
                     writeln(emitStream.toString);
                 }
-                auto loader2        = Loader(emitStream.toBytes());
+                auto loader2        = Loader(emitStream.toString().dup);
                 loader2.name        = "TEST";
                 loader2.constructor = new Constructor;
                 loader2.resolver    = new Resolver;

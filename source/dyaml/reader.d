@@ -90,9 +90,9 @@ final class Reader
         ///
         /// Throws:  ReaderException on a UTF decoding error or if there are
         ///          nonprintable Unicode characters illegal in YAML.
-        this(ubyte[] buffer) @trusted pure //!nothrow
+        this(void[] buffer) @trusted pure //!nothrow
         {
-            auto endianResult = fixUTFByteOrder(buffer);
+            auto endianResult = fixUTFByteOrder(cast(ubyte[])buffer);
             if(endianResult.bytesStripped > 0)
             {
                 throw new ReaderException("Size of UTF-16 or UTF-32 input not aligned "
@@ -109,8 +109,11 @@ final class Reader
             }
 
             buffer_ = utf8Result.utf8;
+            //buffer_ = buffer;
 
             characterCount_ = utf8Result.characterCount;
+            //characterCount_ = buffer.length;
+
             // Check that all characters in buffer are printable.
             enforce(isPrintableValidUTF8(buffer_),
                     new ReaderException("Special unicode characters are not allowed"));
@@ -775,7 +778,7 @@ size_t countASCII(const(char)[] buffer) @trusted pure nothrow @nogc
 void testEndian(R)()
 {
     writeln(typeid(R).toString() ~ ": endian unittest");
-    void endian_test(ubyte[] data, Encoding encoding_expected, Endian endian_expected)
+    void endian_test(char[] data, Encoding encoding_expected, Endian endian_expected)
     {
         auto reader = new R(data);
         //assert(reader.encoding == encoding_expected);
@@ -789,9 +792,8 @@ void testEndian(R)()
 
 void testPeekPrefixForward(R)()
 {
-    import std.stream;
     writeln(typeid(R).toString() ~ ": peek/prefix/forward unittest");
-    ubyte[] data = ByteOrderMarks[BOM.UTF8] ~ cast(ubyte[])"data";
+    char[] data = "data".dup;
     auto reader = new R(data);
     assert(reader.save().startsWith("data"));
     assert(reader[0..4] == "data");
@@ -800,25 +802,23 @@ void testPeekPrefixForward(R)()
 
 void testUTF(R)()
 {
-    import std.stream;
     writeln(typeid(R).toString() ~ ": UTF formats unittest");
     dchar[] data = cast(dchar[])"data";
-    void utf_test(T)(T[] data, BOM bom)
+    void utf_test(T)(T[] data)
     {
-        ubyte[] bytes = ByteOrderMarks[bom] ~
-                        (cast(ubyte[])data)[0 .. data.length * T.sizeof];
+        char[] bytes = data.to!(char[]);
         auto reader = new R(bytes);
         assert(reader.startsWith("data"));
     }
-    utf_test!char(to!(char[])(data), BOM.UTF8);
-    utf_test!wchar(to!(wchar[])(data), endian == Endian.bigEndian ? BOM.UTF16BE : BOM.UTF16LE);
-    utf_test(data, endian == Endian.bigEndian ? BOM.UTF32BE : BOM.UTF32LE);
+    utf_test!char(to!(char[])(data));
+    utf_test!wchar(to!(wchar[])(data));
+    utf_test(data);
 }
 
 void test1Byte(R)()
 {
     writeln(typeid(R).toString() ~ ": 1 byte file unittest");
-    ubyte[] data = [97];
+    char[] data = [97];
 
     auto reader = new R(data);
     assert(reader.front == 'a');

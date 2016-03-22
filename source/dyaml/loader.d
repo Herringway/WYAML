@@ -136,11 +136,11 @@ struct Loader
          *
          * Throws:  YAMLException if yamlData contains data illegal in YAML.
          */
-        this(void[] yamlData) @safe
+        this(char[] yamlData) @safe
         {
             try
             {
-                reader_      = new Reader(cast(ubyte[])yamlData);
+                reader_      = new Reader(yamlData);
                 scanner_     = new Scanner(reader_);
                 parser_      = new Parser(scanner_);
             }

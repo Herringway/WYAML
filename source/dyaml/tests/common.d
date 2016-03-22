@@ -16,10 +16,14 @@ public import dyaml;
 import core.exception;
 import std.algorithm;
 import std.array;
+import std.bitmanip;
 import std.conv;
 import std.file;
 import std.path;
+import std.string;
+import std.system;
 import std.typecons;
+import std.utf;
 
 package:
 
@@ -65,7 +69,78 @@ void run(F ...)(string testName, void function(bool, F) testFunction,
     display(results, verbose);
 }
 
+T readText(T = char[])(string path) out(result) {
+    validate(result);
+} body {
+    import std.range;
+    auto buf = read(path);
+    if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom16].representation)) {
+        return (cast(wchar[])buf).to!T;
+    } else if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom16(true)].representation)) {
+        foreach (ref character; (cast(wchar[])buf))
+            character = character.swapEndian();
+        return (cast(wchar[])buf).to!T;
+    } else if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom32].representation)) {
+        return (cast(dchar[])buf).to!T;
+    } else if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom32(true)].representation)) {
+        foreach (ref character; (cast(dchar[])buf))
+            character = character.swapEndian();
+        return (cast(dchar[])buf).to!T;
+    }
+    return (cast(char[])buf).to!T;
+    //try {
+    //    return std.file.readText!T(path);
+    //} catch (std.utf.UTFException) {
+    //    auto buffer = cast(T)std.file.read(path);
+    //    foreach (ref character; buffer)
+    //        character = character.swapEndian();
+    //    buffer.validate();
+    //    return buffer;
+    //}
+}
 
+/// Get an UTF-16 byte order mark.
+///
+/// Params:  wrong = Get the incorrect BOM for this system.
+///
+/// Returns: UTF-16 byte order mark.
+wchar bom16(bool wrong = false) pure
+{
+    wchar bom = cast(wchar)0xFFFE;
+    if (!wrong)
+        return bom.swapEndian();
+    return bom;
+}
+unittest {
+    import std.string;
+    auto val = bom16();
+    assert(bom16(true) == val.swapEndian);
+    if (endian == Endian.bigEndian)
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0xFE, 0xFF]);
+    else
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0xFF, 0xFE]);
+}
+/// Get an UTF-32 byte order mark.
+///
+/// Params:  wrong = Get the incorrect BOM for this system.
+///
+/// Returns: UTF-32 byte order mark.
+dchar bom32(bool wrong = false) pure
+{
+    dchar bom = cast(dchar)0xFFFE0000;
+    if (!wrong)
+        return bom.swapEndian();
+    return bom;
+}
+unittest {
+    import std.string;
+    auto val = bom32();
+    assert(bom32(true) == val.swapEndian);
+    if (endian == Endian.bigEndian)
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0x00, 0x00, 0xFE, 0xFF]);
+    else
+        assert(cast(ubyte[])[val].representation == cast(ubyte[])[0xFF, 0xFE, 0x00, 0x00]);
+}
 private:
 
 ///Unittest status.
@@ -202,5 +277,4 @@ void display(Result[] results, const bool verbose)
     if(failures > 0){writeln("FAILURES: ", failures);}
     if(errors > 0)  {writeln("ERRORS: ", errors);}
 }
-
 } // version(unittest)

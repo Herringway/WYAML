@@ -10,8 +10,6 @@ module dyaml.tests.errors;
 version(unittest)
 {
 
-import std.file;
-
 import dyaml.tests.common;
 
 
@@ -21,11 +19,13 @@ import dyaml.tests.common;
 ///          errorFilename = File name to read from.
 void testLoaderError(bool verbose, string errorFilename)
 {
-    auto buffer = std.file.read(errorFilename);
+    try {
+        char[] buffer = readText!(char[])(errorFilename);
 
-    Node[] nodes;
-    try { nodes = Loader(buffer).loadAll(); }
-    catch(YAMLException e)
+        Node[] nodes;
+        nodes = Loader(buffer).loadAll();
+    }
+    catch(Exception e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }
         return;
@@ -40,13 +40,13 @@ void testLoaderError(bool verbose, string errorFilename)
 void testLoaderErrorString(bool verbose, string errorFilename)
 {
     // Load file to a buffer, then pass that to the YAML loader.
-    auto buffer = std.file.read(errorFilename);
 
     try
     {
+        auto buffer = readText!(char[])(errorFilename);
         auto nodes = Loader(buffer).loadAll();
     }
-    catch(YAMLException e)
+    catch(Exception e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }
         return;
@@ -60,8 +60,8 @@ void testLoaderErrorString(bool verbose, string errorFilename)
 ///          errorFilename = File name to read from.
 void testLoaderErrorFilename(bool verbose, string errorFilename)
 {
-    try { auto nodes = Loader(read(errorFilename)).loadAll(); }
-    catch(YAMLException e)
+    try { auto nodes = Loader(readText!(char[])(errorFilename)).loadAll(); }
+    catch(Exception e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }
         return;
@@ -76,8 +76,8 @@ void testLoaderErrorFilename(bool verbose, string errorFilename)
 ///          errorFilename = File name to read from.
 void testLoaderErrorSingle(bool verbose, string errorFilename)
 {
-    try { auto nodes = Loader(read(errorFilename)).load(); }
-    catch(YAMLException e)
+    try { auto nodes = Loader(readText!(char[])(errorFilename)).load(); }
+    catch(Exception e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }
         return;

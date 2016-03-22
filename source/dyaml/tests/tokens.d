@@ -11,7 +11,6 @@ version(unittest)
 {
 
 import std.array;
-import std.file;
 
 import dyaml.tests.common;
 import dyaml.token;
@@ -47,13 +46,13 @@ void testTokens(bool verbose, string dataFilename, string tokensFilename)
                     TokenID.Value              : ":"   ];
 
     string[] tokens1;
-    string[] tokens2 = readText(tokensFilename).split();
+    auto tokens2 = readText(tokensFilename).split();
     scope(exit)
     {
         if(verbose){writeln("tokens1: ", tokens1, "\ntokens2: ", tokens2);}
     }
 
-    auto loader = Loader(read(dataFilename));
+    auto loader = Loader(readText!(char[])(dataFilename));
     foreach(token; loader.scan())
     {
         if(token.id != TokenID.StreamStart && token.id != TokenID.StreamEnd)
@@ -81,7 +80,7 @@ void testScanner(bool verbose, string dataFilename, string canonicalFilename)
         {
             if(verbose){writeln(tokens);}
         }
-        auto loader = Loader(read(filename));
+        auto loader = Loader(readText!(char[])(filename));
         foreach(ref token; loader.scan()){tokens ~= to!string(token.id);}
     }
 }

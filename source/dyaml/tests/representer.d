@@ -63,7 +63,7 @@ void testRepresenterTypes(bool verbose, string codeFilename)
         constructor.addConstructorMapping("!tag1", &constructClass);
         constructor.addConstructorScalar("!tag2", &constructStruct);
 
-        auto loader        = Loader(emitStream.toBytes);
+        auto loader        = Loader(emitStream.toString().dup);
         loader.name        = "TEST";
         loader.constructor = constructor;
         readNodes          = loader.loadAll();
