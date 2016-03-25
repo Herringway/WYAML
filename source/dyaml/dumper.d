@@ -61,7 +61,6 @@ auto dumper(T)(T range) if(isOutputRange!(T, ubyte[])) {
  *
  * Write to memory:
  * --------------------
- * import std.stream;
  * auto stream = new MemoryStream();
  * auto node = Node([1, 2, 3, 4, 5]);
  * Dumper(stream).dump(node);
@@ -314,7 +313,6 @@ unittest
 
 unittest
 {
-    import std.stream;
     auto stream = outputRangeObject!(ubyte[])(new OutBuffer());
     auto node = Node([1, 2, 3, 4, 5]);
     Dumper(stream).dump(node);
