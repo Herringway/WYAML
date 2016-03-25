@@ -91,8 +91,6 @@ struct Dumper
 
         //Stream to write to.
         OutputRange!(ubyte[]) stream_;
-        //True if this Dumper owns stream_ and needs to destroy it in the destructor.
-        bool weOwnStream_ = false;
 
         //Write scalars in canonical form?
         bool canonical_;
@@ -131,7 +129,6 @@ struct Dumper
         @trusted ~this()
         {
             YAMLVersion_ = null;
-            if(weOwnStream_) { destroy(stream_); }
         }
 
         ///Set stream _name. Used in debugging messages.
