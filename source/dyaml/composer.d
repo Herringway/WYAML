@@ -78,16 +78,6 @@ final class Composer
             constructor_ = constructor;
         }
 
-        ///Destroy the composer.
-        pure @safe nothrow ~this()
-        {
-            parser_ = null;
-            resolver_ = null;
-            constructor_ = null;
-            anchors_.destroy();
-            anchors_ = null;
-        }
-
         /**
          * Determine if there are any nodes left.
          *

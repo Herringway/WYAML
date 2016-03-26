@@ -186,21 +186,6 @@ struct Emitter
             analysis_.flags |= ScalarFlags.isNull;
         }
 
-        ///Destroy the emitter.
-        @trusted ~this()
-        {
-            stream_ = null;
-            states_.destroy();
-            events_.destroy();
-            indents_.destroy();
-            tagDirectives_.destroy();
-            tagDirectives_ = null;
-            preparedAnchor_.destroy();
-            preparedAnchor_ = null;
-            preparedTag_.destroy();
-            preparedTag_ = null;
-        }
-
         ///Emit an event. Throws EmitterException on error.
         void emit(Event event) @trusted
         {
@@ -1316,12 +1301,6 @@ struct ScalarWriter
             emitter_ = &emitter;
             text_ = text;
             split_ = split;
-        }
-
-        ///Destroy the ScalarWriter.
-        @trusted nothrow ~this()
-        {
-            text_ = null;
         }
 
         ///Write text as single quoted scalar.

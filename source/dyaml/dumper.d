@@ -124,12 +124,6 @@ struct Dumper
             stream_ = stream;
         }
 
-        ///Destroy the Dumper.
-        @trusted ~this()
-        {
-            YAMLVersion_ = null;
-        }
-
         ///Set stream _name. Used in debugging messages.
         @property void name(string name) pure @safe nothrow
         {

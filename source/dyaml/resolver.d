@@ -70,13 +70,6 @@ final class Resolver
             if(defaultImplicitResolvers){addImplicitResolvers();}
         }
 
-        ///Destroy the Resolver.
-        pure @safe nothrow ~this()
-        {
-            yamlImplicitResolvers_.destroy();
-            yamlImplicitResolvers_ = null;
-        }
-
         /**
          * Add an implicit scalar resolver.
          *

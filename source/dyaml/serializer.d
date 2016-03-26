@@ -86,12 +86,6 @@ struct Serializer
         @safe ~this()
         {
             emitter_.emit(streamEndEvent(Mark(), Mark()));
-            YAMLVersion_.destroy();
-            YAMLVersion_ = null;
-            serializedNodes_.destroy();
-            serializedNodes_ = null;
-            anchors_.destroy();
-            anchors_ = null;
         }
 
         ///Serialize a node, emitting it in the process.

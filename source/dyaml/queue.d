@@ -59,7 +59,7 @@ struct Queue(T)
         @disable int opCmp(ref Queue);
 
         /// Destroy the queue, deallocating all its elements.
-        @trusted nothrow ~this()
+        @trusted nothrow @nogc ~this()
         {
             while(!empty) { pop(); }
             while(freeList_ !is null)
