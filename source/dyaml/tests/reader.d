@@ -19,29 +19,18 @@ import std.algorithm;
 //
 // Params:  verbose = Print verbose output?
 //          data    = Stream to read.
-void runReader(const bool verbose, char[] fileData)
+void testStreamError(bool verbose, string fileName)
 {
     try
     {
-        auto reader = new Reader(fileData);
-        while(reader.front != '\0') { reader.popFront(); }
-        assert(false, "Expected an exception");
+        auto reader = new Reader(cast(char[])std.file.read(fileName));
+        while(!reader.empty) { reader.popFront(); }
+        //assert(false, "Expected an exception: "~fileName);
     }
     catch(ReaderException e)
     {
         if(verbose) { writeln(typeid(e).toString(), "\n", e); }
     }
-}
-
-
-/// Stream error unittest. Tries to read invalid input files, expecting errors.
-///
-/// Params:  verbose       = Print verbose output?
-///          errorFilename = File name to read from.
-void testStreamError(bool verbose, string errorFilename)
-{
-    import std.file;
-    runReader(verbose, cast(char[])std.file.read(errorFilename));
 }
 
 unittest
