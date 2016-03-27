@@ -72,6 +72,16 @@ class ScannerException : MarkedYAMLException
 {
     mixin MarkedExceptionCtors;
 }
+class UnexpectedTokenException : YAMLException {
+    this(string context, in Mark begin, in Mark end, string expected, dchar got, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super("Expected %s in %s, got %s".format(expected, context, got), file, line);
+    }
+}
+class UnexpectedSequenceException : YAMLException {
+    this(string context, in Mark begin, in Mark end, string unexpected, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super("Found unexpected %s in %s".format(unexpected, context), file, line);
+    }
+}
 
 /// Generates tokens from data provided by a Reader.
 final class Scanner
@@ -143,25 +153,6 @@ final class Scanner
         /// Possible simple keys indexed by flow levels.
         SimpleKey[] possibleSimpleKeys_;
 
-
-        /// Set on error by nothrow/@nogc inner functions along with errorData_.
-        ///
-        /// Non-nothrow/GC-using caller functions can then throw an exception using
-        /// data stored in errorData_.
-        bool error_;
-
-        /// Data for the exception to throw if error_ is true.
-        MarkedYAMLExceptionData errorData_;
-
-        /// Error messages can be built in this buffer without using the GC.
-        ///
-        /// ScannerException (MarkedYAMLException) copies string data passed to its
-        /// constructor so it's safe to use slices of this buffer as parameters for
-        /// exceptions that may outlive the Scanner. The GC allocation when creating the
-        /// error message is removed, but the allocation when creating an exception is
-        /// not.
-        char[256] msgBuffer_;
-
     public:
         /// Construct a Scanner using specified Reader.
         this(Reader reader) @safe nothrow
@@ -223,41 +214,6 @@ final class Scanner
         }
 
     private:
-        /// Build an error message in msgBuffer_ and return it as a string.
-        string buildMsg(S ...)(S args) @trusted pure nothrow @nogc
-        {
-            return cast(string)msgBuffer_.printNoGC(args);
-        }
-
-        /// Most scanning error messages have the same format; so build them with this
-        /// function.
-        string expected(T)(string expected, T found) @safe pure nothrow @nogc
-        {
-            return buildMsg("expected ", expected, ", but found ", found);
-        }
-
-        /// If error_ is true, throws a ScannerException constructed from errorData_ and
-        /// sets error_ to false.
-        void throwIfError() @safe pure
-        {
-            if(!error_) { return; }
-            error_ = false;
-            throw new ScannerException(errorData_);
-        }
-
-        /// Called by internal nothrow/@nogc methods to set an error to be thrown by
-        /// their callers.
-        ///
-        /// See_Also: dyaml.exception.MarkedYamlException
-        void error(string context, const Mark contextMark, string problem,
-                   const Mark problemMark) @safe pure nothrow @nogc
-        {
-            assert(error_ == false,
-                   "Setting an error when there already is a not yet thrown error");
-            error_     = true;
-            errorData_ = MarkedYAMLExceptionData(context, contextMark, problem, problemMark);
-        }
-
         /// Determine whether or not we need to fetch more tokens before peeking/getting a token.
         bool needMoreTokens() @safe pure
         {
@@ -475,7 +431,6 @@ final class Scanner
             allowSimpleKey_ = false;
 
             auto directive = scanDirective();
-            throwIfError();
             tokens_.push(directive);
         }
 
@@ -659,7 +614,6 @@ final class Scanner
             allowSimpleKey_ = false;
 
             auto anchor = scanAnchor(id);
-            throwIfError();
             tokens_.push(anchor);
         }
 
@@ -676,7 +630,6 @@ final class Scanner
             allowSimpleKey_ = false;
 
             tokens_.push(scanTag());
-            throwIfError();
         }
 
         /// Add block SCALAR token.
@@ -689,7 +642,6 @@ final class Scanner
             allowSimpleKey_ = true;
 
             auto blockScalar = scanBlockScalar(style);
-            throwIfError();
             tokens_.push(blockScalar);
         }
 
@@ -707,7 +659,6 @@ final class Scanner
 
             // Scan and add SCALAR.
             auto scalar = scanFlowScalar(quotes);
-            throwIfError();
             tokens_.push(scalar);
         }
 
@@ -724,7 +675,6 @@ final class Scanner
             // change this flag if the scan is finished at the beginning of the line.
             allowSimpleKey_ = false;
             auto plain = scanPlain();
-            throwIfError();
 
             // Scan and add SCALAR. May change allowSimpleKey_
             tokens_.push(plain);
@@ -750,6 +700,8 @@ final class Scanner
         bool checkSequence(string T)() @safe
         {
             if (reader_.column != 0)
+                return false;
+            if (reader_.empty)
                 return false;
             auto readerCopy = reader_.save();
             if (!readerCopy.startsWith(T))
@@ -810,28 +762,20 @@ final class Scanner
         /// Move to the next non-space character.
         void findNextNonSpace() @safe
         {
-            while(reader_.skipOver(' ')) {}
+            while(!reader_.empty && reader_.skipOver(' ')) {}
         }
 
         /// Scan a string of alphanumeric or "-_" characters.
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanAlphaNumericToSlice(string name)(const Mark startMark) @system
         {
             size_t length = 0;
             dchar c = reader_.front;
             while(c.isAlphaNum || c.among!('-', '_')) { c = reader_.save().drop(++length).front; }
 
-            if(length == 0)
-            {
-                enum contextMsg = "While scanning " ~ name;
-                error(contextMsg, startMark, expected("alphanumeric, '-' or '_'", c),
-                      reader_.mark);
-                return;
-            }
+            enforce(length != 0, new UnexpectedTokenException(name, startMark, reader_.mark, "alphanumeric, '-', or '_'", c));
 
             reader_.sliceBuilder.write(reader_.take(length).array);
         }
@@ -839,7 +783,7 @@ final class Scanner
         /// Scan and throw away all characters until next line break.
         void scanToNextBreak() @safe
         {
-            while(!reader_.front.among!(allBreaks)) { reader_.popFront(); }
+            while(!reader_.startsWith(allBreaks)) { reader_.popFront(); }
         }
 
         /// Scan all characters until next line break.
@@ -905,7 +849,7 @@ final class Scanner
             // Scan directive name
             reader_.sliceBuilder.begin();
             scanDirectiveNameToSlice(startMark);
-            if(error_) { return Token.init; }
+
             const name = reader_.sliceBuilder.finish();
 
             reader_.sliceBuilder.begin();
@@ -914,7 +858,6 @@ final class Scanner
             uint tagHandleEnd = uint.max;
             if(name == "YAML")     { scanYAMLDirectiveValueToSlice(startMark); }
             else if(name == "TAG") { tagHandleEnd = scanTagDirectiveValueToSlice(startMark); }
-            if(error_) { return Token.init; }
             char[] value = reader_.sliceBuilder.finish();
 
             Mark endMark = reader_.mark;
@@ -929,7 +872,6 @@ final class Scanner
             }
 
             scanDirectiveIgnoredLine(startMark);
-            if(error_) { return Token.init; }
 
             return directiveToken(startMark, endMark, value, directive, tagHandleEnd);
         }
@@ -938,72 +880,44 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanDirectiveNameToSlice(const Mark startMark) @system
         {
             // Scan directive name.
             scanAlphaNumericToSlice!"a directive"(startMark);
-            if(error_) { return; }
-
-            if(reader_.front.among!(allWhiteSpace)) { return; }
-            error("While scanning a directive", startMark,
-                  expected("alphanumeric, '-' or '_'", reader_.front), reader_.mark);
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", startMark, reader_.mark, "alphanumeric, '-' or '_'", reader_.front));
         }
 
         /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanYAMLDirectiveValueToSlice(const Mark startMark) @system
         {
             findNextNonSpace();
 
             scanYAMLDirectiveNumberToSlice(startMark);
-            if(error_) { return; }
 
-            if(reader_.front != '.')
-            {
-                error("While scanning a directive", startMark,
-                      expected("digit or '.'", reader_.front), reader_.mark);
-                return;
-            }
+            enforce(reader_.front == '.', new UnexpectedTokenException("directive", startMark, reader_.mark, "digit or '.'", reader_.front));
             // Skip the '.'.
             reader_.popFront();
 
             reader_.sliceBuilder.write('.');
             scanYAMLDirectiveNumberToSlice(startMark);
-            if(error_) { return; }
 
-            if(!reader_.front.among!(allWhiteSpace))
-            {
-                error("While scanning a directive", startMark,
-                      expected("digit or '.'", reader_.front), reader_.mark);
-            }
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", startMark, reader_.mark, "digit or '.'", reader_.front));
         }
 
         /// Scan a number from a YAML directive.
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanYAMLDirectiveNumberToSlice(const Mark startMark) @system
         {
-            if(!isDigit(reader_.front))
-            {
-                error("While scanning a directive", startMark,
-                      expected("digit", reader_.front), reader_.mark);
-                return;
+            enforce(reader_.front.isDigit, new UnexpectedTokenException("directive", startMark, reader_.mark, "digit", reader_.front));
+            while (reader_.front.isDigit) {
+                reader_.sliceBuilder.write(reader_.front);
+                reader_.popFront();
             }
-
-            // Already found the first digit in the enforce(), so set length to 1.
-            uint length = 1;
-            while(reader_.save().drop(length).front.isDigit) { ++length; }
-
-            reader_.sliceBuilder.write(reader_.take(length).array);
         }
 
         /// Scan value of a tag directive.
@@ -1012,14 +926,11 @@ final class Scanner
         /// characters into that slice.
         ///
         /// Returns: Length of tag handle (which is before tag prefix) in scanned data
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         uint scanTagDirectiveValueToSlice(const Mark startMark) @system
         {
             findNextNonSpace();
             const startLength = reader_.sliceBuilder.length;
             scanTagDirectiveHandleToSlice(startMark);
-            if(error_) { return uint.max; }
             const handleLength = cast(uint)(reader_.sliceBuilder.length  - startLength);
             findNextNonSpace();
             scanTagDirectivePrefixToSlice(startMark);
@@ -1031,45 +942,29 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanTagDirectiveHandleToSlice(const Mark startMark) @system
         {
             scanTagHandleToSlice!"directive"(startMark);
-            if(error_) { return; }
-            if(reader_.front == ' ') { return; }
-            error("While scanning a directive handle", startMark,
-                  expected("' '", reader_.front), reader_.mark);
+            enforce(reader_.front == ' ', new UnexpectedTokenException("directive", startMark, reader_.mark, "' '", reader_.front));
         }
 
         /// Scan prefix of a tag directive.
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanTagDirectivePrefixToSlice(const Mark startMark) @system
         {
             scanTagURIToSlice!"directive"(startMark);
-            if(reader_.front.among!(allWhiteSpace)) { return; }
-            error("While scanning a directive prefix", startMark,
-                  expected("' '", reader_.front), reader_.mark);
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", startMark, reader_.mark, "' '", reader_.front));
         }
 
         /// Scan (and ignore) ignored line after a directive.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanDirectiveIgnoredLine(const Mark startMark) @safe
         {
             findNextNonSpace();
             if(reader_.front == '#') { scanToNextBreak(); }
-            if(reader_.front.among!(allBreaks))
-            {
-                scanLineBreak();
-                return;
-            }
-            error("While scanning a directive", startMark,
-                  expected("comment or a line break", reader_.front), reader_.mark);
+            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("directive", startMark, reader_.mark, "comment or a line break", reader_.front));
+            scanLineBreak();
         }
 
 
@@ -1083,8 +978,6 @@ final class Scanner
         /// and
         ///   [ *alias , "value" ]
         /// Therefore we restrict aliases to ASCII alphanumeric characters.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         Token scanAnchor(const TokenID id) @trusted
         {
             const startMark = reader_.mark;
@@ -1094,33 +987,21 @@ final class Scanner
             reader_.sliceBuilder.begin();
             if(i == '*') { scanAlphaNumericToSlice!"an alias"(startMark); }
             else         { scanAlphaNumericToSlice!"an anchor"(startMark); }
-            // On error, value is discarded as we return immediately
+
+            enforce(reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", startMark, reader_.mark, "alphanumeric, '-' or '_'", reader_.front));
+
             char[] value = reader_.sliceBuilder.finish();
-            if(error_)   { return Token.init; }
-
-            if(!reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'))
-            {
-                enum anchorCtx = "While scanning an anchor";
-                enum aliasCtx  = "While scanning an alias";
-                error(i == '*' ? aliasCtx : anchorCtx, startMark,
-                      expected("alphanumeric, '-' or '_'", reader_.front), reader_.mark);
-                return Token.init;
+            switch(id) {
+                case TokenID.Alias:
+                    return aliasToken(startMark, reader_.mark, value);
+                case TokenID.Anchor:
+                    return anchorToken(startMark, reader_.mark, value);
+                default:
+                    assert(false, "Invalid token reached");
             }
-
-            if(id == TokenID.Alias)
-            {
-                return aliasToken(startMark, reader_.mark, value);
-            }
-            if(id == TokenID.Anchor)
-            {
-                return anchorToken(startMark, reader_.mark, value);
-            }
-            assert(false, "This code should never be reached");
         }
 
         /// Scan a tag token.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         Token scanTag() @trusted
         {
             const startMark = reader_.mark;
@@ -1138,13 +1019,7 @@ final class Scanner
 
                 handleEnd = 0;
                 scanTagURIToSlice!"tag"(startMark);
-                if(error_) { return Token.init; }
-                if(reader_.front != '>')
-                {
-                    error("While scanning a tag", startMark,
-                          expected("'>'", reader_.front), reader_.mark);
-                    return Token.init;
-                }
+                enforce(reader_.front == '>', new UnexpectedTokenException("tag", startMark, reader_.mark, "'>'", reader_.front));
                 reader_.popFront();
             }
             else if(c.among!(allWhiteSpace))
@@ -1173,7 +1048,6 @@ final class Scanner
                 {
                     scanTagHandleToSlice!"tag"(startMark);
                     handleEnd = cast(uint)reader_.sliceBuilder.length;
-                    if(error_) { return Token.init; }
                 }
                 else
                 {
@@ -1183,23 +1057,15 @@ final class Scanner
                 }
 
                 scanTagURIToSlice!"tag"(startMark);
-                if(error_) { return Token.init; }
             }
 
-            if(reader_.front.among!(allWhiteSpace))
-            {
-                char[] slice = reader_.sliceBuilder.finish();
-                return tagToken(startMark, reader_.mark, slice, handleEnd);
-            }
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("tag", startMark, reader_.mark, "' '", reader_.front));
 
-            error("While scanning a tag", startMark, expected("' '", reader_.front),
-                  reader_.mark);
-            return Token.init;
+            char[] slice = reader_.sliceBuilder.finish();
+            return tagToken(startMark, reader_.mark, slice, handleEnd);
         }
 
         /// Scan a block scalar token with specified style.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         Token scanBlockScalar(const ScalarStyle style) @trusted
         {
             const startMark = reader_.mark;
@@ -1208,12 +1074,10 @@ final class Scanner
             reader_.popFront();
 
             const indicators = scanBlockScalarIndicators(startMark);
-            if(error_) { return Token.init; }
 
             const chomping   = indicators[0];
             const increment  = indicators[1];
             scanBlockScalarIgnoredLine(startMark);
-            if(error_) { return Token.init; }
 
             // Determine the indentation level and go to the first non-empty line.
             Mark endMark;
@@ -1340,8 +1204,6 @@ final class Scanner
         }
 
         /// Scan chomping and indentation indicators of a scalar token.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         Tuple!(Chomping, int) scanBlockScalarIndicators(const Mark startMark) @safe
         {
             auto chomping = Chomping.Clip;
@@ -1352,22 +1214,16 @@ final class Scanner
             if(getChomping(c, chomping))
             {
                 getIncrement(c, increment, startMark);
-                if(error_) { return tuple(Chomping.init, int.max); }
             }
             else
             {
                 const gotIncrement = getIncrement(c, increment, startMark);
-                if(error_)       { return tuple(Chomping.init, int.max); }
                 if(gotIncrement) { getChomping(c, chomping); }
             }
 
-            if(c.among!(allWhiteSpace))
-            {
-                return tuple(chomping, increment);
-            }
-            error("While scanning a block scalar", startMark,
-                  expected("chomping or indentation indicator", c), reader_.mark);
-            return tuple(Chomping.init, int.max);
+            enforce(c.among!(allWhiteSpace), new UnexpectedTokenException("block scalar", startMark, reader_.mark, "chomping or indentation indicator", c));
+
+            return tuple(chomping, increment);
         }
 
         /// Get chomping indicator, if detected. Return false otherwise.
@@ -1398,40 +1254,29 @@ final class Scanner
         ///             the next character in the Reader.
         /// increment = Write the increment value here, if detected.
         /// startMark = Mark for error messages.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         bool getIncrement(ref dchar c, ref int increment, const Mark startMark) @safe
         {
             if(!c.isDigit) { return false; }
             // Convert a digit to integer.
             increment = c - '0';
             assert(increment < 10 && increment >= 0, "Digit has invalid value");
-            if(increment > 0)
-            {
-                reader_.popFront();
-                c = reader_.front;
-                return true;
-            }
-            error("While scanning a block scalar", startMark,
-                  expected("indentation indicator in range 1-9", "0"), reader_.mark);
-            return false;
+            enforce(increment > 0, new UnexpectedTokenException("block scalar", startMark, reader_.mark, "1-9", '0'));
+
+            reader_.popFront();
+            c = reader_.front;
+            return true;
         }
 
         /// Scan (and ignore) ignored line in a block scalar.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanBlockScalarIgnoredLine(const Mark startMark) @safe
         {
             findNextNonSpace();
             if(reader_.front == '#') { scanToNextBreak(); }
 
-            if(reader_.front.among!(allBreaks))
-            {
-                scanLineBreak();
-                return;
-            }
-            error("While scanning a block scalar", startMark,
-                  expected("comment or line break", reader_.front), reader_.mark);
+            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("block scalar", startMark, reader_.mark, "comment or line break", reader_.front));
+
+            scanLineBreak();
+            return;
         }
 
         /// Scan indentation in a block scalar, returning line breaks, max indent and end mark.
@@ -1478,8 +1323,6 @@ final class Scanner
         }
 
         /// Scan a qouted flow scalar token with specified quotes.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         Token scanFlowScalar(const ScalarStyle quotes) @trusted
         {
             const startMark = reader_.mark;
@@ -1487,17 +1330,13 @@ final class Scanner
             reader_.popFront();
 
             reader_.sliceBuilder.begin();
-            scope(exit) if(error_) { reader_.sliceBuilder.finish(); }
 
             scanFlowScalarNonSpacesToSlice(quotes, startMark);
-            if(error_) { return Token.init; }
 
             while(reader_.front != quote)
             {
                 scanFlowScalarSpacesToSlice(startMark);
-                if(error_) { return Token.init; }
                 scanFlowScalarNonSpacesToSlice(quotes, startMark);
-                if(error_) { return Token.init; }
             }
             reader_.popFront();
 
@@ -1509,8 +1348,6 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanFlowScalarNonSpacesToSlice(const ScalarStyle quotes, const Mark startMark)
             @system
         {
@@ -1553,13 +1390,8 @@ final class Scanner
                         const hexLength = dyaml.escapes.escapeHexLength(c);
                         reader_.popFront();
 
-                        foreach(i; 0 .. hexLength) if(!reader_.save().drop(i).front.isHexDigit)
-                        {
-                            error("While scanning a double quoted scalar", startMark,
-                                  expected("escape sequence of hexadecimal numbers",
-                                           reader_.save().drop(i).front), reader_.mark);
-                            return;
-                        }
+                        foreach(i; 0 .. hexLength)
+                            enforce(reader_.save().drop(i).front.isHexDigit, new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "escape sequence of hexadecimal numbers", reader_.save().drop(i).front));
                         dchar[] hex = reader_.take(hexLength).array;
                         char[2] escapeStart = ['\\', cast(char) c];
                         reader_.sliceBuilder.write(escapeStart);
@@ -1571,26 +1403,16 @@ final class Scanner
                         //       escaping code in parser, which is in parser because it
                         //       can't always be done in place)
                         parseNoGC!int(hex, 16u, overflow);
-                        if(overflow)
-                        {
-                            error("While scanning a double quoted scalar", startMark,
-                                  "overflow when parsing an escape sequence of "
-                                  "hexadecimal numbers.", reader_.mark);
-                            return;
-                        }
+                        enforce(!overflow, new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "hexadecimal value <= 0xFFFF", '\0'));
                     }
                     else if(c.among!(newLines))
                     {
                         scanLineBreak();
                         scanFlowScalarBreaksToSlice(startMark);
-                        if(error_) { return; }
                     }
                     else
                     {
-                        error("While scanning a double quoted scalar", startMark,
-                              buildMsg("found unsupported escape character", c),
-                              reader_.mark);
-                        return;
+                        enforce(false, new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "valid escape character", c));
                     }
                 }
                 else { return; }
@@ -1601,8 +1423,6 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// spaces into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanFlowScalarSpacesToSlice(const Mark startMark) @system
         {
             // Increase length as long as we see whitespace.
@@ -1614,12 +1434,7 @@ final class Scanner
 
             // Can check the last byte without striding because '\0' is ASCII
             const c = reader_.front;
-            if(c == '\0')
-            {
-                error("While scanning a quoted scalar", startMark,
-                      "found unexpected end of buffer", reader_.mark);
-                return;
-            }
+            enforce(c != '\0', new UnexpectedTokenException("quoted scalar", startMark, reader_.mark, "null", c));
 
             // Spaces not followed by a line break.
             if(!c.among!(newLines))
@@ -1636,7 +1451,6 @@ final class Scanner
             // If we have extra line breaks after the first, scan them into the
             // slice.
             const bool extraBreaks = scanFlowScalarBreaksToSlice(startMark);
-            if(error_) { return; }
 
             // No extra breaks, one normal line break. Replace it with a space.
             if(lineBreak == '\n' && !extraBreaks) { reader_.sliceBuilder.write(' '); }
@@ -1646,8 +1460,6 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// line breaks into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         bool scanFlowScalarBreaksToSlice(const Mark startMark) @system
         {
             // True if at least one line break was found.
@@ -1655,13 +1467,8 @@ final class Scanner
             for(;;)
             {
                 // Instead of checking indentation, we check for document separators.
-                if(reader_.save().startsWith("---", "...") &&
-                   reader_.save().drop(3).front.among!(allWhiteSpace))
-                {
-                    error("While scanning a quoted scalar", startMark,
-                          "found unexpected document separator", reader_.mark);
-                    return false;
-                }
+                enforce(!reader_.save().startsWith("---", "...") ||
+                   !reader_.save().drop(3).front.among!(allWhiteSpace), new UnexpectedSequenceException("quoted scalar", startMark, reader_.mark, "document separator"));
 
                 // Skip any whitespaces.
                 while(reader_.front.among!(whiteSpaces)) { reader_.popFront(); }
@@ -1677,8 +1484,6 @@ final class Scanner
         }
 
         /// Scan plain scalar token (no block, no quotes).
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         Token scanPlain() @trusted
         {
             // We keep track of the allowSimpleKey_ flag here.
@@ -1738,11 +1543,7 @@ final class Scanner
                     spacesTransaction.commit();
                     reader_.sliceBuilder.finish();
                     reader_.popFrontN(length);
-                    error("While scanning a plain scalar", startMark,
-                          "found unexpected ':' . Please check "
-                          "http://pyyaml.org/wiki/YAMLColonInFlowContext for details.",
-                          reader_.mark);
-                    return Token.init;
+                    throw new UnexpectedSequenceException("plain scalar", startMark, reader_.mark, ":");
                 }
 
                 if(length == 0) { break; }
@@ -1835,17 +1636,10 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanTagHandleToSlice(string name)(const Mark startMark) @system
         {
             dchar c = reader_.front;
-            enum contextMsg = "While scanning a " ~ name;
-            if(c != '!')
-            {
-                error(contextMsg, startMark, expected("'!'", c), reader_.mark);
-                return;
-            }
+            enforce(c == '!', new UnexpectedTokenException(name, startMark, reader_.mark, "'!'", c));
 
             uint length = 1;
             c = reader_.save().drop(length).front;
@@ -1856,12 +1650,7 @@ final class Scanner
                     ++length;
                     c = reader_.save().drop(length).front;
                 }
-                if(c != '!')
-                {
-                    reader_.popFrontN(length);
-                    error(contextMsg, startMark, expected("'!'", c), reader_.mark);
-                    return;
-                }
+                enforce(c == '!', new UnexpectedTokenException(name, startMark, reader_.mark, "'!'", c));
                 ++length;
             }
 
@@ -1872,8 +1661,6 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanTagURIToSlice(string name)(const Mark startMark) @trusted
         {
             // Note: we do not check if URI is well-formed.
@@ -1889,7 +1676,6 @@ final class Scanner
                         reader_.sliceBuilder.write(chars);
                         length = 0;
                         scanURIEscapesToSlice!name(startMark);
-                        if(error_) { return; }
                     }
                     else { ++length; }
                     c = reader_.save().drop(length).front;
@@ -1902,10 +1688,7 @@ final class Scanner
                 }
             }
             // OK if we scanned something, error otherwise.
-            if(reader_.sliceBuilder.length > startLen) { return; }
-
-            enum contextMsg = "While parsing a " ~ name;
-            error(contextMsg, startMark, expected("URI", c), reader_.mark);
+            enforce(reader_.sliceBuilder.length > startLen, new UnexpectedTokenException(name, startMark, reader_.mark, "URI", c));
         }
 
         // Not @nogc yet because std.utf.decode is not @nogc
@@ -1913,8 +1696,6 @@ final class Scanner
         ///
         /// Assumes that the caller is building a slice in Reader, and puts the scanned
         /// characters into that slice.
-        ///
-        /// In case of an error, error_ is set. Use throwIfError() to handle this.
         void scanURIEscapesToSlice(string name)(const Mark startMark) @system
         {
             // URI escapes encode a UTF-8 string. We store UTF-8 code units here for
@@ -1939,12 +1720,6 @@ final class Scanner
                     c = bytes[0];
                     ++nextChar;
                 }
-                else
-                {
-                    const decoded = decodeUTF8NoGC!(No.validated)(bytes[], nextChar);
-                    if(decoded.errorMessage !is null) { return size_t.max; }
-                    c = decoded.decoded;
-                }
                 reader_.sliceBuilder.write(c);
                 if(bytes.length - nextChar > 0)
                 {
@@ -1961,13 +1736,7 @@ final class Scanner
                 if(bytesUsed == bytes.length)
                 {
                     bytesUsed = getDchar(bytes[], reader_);
-                    if(bytesUsed == size_t.max)
-                    {
-                        error(contextMsg, startMark,
-                                "Invalid UTF-8 data encoded in URI escape sequence",
-                                reader_.mark);
-                        return;
-                    }
+                    enforce(bytesUsed != size_t.max,  new UnexpectedSequenceException(name, startMark, reader_.mark, "Invalid UTF-8 in URI"));
                 }
 
                 char b = 0;
@@ -1976,13 +1745,7 @@ final class Scanner
                 foreach(k; 0 .. 2)
                 {
                     const dchar c = reader_.save().drop(k).front;
-                    if(!c.isHexDigit)
-                    {
-                        auto msg = expected("URI escape sequence of 2 hexadecimal "
-                                            "numbers", c);
-                        error(contextMsg, startMark, msg, reader_.mark);
-                        return;
-                    }
+                    enforce(c.isHexDigit, new UnexpectedTokenException(name, startMark, reader_.mark, "URI escape sequence with two hexadecimal numbers", c));
 
                     uint digit;
                     if(c - '0' < 10)     { digit = c - '0'; }
