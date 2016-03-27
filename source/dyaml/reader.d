@@ -25,7 +25,6 @@ import std.utf;
 import tinyendian;
 
 import dyaml.exception;
-import dyaml.nogcutil;
 
 
 
@@ -180,13 +179,7 @@ final class Reader
                 return;
             }
 
-            // UTF-8
-            assert(bufferOffset_ < buffer_.length,
-                   "Attempted to decode past the end of YAML buffer");
-            assert(buffer_[bufferOffset_] >= 0x80,
-                   "ASCII must be handled by preceding code");
-
-            const c = decodeValidUTF8NoGC(buffer_, bufferOffset_);
+            const c = decode(buffer_, bufferOffset_);
 
             // New line. (can compare with '\n' without decoding since it's ASCII)
             if(c.among!('\n', '\u0085', '\u2028', '\u2029') || (c == '\r' && buffer_[bufferOffset_] != '\n'))
@@ -202,9 +195,9 @@ final class Reader
         /// Used to build slices of read data in Reader; to avoid allocations.
         SliceBuilder sliceBuilder;
 
-@safe pure nothrow @nogc:
+@safe pure:
         /// Get a string describing current buffer position, used for error messages.
-        Mark mark() const { return Mark(line_, column_); }
+        Mark mark() @nogc nothrow const { return Mark(line_, column_); }
 
         /// Get current line number.
         uint line() const { return line_; }
@@ -236,7 +229,7 @@ private:
                 return b;
             }
 
-            return decodeValidUTF8NoGC(buffer_, lastDecodedBufferOffset_);
+            return decode(buffer_, lastDecodedBufferOffset_);
         }
 }
 
@@ -248,7 +241,7 @@ private:
 /// See begin() documentation.
 struct SliceBuilder
 {
-pure nothrow @nogc:
+pure:
 private:
     // No copying by the user.
     @disable this(this);
@@ -277,7 +270,7 @@ private:
     }
 
     // Is a slice currently being built?
-    bool inProgress() @safe const
+    bool inProgress() @safe const nothrow @nogc
     {
         assert(start_ == size_t.max ? end_ == size_t.max : end_ != size_t.max,
                "start_/end_ are not consistent");
@@ -367,7 +360,7 @@ public:
 
         // We need to encode a non-ASCII dchar into UTF-8
         char[4] encodeBuf;
-        const bytes = encodeValidCharNoGC(encodeBuf, c);
+        const bytes = encode(encodeBuf, c);
         reader_.buffer_[end_ .. end_ + bytes] = encodeBuf[0 .. bytes];
         end_ += bytes;
     }
@@ -398,7 +391,7 @@ public:
         // Encode c into UTF-8
         char[4] encodeBuf;
         if(c < 0x80) { encodeBuf[0] = cast(char)c; }
-        const size_t bytes = c < 0x80 ? 1 : encodeValidCharNoGC(encodeBuf, c);
+        const size_t bytes = c < 0x80 ? 1 : encode(encodeBuf, c);
 
         if(movedLength > 0)
         {
@@ -480,7 +473,7 @@ private:
     // Push the current end of the slice so we can revert to it if needed.
     //
     // Used by Transaction.
-    void push() @system
+    void push() @system nothrow @nogc
     {
         assert(inProgress, "push called without begin");
         assert(endStackUsed_ < endStack_.length, "Slice stack overflow");
@@ -491,7 +484,7 @@ private:
     // value, reverting changes since the old end was pushed.
     //
     // Used by Transaction.
-    void pop() @system
+    void pop() @system nothrow @nogc
     {
         assert(inProgress, "pop called without begin");
         assert(endStackUsed_ > 0, "Trying to pop an empty slice stack");
@@ -502,7 +495,7 @@ private:
     // changes made since pushing the old end.
     //
     // Used by Transaction.
-    void apply() @system
+    void apply() @system nothrow @nogc
     {
         assert(inProgress, "apply called without begin");
         assert(endStackUsed_ > 0, "Trying to apply an empty slice stack");
@@ -569,15 +562,9 @@ auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure nothrow
                     continue;
                 }
 
-                const encodeResult = encodeCharNoGC!(No.validated)(encodeBuf, c);
-                if(encodeResult.errorMessage !is null)
-                {
-                    result.errorMessage = encodeResult.errorMessage;
-                    return;
-                }
-                const bytes = encodeResult.bytes;
-                utf8[length .. length + bytes] = encodeBuf[0 .. bytes];
-                length += bytes;
+                const encodeResult = std.utf.encode(encodeBuf, c);
+                utf8[length .. length + encodeResult] = encodeBuf[0 .. encodeResult];
+                length += encodeResult;
             }
             result.utf8 = utf8[0 .. length];
         }
@@ -592,15 +579,7 @@ auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure nothrow
     try final switch(encoding)
     {
         case UTFEncoding.UTF_8:
-            result.utf8 = cast(char[])input;
-            const validateResult = result.utf8.validateUTF8NoGC();
-            if(!validateResult.valid)
-            {
-                result.errorMessage = "UTF-8 validation error after character #" ~
-                                      validateResult.characterCount.to!string ~ ": " ~
-                                      validateResult.msg;
-            }
-            result.characterCount = validateResult.characterCount;
+            encode(cast(char[])input, result);
             break;
         case UTFEncoding.UTF_16:
             assert(input.length % 2 == 0, "UTF-16 buffer size must be even");
@@ -720,15 +699,7 @@ bool isPrintableValidUTF8(const char[] chars) @trusted pure nothrow @nogc
         }
 
         if(index == chars.length) { break; }
-
-        // Not ASCII, need to decode.
-        const dchar c = decodeValidUTF8NoGC(chars, index);
-        // We now c is not ASCII, so only check for printable non-ASCII chars.
-        if(!(c == 0x85 || (c >= 0xA0 && c <= '\uD7FF') ||
-            (c >= '\uE000' && c <= '\uFFFD')))
-        {
-            return false;
-        }
+        index++;
     }
     return true;
 }

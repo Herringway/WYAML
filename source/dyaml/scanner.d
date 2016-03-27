@@ -25,7 +25,6 @@ import std.traits : Unqual;
 
 import dyaml.escapes;
 import dyaml.exception;
-import dyaml.nogcutil;
 import dyaml.queue;
 import dyaml.reader;
 import dyaml.style;
@@ -1396,14 +1395,7 @@ final class Scanner
                         char[2] escapeStart = ['\\', cast(char) c];
                         reader_.sliceBuilder.write(escapeStart);
                         reader_.sliceBuilder.write(hex);
-                        bool overflow;
-                        // Note: This is just error checking; Parser does the actual
-                        //       escaping (otherwise we could accidentally create an
-                        //       escape sequence here that wasn't in input, breaking the
-                        //       escaping code in parser, which is in parser because it
-                        //       can't always be done in place)
-                        parseNoGC!int(hex, 16u, overflow);
-                        enforce(!overflow, new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "hexadecimal value <= 0xFFFF", '\0'));
+                        parse!int(hex, 16u);
                     }
                     else if(c.among!(newLines))
                     {
