@@ -239,10 +239,10 @@ final class Scanner
             unwindIndent(reader_.column);
 
             // Get the next character.
-            const dchar c = reader_.front;
 
             // Fetch the token.
-            if(c == '\0')            { return fetchStreamEnd();     }
+            if(reader_.empty)        { return fetchStreamEnd();     }
+            const dchar c = reader_.front;
             if(checkDirective())     { return fetchDirective();     }
             if(checkDocumentStart()) { return fetchDocumentStart(); }
             if(checkDocumentEnd())   { return fetchDocumentEnd();   }
@@ -707,6 +707,8 @@ final class Scanner
             if (!readerCopy.startsWith(T))
                 return false;
             readerCopy.popFront();
+            if (readerCopy.empty)
+                return true;
             if (!readerCopy.front.among!allWhiteSpace)
                 return false;
             return true;
@@ -762,19 +764,15 @@ final class Scanner
         /// Move to the next non-space character.
         void findNextNonSpace() @safe
         {
-            while(!reader_.empty && reader_.skipOver(' ')) {}
+            reader_.until!(x => x != ' ').walkLength;
         }
 
         /// Scan a string of alphanumeric or "-_" characters.
         auto scanAlphaNumeric(string name, const Mark startMark) @system
         {
-            size_t length = 0;
-            dchar c = reader_.front;
-            while(c.isAlphaNum || c.among!('-', '_')) { c = reader_.save().drop(++length).front; }
-
-            enforce(length != 0, new UnexpectedTokenException(name, startMark, reader_.mark, "alphanumeric, '-', or '_'", c));
-
-            return reader_.take(length).array;
+            auto output = reader_.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
+            enforce(!output.empty, new UnexpectedTokenException(name, startMark, reader_.mark, "alphanumeric, '-', or '_'", reader_.front));
+            return output;
         }
 
         /// Scan all characters until next line break.
@@ -809,7 +807,7 @@ final class Scanner
             for(;;)
             {
                 findNextNonSpace();
-
+                if (reader_.empty) break;
                 if(reader_.front == '#') { scanToNextBreak(); }
                 if(scanLineBreak() != '\0')
                 {
@@ -855,9 +853,6 @@ final class Scanner
         }
 
         /// Scan name of a directive token.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanDirectiveName(const Mark startMark) @system
         {
             // Scan directive name.
@@ -867,9 +862,6 @@ final class Scanner
         }
 
         /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanYAMLDirectiveValue(const Mark startMark) @system
         {
             dchar[] output;
@@ -897,9 +889,6 @@ final class Scanner
 
         /// Scan value of a tag directive.
         ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
-        ///
         /// Returns: Length of tag handle (which is before tag prefix) in scanned data
         auto scanTagDirectiveValue(const Mark startMark, out uint handleLength) @system
         {
@@ -914,9 +903,6 @@ final class Scanner
         }
 
         /// Scan handle of a tag directive.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanTagDirectiveHandle(const Mark startMark) @system
         {
             auto output = scanTagHandle("directive", startMark);
@@ -925,9 +911,6 @@ final class Scanner
         }
 
         /// Scan prefix of a tag directive.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanTagDirectivePrefix(const Mark startMark) @system
         {
             auto output = scanTagURI("directive", startMark);
@@ -1055,9 +1038,6 @@ final class Scanner
 
             dchar[] slice;
             dchar[] newSlice;
-            // Used to strip the last line breaks written to the slice at the end of the
-            // scalar, which may be needed based on chomping.
-            //Transaction breaksTransaction = Transaction(reader_.sliceBuilder);
             // Read the first indentation/line breaks before the scalar.
             size_t startLen = 0;
             if(increment == int.min)
@@ -1072,11 +1052,10 @@ final class Scanner
                 newSlice ~= scanBlockScalarBreaks(indent, endMark);
             }
 
-            // int.max means there's no line break (int.max is outside UTF-32).
-            dchar lineBreak = cast(dchar)int.max;
+            dchar lineBreak = '\0';
             size_t fullLen = 0;
             // Scan the inner part of the block scalar.
-            while(reader_.column == indent && reader_.front != '\0')
+            while(reader_.column == indent && !reader_.empty)
             {
                 slice ~= newSlice;
                 newSlice = [];
@@ -1094,7 +1073,7 @@ final class Scanner
                 // This will not run during the last iteration (see the if() vs the
                 // while()), hence breaksTransaction rollback (which happens after this
                 // loop) will never roll back data written in this if() block.
-                if(reader_.column == indent && reader_.front != '\0')
+                if(reader_.column == indent && !reader_.empty)
                 {
                     // Unfortunately, folding rules are ambiguous.
 
@@ -1102,8 +1081,6 @@ final class Scanner
                     if(style == ScalarStyle.Folded && lineBreak == '\n' &&
                        leadingNonSpace && !reader_.front.among!(whiteSpaces))
                     {
-                        // No breaks were scanned; no need to insert the space in the
-                        // middle of slice.
                         if(startLen == newSlice.length)
                         {
                             newSlice ~= ' ';
@@ -1111,8 +1088,6 @@ final class Scanner
                     }
                     else
                     {
-                        // We need to insert in the middle of the slice in case any line
-                        // breaks were scanned.
                         newSlice = chain(newSlice[0..startLen], [lineBreak], newSlice[startLen..$]).array;
                     }
                 }
@@ -1126,7 +1101,7 @@ final class Scanner
             // (which are at the end of the scalar). Otherwise re remove them (end the
             // transaction).
             if(chomping == Chomping.Keep)  { slice ~= newSlice; }
-            if(chomping != Chomping.Strip && lineBreak != int.max)
+            if(chomping != Chomping.Strip && lineBreak != '\0')
             {
                 // If chomping is Keep, we keep the line break but the first line break
                 // that isn't stripped (since chomping isn't Strip in this branch) must
@@ -1224,13 +1199,10 @@ final class Scanner
         }
 
         /// Scan indentation in a block scalar, returning line breaks, max indent and end mark.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanBlockScalarIndentation(out uint maxIndent, out Mark endMark) @system
         {
             dchar[] output;
-            while(reader_.front.among!(newLinesPlusSpaces))
+            while(!reader_.empty && reader_.front.among!(newLinesPlusSpaces))
             {
                 if(reader_.front != ' ')
                 {
@@ -1246,17 +1218,14 @@ final class Scanner
         }
 
         /// Scan line breaks at lower or specified indentation in a block scalar.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanBlockScalarBreaks(const uint indent, out Mark end) @trusted
         {
             end = reader_.mark;
             dchar[] output;
 
-            for(;;)
+            while(!reader_.empty)
             {
-                while(reader_.column < indent && reader_.front == ' ') { reader_.popFront(); }
+                while(!reader_.empty && reader_.column < indent && reader_.front == ' ') { reader_.popFront(); }
                 if(!reader_.front.among!(newLines))  { break; }
                 output ~= scanLineBreak();
                 end = reader_.mark;
@@ -1265,7 +1234,7 @@ final class Scanner
             return output;
         }
 
-        /// Scan a qouted flow scalar token with specified quotes.
+        /// Scan a quoted flow scalar token with specified quotes.
         Token scanFlowScalar(const ScalarStyle quotes) @trusted
         {
             const startMark = reader_.mark;
@@ -1285,22 +1254,17 @@ final class Scanner
         }
 
         /// Scan nonspace characters in a flow scalar.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanFlowScalarNonSpaces(const ScalarStyle quotes, const Mark startMark)
-//            @safe
+            //@safe
         {
             dchar[] output;
             for(;;) with(ScalarStyle)
             {
-                dchar c = reader_.front;
+                dchar c = void;
 
-                size_t numCodePoints = 0;
-                while(!reader_.save().drop(numCodePoints).front.among!(allWhiteSpacePlusQuotesAndSlashes)) { ++numCodePoints; }
-
-                output ~= reader_.take(numCodePoints).array;
-
+                output ~= reader_.until!(x => x.among!(allWhiteSpacePlusQuotesAndSlashes)).array;
+                if (reader_.empty)
+                    break;
                 c = reader_.front;
                 if(quotes == SingleQuoted && c == '\'' && reader_.save().drop(1).front == '\'')
                 {
@@ -1320,9 +1284,6 @@ final class Scanner
                     if(c.among!(dyaml.escapes.escapeSeqs))
                     {
                         reader_.popFront();
-                        // Escaping has been moved to Parser as it can't be done in
-                        // place (in a slice) in case of '\P' and '\L' (very uncommon,
-                        // but we don't want to break the spec)
                         output ~= ['\\', c];
                     }
                     else if(c.among!(dyaml.escapes.escapeHexSeq))
@@ -1330,11 +1291,12 @@ final class Scanner
                         const hexLength = dyaml.escapes.escapeHexLength(c);
                         reader_.popFront();
 
-                        foreach(i; 0 .. hexLength)
-                            enforce(reader_.save().drop(i).front.isHexDigit, new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "escape sequence of hexadecimal numbers", reader_.save().drop(i).front));
+                        auto v = reader_.take(hexLength);
+                        auto hex = v.save().array;
+                        enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "escape sequence of hexadecimal numbers", v.until!(x => x.isHexDigit).front));
+
                         output ~= '\\';
                         output ~= c;
-                        auto hex = reader_.take(hexLength).array;
                         output ~= hex;
                         parse!int(hex, 16u);
                     }
@@ -1365,9 +1327,8 @@ final class Scanner
                 reader_.popFront();
             }
 
-            // Can check the last byte without striding because '\0' is ASCII
+            enforce(!reader_.empty, new UnexpectedSequenceException("quoted scalar", startMark, reader_.mark, "end of stream"));
             const c = reader_.front;
-            enforce(c != '\0', new UnexpectedTokenException("quoted scalar", startMark, reader_.mark, "null", c));
 
             // Spaces not followed by a line break.
             if(!c.among!(newLines))
@@ -1381,8 +1342,6 @@ final class Scanner
 
             if(lineBreak != '\n') { output ~= lineBreak; }
 
-            // If we have extra line breaks after the first, scan them into the
-            // slice.
             bool extraBreaks;
             output ~= scanFlowScalarBreaks(startMark, extraBreaks);
 
@@ -1408,10 +1367,10 @@ final class Scanner
                    !reader_.save().drop(3).front.among!(allWhiteSpace), new UnexpectedSequenceException("quoted scalar", startMark, reader_.mark, "document separator"));
 
                 // Skip any whitespaces.
-                while(reader_.front.among!(whiteSpaces)) { reader_.popFront(); }
+                reader_.until!(x => !x.among!whiteSpaces).walkLength;
 
                 // Encountered a non-whitespace non-linebreak character, so we're done.
-                if (!reader_.front.among!(newLines)) break;
+                if (reader_.empty || !reader_.front.among!(newLines)) break;
 
                 const lineBreak = scanLineBreak();
                 extraBreaks = true;
@@ -1436,7 +1395,7 @@ final class Scanner
             dchar[] slice;
             dchar[] newSlice;
             // Stop at a comment.
-            while(reader_.front != '#')
+            while(!reader_.empty && reader_.front != '#')
             {
                 // Scan the entire plain scalar.
                 size_t length = 0;
@@ -1444,10 +1403,14 @@ final class Scanner
                 // Moved the if() out of the loop for optimization.
                 if(flowLevel_ == 0)
                 {
-                    c = reader_.save().drop(length).front;
+                    auto savedReader = reader_.save();
+                    c = savedReader.front;
                     for(;;)
                     {
-                        const cNext = reader_.save().drop(length+1).front;
+                        if (savedReader.empty)
+                            break;
+                        savedReader.popFront();
+                        const cNext = savedReader.front;
                         if(c.among!(allWhiteSpace) ||
                            (c == ':' && cNext.among!(allWhiteSpace)))
                         {
@@ -1538,7 +1501,7 @@ final class Scanner
             bool extraBreaks = false;
 
             if(lineBreak != '\n') { output ~= lineBreak; }
-            while(reader_.front.among!(newLinesPlusSpaces))
+            while(!reader_.empty && reader_.front.among!(newLinesPlusSpaces))
             {
                 if(reader_.front == ' ') { reader_.popFront(); }
                 else
@@ -1579,32 +1542,27 @@ final class Scanner
         }
 
         /// Scan URI in a tag token.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanTagURI(string name, const Mark startMark) @trusted
         {
             // Note: we do not check if URI is well-formed.
             dchar[] output;
             dchar c = reader_.front;
+            uint length = 0;
+            while(c.isAlphaNum || c.among!('-', ';', '/', '?', ':', '&', '@', '=', '+', '$', ',', '_', '.', '!', '~', '*', '\'', parentheses, squareBrackets, '%'))
             {
-                uint length = 0;
-                while(c.isAlphaNum || c.among!('-', ';', '/', '?', ':', '&', '@', '=', '+', '$', ',', '_', '.', '!', '~', '*', '\'', parentheses, squareBrackets, '%'))
-                {
-                    if(c == '%')
-                    {
-                        output ~= reader_.take(length).array;
-                        length = 0;
-                        output ~= scanURIEscapes(name, startMark);
-                    }
-                    else { ++length; }
-                    c = reader_.save().drop(length).front;
-                }
-                if(length > 0)
+                if(c == '%')
                 {
                     output ~= reader_.take(length).array;
                     length = 0;
+                    output ~= scanURIEscapes(name, startMark);
                 }
+                else { ++length; }
+                c = reader_.save().drop(length).front;
+            }
+            if(length > 0)
+            {
+                output ~= reader_.take(length).array;
+                length = 0;
             }
             // OK if we scanned something, error otherwise.
             enforce(output.length > 0, new UnexpectedTokenException(name, startMark, reader_.mark, "URI", c));
@@ -1613,9 +1571,6 @@ final class Scanner
 
         // Not @nogc yet because std.utf.decode is not @nogc
         /// Scan URI escape sequences.
-        ///
-        /// Assumes that the caller is building a slice in Reader, and puts the scanned
-        /// characters into that slice.
         auto scanURIEscapes(string name, const Mark startMark) @system
         {
             // URI escapes encode a UTF-8 string. We store UTF-8 code units here for
