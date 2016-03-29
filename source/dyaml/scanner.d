@@ -64,6 +64,7 @@ alias chompIndicators = AliasSeq!('+', '-');
 alias curlyBraces = AliasSeq!('{', '}');
 alias squareBrackets = AliasSeq!('[', ']');
 alias parentheses = AliasSeq!('(', ')');
+alias miscValidURIChars = AliasSeq!('-', ';', '/', '?', ':', '&', '@', '=', '+', '$', ',', '_', '.', '!', '~', '*', '\'', parentheses, squareBrackets, '%');
 
 /// Marked exception thrown at scanner errors.
 ///
@@ -73,13 +74,23 @@ class ScannerException : MarkedYAMLException
     mixin MarkedExceptionCtors;
 }
 class UnexpectedTokenException : YAMLException {
-    this(string context, in Mark begin, in Mark end, string expected, dchar got, string file = __FILE__, size_t line = __LINE__) @safe pure {
+    this(string context, string expected, dchar got, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super("Expected %s in %s, got %s".format(expected, context, got), file, line);
     }
 }
 class UnexpectedSequenceException : YAMLException {
-    this(string context, in Mark begin, in Mark end, string unexpected, string file = __FILE__, size_t line = __LINE__) @safe pure {
+    this(string context, string unexpected, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super("Found unexpected %s in %s".format(unexpected, context), file, line);
+    }
+}
+class UnexpectedSequenceWithMarkException : YAMLException {
+    this(UnexpectedSequenceException e, in Mark begin, in Mark end) @safe pure {
+        super(""~e.msg, e.file, e.line);
+    }
+}
+class UnexpectedTokenWithMarkException : YAMLException {
+    this(UnexpectedTokenException e, in Mark begin, in Mark end) @safe pure {
+        super(""~e.msg, e.file, e.line);
     }
 }
 
@@ -228,48 +239,55 @@ final class Scanner
         /// Fetch at token, adding it to tokens_.
         void fetchToken() @safe
         {
-            // Eat whitespaces and comments until we reach the next token.
-            scanToNextToken();
+            auto startMark = reader_.mark;
+            try {
+                // Eat whitespaces and comments until we reach the next token.
+                scanToNextToken();
 
-            // Remove obsolete possible simple keys.
-            stalePossibleSimpleKeys();
+                // Remove obsolete possible simple keys.
+                stalePossibleSimpleKeys();
 
-            // Compare current indentation and column. It may add some tokens
-            // and decrease the current indentation level.
-            unwindIndent(reader_.column);
+                // Compare current indentation and column. It may add some tokens
+                // and decrease the current indentation level.
+                unwindIndent(reader_.column);
 
-            // Get the next character.
+                // Get the next character.
 
-            // Fetch the token.
-            if(reader_.empty)        { return fetchStreamEnd();     }
-            const dchar c = reader_.front;
-            if(checkDirective())     { return fetchDirective();     }
-            if(checkDocumentStart()) { return fetchDocumentStart(); }
-            if(checkDocumentEnd())   { return fetchDocumentEnd();   }
-            // Order of the following checks is NOT significant.
-            switch(c)
-            {
-                case '[':  return fetchFlowSequenceStart();
-                case '{':  return fetchFlowMappingStart();
-                case ']':  return fetchFlowSequenceEnd();
-                case '}':  return fetchFlowMappingEnd();
-                case ',':  return fetchFlowEntry();
-                case '!':  return fetchTag();
-                case '\'': return fetchSingle();
-                case '\"': return fetchDouble();
-                case '*':  return fetchAlias();
-                case '&':  return fetchAnchor();
-                case '?':  if(checkKey())        { return fetchKey();        } goto default;
-                case ':':  if(checkValue())      { return fetchValue();      } goto default;
-                case '-':  if(checkBlockEntry()) { return fetchBlockEntry(); } goto default;
-                case '|':  if(flowLevel_ == 0)   { return fetchLiteral();    } break;
-                case '>':  if(flowLevel_ == 0)   { return fetchFolded();     } break;
-                default:   if(checkPlain())      { return fetchPlain();      }
+                // Fetch the token.
+                if(reader_.empty)        { return fetchStreamEnd();     }
+                const dchar c = reader_.front;
+                if(checkDirective())     { return fetchDirective();     }
+                if(checkDocumentStart()) { return fetchDocumentStart(); }
+                if(checkDocumentEnd())   { return fetchDocumentEnd();   }
+                // Order of the following checks is NOT significant.
+                switch(c)
+                {
+                    case '[':  return fetchFlowSequenceStart();
+                    case '{':  return fetchFlowMappingStart();
+                    case ']':  return fetchFlowSequenceEnd();
+                    case '}':  return fetchFlowMappingEnd();
+                    case ',':  return fetchFlowEntry();
+                    case '!':  return fetchTag();
+                    case '\'': return fetchSingle();
+                    case '\"': return fetchDouble();
+                    case '*':  return fetchAlias();
+                    case '&':  return fetchAnchor();
+                    case '?':  if(checkKey())        { return fetchKey();        } goto default;
+                    case ':':  if(checkValue())      { return fetchValue();      } goto default;
+                    case '-':  if(checkBlockEntry()) { return fetchBlockEntry(); } goto default;
+                    case '|':  if(flowLevel_ == 0)   { return fetchLiteral();    } break;
+                    case '>':  if(flowLevel_ == 0)   { return fetchFolded();     } break;
+                    default:   if(checkPlain())      { return fetchPlain();      }
+                }
+                throw new ScannerException("While scanning for the next token, found character "
+                                           "\'%s\', index %s that cannot start any token"
+                                           .format(c, to!int(c)), reader_.mark);
+            } catch (UnexpectedTokenException e) {
+                throw new UnexpectedTokenWithMarkException(e, startMark, reader_.mark);
+            } catch (UnexpectedSequenceException e) {
+                throw new UnexpectedSequenceWithMarkException(e, startMark, reader_.mark);
             }
 
-            throw new ScannerException("While scanning for the next token, found character "
-                                       "\'%s\', index %s that cannot start any token"
-                                       .format(c, to!int(c)), reader_.mark);
         }
 
 
@@ -768,10 +786,10 @@ final class Scanner
         }
 
         /// Scan a string of alphanumeric or "-_" characters.
-        auto scanAlphaNumeric(string name, const Mark startMark) @system
+        auto scanAlphaNumeric(string name) @system
         {
             auto output = reader_.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
-            enforce(!output.empty, new UnexpectedTokenException(name, startMark, reader_.mark, "alphanumeric, '-', or '_'", reader_.front));
+            enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader_.front));
             return output;
         }
 
@@ -809,7 +827,7 @@ final class Scanner
                 findNextNonSpace();
                 if (reader_.empty) break;
                 if(reader_.front == '#') { scanToNextBreak(); }
-                if(scanLineBreak() != '\0')
+                if(scanLineBreak(reader_) != '\0')
                 {
                     if(flowLevel_ == 0) { allowSimpleKey_ = true; }
                 }
@@ -828,13 +846,13 @@ final class Scanner
             reader_.popFront();
 
             // Scan directive name
-            const name = scanDirectiveName(startMark);
+            const name = scanDirectiveName();
 
             // Index where tag handle ends and suffix starts in a tag directive value.
             uint tagHandleEnd = uint.max;
             dchar[] value;
-            if(name == "YAML")     { value = scanYAMLDirectiveValue(startMark); }
-            else if(name == "TAG") { value = scanTagDirectiveValue(startMark, tagHandleEnd); }
+            if(name == "YAML")     { value = scanYAMLDirectiveValue(); }
+            else if(name == "TAG") { value = scanTagDirectiveValue(tagHandleEnd); }
 
             Mark endMark = reader_.mark;
 
@@ -847,84 +865,83 @@ final class Scanner
                 scanToNextBreak();
             }
 
-            scanDirectiveIgnoredLine(startMark);
-
+            scanDirectiveIgnoredLine();
             return directiveToken(startMark, endMark, value.toUTF8.dup, directive, tagHandleEnd);
         }
 
         /// Scan name of a directive token.
-        auto scanDirectiveName(const Mark startMark) @system
+        auto scanDirectiveName() @system
         {
             // Scan directive name.
-            auto output = scanAlphaNumeric("a directive", startMark);
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", startMark, reader_.mark, "alphanumeric, '-' or '_'", reader_.front));
+            auto output = scanAlphaNumeric("a directive");
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "alphanumeric, '-' or '_'", reader_.front));
             return output;
         }
 
         /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
-        auto scanYAMLDirectiveValue(const Mark startMark) @system
+        auto scanYAMLDirectiveValue() @system
         {
             dchar[] output;
             findNextNonSpace();
 
-            output ~= scanYAMLDirectiveNumber(startMark);
+            output ~= scanYAMLDirectiveNumber();
 
-            enforce(reader_.front == '.', new UnexpectedTokenException("directive", startMark, reader_.mark, "digit or '.'", reader_.front));
+            enforce(reader_.front == '.', new UnexpectedTokenException("directive", "digit or '.'", reader_.front));
             // Skip the '.'.
             reader_.popFront();
 
             output ~= '.';
-            output ~= scanYAMLDirectiveNumber(startMark);
+            output ~= scanYAMLDirectiveNumber();
 
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", startMark, reader_.mark, "digit or '.'", reader_.front));
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "digit or '.'", reader_.front));
             return output;
         }
 
         /// Scan a number from a YAML directive.
-        auto scanYAMLDirectiveNumber(const Mark startMark) @system
+        auto scanYAMLDirectiveNumber() @system
         {
-            enforce(reader_.front.isDigit, new UnexpectedTokenException("directive", startMark, reader_.mark, "digit", reader_.front));
+            enforce(reader_.front.isDigit, new UnexpectedTokenException("directive", "digit", reader_.front));
             return reader_.until!(x => x.isDigit)(OpenRight.no).array;
         }
 
         /// Scan value of a tag directive.
         ///
         /// Returns: Length of tag handle (which is before tag prefix) in scanned data
-        auto scanTagDirectiveValue(const Mark startMark, out uint handleLength) @system
+        auto scanTagDirectiveValue(out uint handleLength) @system
         {
             dchar[] output;
             findNextNonSpace();
-            output ~= scanTagDirectiveHandle(startMark);
+            output ~= scanTagDirectiveHandle();
             handleLength = cast(uint)(output.length);
             findNextNonSpace();
-            output ~= scanTagDirectivePrefix(startMark);
+            output ~= scanTagDirectivePrefix();
 
             return output;
         }
 
         /// Scan handle of a tag directive.
-        auto scanTagDirectiveHandle(const Mark startMark) @system
+        auto scanTagDirectiveHandle() @system
         {
-            auto output = scanTagHandle("directive", startMark);
-            enforce(reader_.front == ' ', new UnexpectedTokenException("directive", startMark, reader_.mark, "' '", reader_.front));
+            auto output = scanTagHandle(reader_, "directive");
+            enforce(reader_.front == ' ', new UnexpectedTokenException("directive", "' '", reader_.front));
             return output;
         }
 
         /// Scan prefix of a tag directive.
-        auto scanTagDirectivePrefix(const Mark startMark) @system
+        auto scanTagDirectivePrefix() @system
         {
-            auto output = scanTagURI("directive", startMark);
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", startMark, reader_.mark, "' '", reader_.front));
+            auto output = scanTagURI(reader_, "directive");
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader_.front));
             return output;
         }
 
         /// Scan (and ignore) ignored line after a directive.
-        void scanDirectiveIgnoredLine(const Mark startMark) @safe
+        void scanDirectiveIgnoredLine() @safe
         {
             findNextNonSpace();
             if(reader_.front == '#') { scanToNextBreak(); }
-            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("directive", startMark, reader_.mark, "comment or a line break", reader_.front));
-            scanLineBreak();
+            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader_.front));
+            scanLineBreak(reader_);
         }
 
 
@@ -945,11 +962,11 @@ final class Scanner
             reader_.popFront();
 
             char[] value;
-            if(i == '*') { value = scanAlphaNumeric("an alias", startMark).toUTF8.dup; }
-            else         { value = scanAlphaNumeric("an anchor", startMark).toUTF8.dup; }
+            if(i == '*') { value = scanAlphaNumeric("an alias").toUTF8.dup; }
+            else         { value = scanAlphaNumeric("an anchor").toUTF8.dup; }
 
 
-            enforce(reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", startMark, reader_.mark, "alphanumeric, '-' or '_'", reader_.front));
+            enforce(reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", "alphanumeric, '-' or '_'", reader_.front));
             switch(id) {
                 case TokenID.Alias:
                     return aliasToken(startMark, reader_.mark, value);
@@ -973,8 +990,8 @@ final class Scanner
                 reader_.popFrontN(2);
 
                 handleEnd = 0;
-                slice ~= scanTagURI("tag",startMark);
-                enforce(reader_.front == '>', new UnexpectedTokenException("tag", startMark, reader_.mark, "'>'", reader_.front));
+                slice ~= scanTagURI(reader_, "tag");
+                enforce(reader_.front == '>', new UnexpectedTokenException("tag", "'>'", reader_.front));
                 reader_.popFront();
             }
             else if(c.among!(allWhiteSpace))
@@ -1001,7 +1018,7 @@ final class Scanner
 
                 if(useHandle)
                 {
-                    slice ~= scanTagHandle("tag", startMark);
+                    slice ~= scanTagHandle(reader_, "tag");
                     handleEnd = cast(uint)slice.length;
                 }
                 else
@@ -1011,10 +1028,10 @@ final class Scanner
                     handleEnd = cast(uint)slice.length;
                 }
 
-                slice ~= scanTagURI("tag", startMark);
+                slice ~= scanTagURI(reader_, "tag");
             }
 
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("tag", startMark, reader_.mark, "' '", reader_.front));
+            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("tag", "' '", reader_.front));
 
             return tagToken(startMark, reader_.mark, slice.toUTF8.dup, handleEnd);
         }
@@ -1026,11 +1043,11 @@ final class Scanner
             // Scan the header.
             reader_.popFront();
 
-            const indicators = scanBlockScalarIndicators(startMark);
+            const indicators = scanBlockScalarIndicators();
 
             const chomping   = indicators[0];
             const increment  = indicators[1];
-            scanBlockScalarIgnoredLine(startMark);
+            scanBlockScalarIgnoredLine();
 
             // Determine the indentation level and go to the first non-empty line.
             Mark endMark;
@@ -1062,7 +1079,7 @@ final class Scanner
                 const bool leadingNonSpace = !reader_.front.among!(whiteSpaces);
                 // This is where the 'interesting' non-whitespace data gets read.
                 slice ~= scanToNextBreak();
-                lineBreak = scanLineBreak();
+                lineBreak = scanLineBreak(reader_);
 
                 fullLen = slice.length+newSlice.length;
                 startLen = 0;
@@ -1123,7 +1140,7 @@ final class Scanner
         }
 
         /// Scan chomping and indentation indicators of a scalar token.
-        Tuple!(Chomping, int) scanBlockScalarIndicators(const Mark startMark) @safe
+        Tuple!(Chomping, int) scanBlockScalarIndicators() @safe
         {
             auto chomping = Chomping.Clip;
             int increment = int.min;
@@ -1132,15 +1149,15 @@ final class Scanner
             /// Indicators can be in any order.
             if(getChomping(c, chomping))
             {
-                getIncrement(c, increment, startMark);
+                getIncrement(c, increment);
             }
             else
             {
-                const gotIncrement = getIncrement(c, increment, startMark);
+                const gotIncrement = getIncrement(c, increment);
                 if(gotIncrement) { getChomping(c, chomping); }
             }
 
-            enforce(c.among!(allWhiteSpace), new UnexpectedTokenException("block scalar", startMark, reader_.mark, "chomping or indentation indicator", c));
+            enforce(c.among!(allWhiteSpace), new UnexpectedTokenException("block scalar", "chomping or indentation indicator", c));
 
             return tuple(chomping, increment);
         }
@@ -1173,13 +1190,13 @@ final class Scanner
         ///             the next character in the Reader.
         /// increment = Write the increment value here, if detected.
         /// startMark = Mark for error messages.
-        bool getIncrement(ref dchar c, ref int increment, const Mark startMark) @safe
+        bool getIncrement(ref dchar c, ref int increment) @safe
         {
             if(!c.isDigit) { return false; }
             // Convert a digit to integer.
             increment = c - '0';
             assert(increment < 10 && increment >= 0, "Digit has invalid value");
-            enforce(increment > 0, new UnexpectedTokenException("block scalar", startMark, reader_.mark, "1-9", '0'));
+            enforce(increment > 0, new UnexpectedTokenException("block scalar", "1-9", '0'));
 
             reader_.popFront();
             c = reader_.front;
@@ -1187,14 +1204,14 @@ final class Scanner
         }
 
         /// Scan (and ignore) ignored line in a block scalar.
-        void scanBlockScalarIgnoredLine(const Mark startMark) @safe
+        void scanBlockScalarIgnoredLine() @safe
         {
             findNextNonSpace();
             if(reader_.front == '#') { scanToNextBreak(); }
 
-            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("block scalar", startMark, reader_.mark, "comment or line break", reader_.front));
+            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader_.front));
 
-            scanLineBreak();
+            scanLineBreak(reader_);
             return;
         }
 
@@ -1206,7 +1223,7 @@ final class Scanner
             {
                 if(reader_.front != ' ')
                 {
-                    output ~= scanLineBreak();
+                    output ~= scanLineBreak(reader_);
                     endMark = reader_.mark;
                     continue;
                 }
@@ -1227,7 +1244,7 @@ final class Scanner
             {
                 while(!reader_.empty && reader_.column < indent && reader_.front == ' ') { reader_.popFront(); }
                 if(!reader_.front.among!(newLines))  { break; }
-                output ~= scanLineBreak();
+                output ~= scanLineBreak(reader_);
                 end = reader_.mark;
             }
 
@@ -1241,12 +1258,12 @@ final class Scanner
             const quote     = reader_.front;
             reader_.popFront();
 
-            dchar[] slice = scanFlowScalarNonSpaces(quotes, startMark);
+            dchar[] slice = scanFlowScalarNonSpaces(quotes);
 
             while(reader_.front != quote)
             {
-                slice ~= scanFlowScalarSpaces(startMark);
-                slice ~= scanFlowScalarNonSpaces(quotes, startMark);
+                slice ~= scanFlowScalarSpaces();
+                slice ~= scanFlowScalarNonSpaces(quotes);
             }
             reader_.popFront();
 
@@ -1254,7 +1271,7 @@ final class Scanner
         }
 
         /// Scan nonspace characters in a flow scalar.
-        auto scanFlowScalarNonSpaces(const ScalarStyle quotes, const Mark startMark)
+        auto scanFlowScalarNonSpaces(const ScalarStyle quotes)
             //@safe
         {
             dchar[] output;
@@ -1293,7 +1310,7 @@ final class Scanner
 
                         auto v = reader_.take(hexLength);
                         auto hex = v.save().array;
-                        enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "escape sequence of hexadecimal numbers", v.until!(x => x.isHexDigit).front));
+                        enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", "escape sequence of hexadecimal numbers", v.until!(x => x.isHexDigit).front));
 
                         output ~= '\\';
                         output ~= c;
@@ -1302,12 +1319,12 @@ final class Scanner
                     }
                     else if(c.among!(newLines))
                     {
-                        scanLineBreak();
-                        output ~= scanFlowScalarBreaks(startMark);
+                        scanLineBreak(reader_);
+                        output ~= scanFlowScalarBreaks();
                     }
                     else
                     {
-                        throw new UnexpectedTokenException("double quoted scalar", startMark, reader_.mark, "valid escape character", c);
+                        throw new UnexpectedTokenException("double quoted scalar", "valid escape character", c);
                     }
                 }
                 else
@@ -1317,7 +1334,7 @@ final class Scanner
         }
 
         /// Scan space characters in a flow scalar.
-        auto scanFlowScalarSpaces(const Mark startMark) @system
+        auto scanFlowScalarSpaces() @system
         {
             dchar[] output;
             // Increase length as long as we see whitespace.
@@ -1327,7 +1344,7 @@ final class Scanner
                 reader_.popFront();
             }
 
-            enforce(!reader_.empty, new UnexpectedSequenceException("quoted scalar", startMark, reader_.mark, "end of stream"));
+            enforce(!reader_.empty, new UnexpectedSequenceException("quoted scalar", "end of stream"));
             const c = reader_.front;
 
             // Spaces not followed by a line break.
@@ -1338,12 +1355,12 @@ final class Scanner
             }
 
             // There's a line break after the spaces.
-            const lineBreak = scanLineBreak();
+            const lineBreak = scanLineBreak(reader_);
 
             if(lineBreak != '\n') { output ~= lineBreak; }
 
             bool extraBreaks;
-            output ~= scanFlowScalarBreaks(startMark, extraBreaks);
+            output ~= scanFlowScalarBreaks(extraBreaks);
 
             // No extra breaks, one normal line break. Replace it with a space.
             if(lineBreak == '\n' && !extraBreaks) { output ~= ' '; }
@@ -1352,19 +1369,19 @@ final class Scanner
         }
 
         /// Scan line breaks in a flow scalar.
-        dchar[] scanFlowScalarBreaks(const Mark startMark)
+        dchar[] scanFlowScalarBreaks()
         {
             bool waste;
-            return scanFlowScalarBreaks(startMark, waste);
+            return scanFlowScalarBreaks(waste);
         }
-        auto scanFlowScalarBreaks(const Mark startMark, out bool extraBreaks)
+        auto scanFlowScalarBreaks(out bool extraBreaks)
         {
             dchar[] output;
             for(;;)
             {
                 // Instead of checking indentation, we check for document separators.
                 enforce(!reader_.save().startsWith("---", "...") ||
-                   !reader_.save().drop(3).front.among!(allWhiteSpace), new UnexpectedSequenceException("quoted scalar", startMark, reader_.mark, "document separator"));
+                   !reader_.save().drop(3).front.among!(allWhiteSpace), new UnexpectedSequenceException("quoted scalar", "document separator"));
 
                 // Skip any whitespaces.
                 reader_.until!(x => !x.among!whiteSpaces).walkLength;
@@ -1372,7 +1389,7 @@ final class Scanner
                 // Encountered a non-whitespace non-linebreak character, so we're done.
                 if (reader_.empty || !reader_.front.among!(newLines)) break;
 
-                const lineBreak = scanLineBreak();
+                const lineBreak = scanLineBreak(reader_);
                 extraBreaks = true;
                 output ~= lineBreak;
             }
@@ -1437,7 +1454,7 @@ final class Scanner
                 if(flowLevel_ > 0 && c == ':' &&
                    !reader_.save().drop(length + 1).front.among!(allWhiteSpace, ',', squareBrackets, curlyBraces))
                 {
-                    throw new UnexpectedSequenceException("plain scalar", startMark, reader_.mark, ":");
+                    throw new UnexpectedSequenceException("plain scalar", ":");
                 }
 
                 if(length == 0) { break; }
@@ -1452,7 +1469,7 @@ final class Scanner
                 newSlice = [];
 
                 const startLength = slice.length;
-                newSlice ~= scanPlainSpaces(startMark);
+                newSlice ~= scanPlainSpaces(reader_, allowSimpleKey_);
                 if(startLength == newSlice.length+slice.length ||
                    (flowLevel_ == 0 && reader_.column < indent))
                 {
@@ -1462,228 +1479,253 @@ final class Scanner
 
             return scalarToken(startMark, endMark, slice.toUTF8.dup, ScalarStyle.Plain);
         }
+}
 
-        /// Scan spaces in a plain scalar.
-        auto scanPlainSpaces(const Mark startMark) @system
+bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+    return reader.save().startsWith("---", "...")
+            && reader.save().drop(3).front.among!(allWhiteSpace);
+}
+unittest {
+    assert("---\r\n".end);
+    assert("...\n".end);
+    assert(!"...a".end);
+    //assert("---".end);
+    //assert("".end);
+}
+/// Scan spaces in a plain scalar.
+auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) @system if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    dchar[] output;
+    // The specification is really confusing about tabs in plain scalars.
+    // We just forbid them completely. Do not use tabs in YAML!
+
+    // Get as many plain spaces as there are.
+    dchar[] whitespaces;
+    while(reader.front == ' ') {
+        whitespaces ~= reader.front;
+        reader.popFront();
+    }
+
+    dchar c = reader.front;
+    // No newline after the spaces (if any)
+    if(!c.among!(newLines))
+    {
+        // We have spaces, but no newline.
+        if(whitespaces.length > 0) { output ~= whitespaces; }
+        return output;
+    }
+
+    // Newline after the spaces (if any)
+    const lineBreak = scanLineBreak(reader);
+    allowSimpleKey_ = true;
+
+
+    if(reader.end) { return output; }
+
+    bool extraBreaks = false;
+
+    if(lineBreak != '\n') { output ~= lineBreak; }
+    while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
+    {
+        if(reader.front == ' ') { reader.popFront(); }
+        else
         {
-            dchar[] output;
-            // The specification is really confusing about tabs in plain scalars.
-            // We just forbid them completely. Do not use tabs in YAML!
+            const lBreak = scanLineBreak(reader);
+            extraBreaks  = true;
+            output ~= lBreak;
 
-            // Get as many plain spaces as there are.
-            dchar[] whitespaces;
-            while(reader_.front == ' ') {
-                whitespaces ~= reader_.front;
-                reader_.popFront();
-            }
-
-            dchar c = reader_.front;
-            // No newline after the spaces (if any)
-            if(!c.among!(newLines))
-            {
-                // We have spaces, but no newline.
-                if(whitespaces.length > 0) { output ~= whitespaces; }
-                return output;
-            }
-
-            // Newline after the spaces (if any)
-            const lineBreak = scanLineBreak();
-            allowSimpleKey_ = true;
-
-            static bool end(Reader reader_)
-            {
-                return reader_.save().startsWith("---", "...")
-                        && reader_.save().drop(3).front.among!(allWhiteSpace);
-            }
-
-            if(end(reader_)) { return output; }
-
-            bool extraBreaks = false;
-
-            if(lineBreak != '\n') { output ~= lineBreak; }
-            while(!reader_.empty && reader_.front.among!(newLinesPlusSpaces))
-            {
-                if(reader_.front == ' ') { reader_.popFront(); }
-                else
-                {
-                    const lBreak = scanLineBreak();
-                    extraBreaks  = true;
-                    output ~= lBreak;
-
-                    if(end(reader_)) { return output; }
-                }
-            }
-
-            // No line breaks, only a space.
-            if(lineBreak == '\n' && !extraBreaks) { output ~= ' '; }
-            return output;
+            if(reader.end) { return output; }
         }
+    }
 
-        /// Scan handle of a tag token.
-        auto scanTagHandle(string name, const Mark startMark) @system
+    // No line breaks, only a space.
+    if(lineBreak == '\n' && !extraBreaks) { output ~= ' '; }
+    return output;
+}
+/// Scan handle of a tag token.
+auto scanTagHandle(T)(ref T reader, string name = "tag handle") @system
+{
+    dchar c = reader.front;
+    enforce(c == '!', new UnexpectedTokenException(name, "'!'", c));
+
+    uint length = 1;
+    c = reader.save().drop(length).front;
+    if(c != ' ')
+    {
+        while(c.isAlphaNum || c.among!('-', '_'))
         {
-            dchar c = reader_.front;
-            enforce(c == '!', new UnexpectedTokenException(name, startMark, reader_.mark, "'!'", c));
-
-            uint length = 1;
-            c = reader_.save().drop(length).front;
-            if(c != ' ')
-            {
-                while(c.isAlphaNum || c.among!('-', '_'))
-                {
-                    ++length;
-                    c = reader_.save().drop(length).front;
-                }
-                enforce(c == '!', new UnexpectedTokenException(name, startMark, reader_.mark, "'!'", c));
-                ++length;
-            }
-
-            return reader_.take(length).array;
+            ++length;
+            c = reader.save().drop(length).front;
         }
+        enforce(c == '!', new UnexpectedTokenException(name, "'!'", c));
+        ++length;
+    }
 
-        /// Scan URI in a tag token.
-        auto scanTagURI(string name, const Mark startMark) @trusted
+    return reader.take(length).array;
+
+    //return chain(reader.take(1), reader.drop(1).until!(x => !(x.isAlphaNum || x.among!('-', '_')))).array;
+}
+unittest {
+    auto str = "!!wordswords ";
+    assert(str.scanTagHandle() == "!!");
+    assert(str == "!!wordswords ");
+}
+/// Scan URI in a tag token.
+auto scanTagURI(T)(ref T reader, string name = "URI") @trusted if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))  {
+    // Note: we do not check if URI is well-formed.
+    dchar[] output;
+    while(!reader.empty && (reader.front.isAlphaNum || reader.front.among!(miscValidURIChars))) {
+        if(reader.front == '%')
+            output ~= scanURIEscapes(reader, name);
+        if (reader.empty)
+            break;
+        output ~= reader.front;
+        reader.popFront();
+    }
+    // OK if we scanned something, error otherwise.
+    enforce(output.length > 0, new UnexpectedTokenException(name, "URI", reader.front));
+    return output;
+}
+unittest {
+    auto str = "http://example.com";
+    assert(str.scanTagURI() == "http://example.com");
+
+    str = "http://example.com/%20";
+    assert(str.scanTagURI() == "http://example.com/ ");
+}
+/// Scan URI escape sequences.
+dchar[] scanURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+    import std.uri : decodeComponent;
+    dchar[] uriBuf;
+    while(!reader.empty && reader.front == '%') {
+        reader.popFront();
+        uriBuf ~= '%';
+        dchar[] nextTwo = reader.take(2).array;
+        static if(isForwardRange!T)
+            reader.popFrontN(2);
+        if(!nextTwo.all!isHexDigit)
+            throw new UnexpectedTokenException(name, "URI escape sequence with two hexadecimal numbers", nextTwo.until!(x => x.isHexDigit).front);
+        uriBuf ~= nextTwo;
+    }
+    return decodeComponent(uriBuf).to!(dchar[]);
+}
+unittest {
+    //it's a space!
+    auto str = "%20";
+    assert(str.scanURIEscapes() == " ");
+    assert(str == "");
+
+    //not an escape
+    str = "2";
+    assert(str.scanURIEscapes() == "");
+    assert(str == "2");
+
+    //empty
+    str = "";
+    assert(str.scanURIEscapes() == "");
+    assert(str == "");
+
+    //invalid escape
+    str = "%H";
+    assertThrown(str.scanURIEscapes());
+
+    //2-byte char
+    str = "%C3%A2";
+    assert(str.scanURIEscapes() == "â");
+    assert(str == "");
+
+    //3-byte char
+    str = "%E2%9C%A8";
+    assert(str.scanURIEscapes() == "✨");
+    assert(str == "");
+
+    //4-byte char
+    str = "%F0%9D%84%A0";
+    assert(str.scanURIEscapes() == "𝄠");
+    assert(str == "");
+
+    //two 1-byte chars
+    str = "%20%20";
+    assert(str.scanURIEscapes() == "  ");
+    assert(str == "");
+
+    //ditto, but with non-escape char
+    str = "%20%20s";
+    assert(str.scanURIEscapes() == "  ");
+    assert(str == "s");
+}
+/// Scan a line break, if any.
+///
+/// Transforms:
+///   '\r\n'      :   '\n'
+///   '\r'        :   '\n'
+///   '\n'        :   '\n'
+///   '\u0085'    :   '\n'
+///   '\u2028'    :   '\u2028'
+///   '\u2029     :   '\u2029'
+///   no break    :   '\0'
+dchar scanLineBreak(T)(ref T reader_) @safe if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+    // Fast path for ASCII line breaks.
+    if (reader_.empty)
+        return '\0';
+    const b = reader_.front;
+    if(b < 0x80)
+    {
+        if(b == '\n' || b == '\r')
         {
-            // Note: we do not check if URI is well-formed.
-            dchar[] output;
-            dchar c = reader_.front;
-            uint length = 0;
-            while(c.isAlphaNum || c.among!('-', ';', '/', '?', ':', '&', '@', '=', '+', '$', ',', '_', '.', '!', '~', '*', '\'', parentheses, squareBrackets, '%'))
-            {
-                if(c == '%')
-                {
-                    output ~= reader_.take(length).array;
-                    length = 0;
-                    output ~= scanURIEscapes(name, startMark);
-                }
-                else { ++length; }
-                c = reader_.save().drop(length).front;
-            }
-            if(length > 0)
-            {
-                output ~= reader_.take(length).array;
-                length = 0;
-            }
-            // OK if we scanned something, error otherwise.
-            enforce(output.length > 0, new UnexpectedTokenException(name, startMark, reader_.mark, "URI", c));
-            return output;
+            if(reader_.save().startsWith("\r\n")) { reader_.popFrontN(2); }
+            else { reader_.popFront(); }
+            return '\n';
         }
+        return '\0';
+    }
 
-        // Not @nogc yet because std.utf.decode is not @nogc
-        /// Scan URI escape sequences.
-        auto scanURIEscapes(string name, const Mark startMark) @system
-        {
-            // URI escapes encode a UTF-8 string. We store UTF-8 code units here for
-            // decoding into UTF-32.
-            char[4] bytes;
-            size_t bytesUsed;
-            Mark mark = reader_.mark;
-            dchar[] output;
-
-            // Get one dchar by decoding data from bytes.
-            //
-            // This is probably slow, but simple and URI escapes are extremely uncommon
-            // in YAML.
-            //
-            // Returns the number of bytes used by the dchar in bytes on success,
-            // size_t.max on failure.
-            static size_t getDchar(char[] bytes, Reader reader_, out dchar character)
-            {
-                size_t nextChar;
-                dchar c;
-                if(bytes[0] < 0x80)
-                {
-                    c = bytes[0];
-                    ++nextChar;
-                }
-                character = c;
-                if(bytes.length - nextChar > 0)
-                {
-                    core.stdc.string.memmove(bytes.ptr, bytes.ptr + nextChar,
-                                             bytes.length - nextChar);
-                }
-                return bytes.length - nextChar;
-            }
-
-            while(reader_.front == '%')
-            {
-                reader_.popFront();
-                if(bytesUsed == bytes.length) {
-                    dchar character;
-                    bytesUsed = getDchar(bytes[], reader_, character);
-                    output ~= character;
-                }
-
-                char b = 0;
-                uint mult = 16;
-                // Converting 2 hexadecimal digits to a byte.
-                foreach(k; 0 .. 2)
-                {
-                    const dchar c = reader_.save().drop(k).front;
-                    enforce(c.isHexDigit, new UnexpectedTokenException(name, startMark, reader_.mark, "URI escape sequence with two hexadecimal numbers", c));
-
-                    uint digit;
-                    if(c - '0' < 10)     { digit = c - '0'; }
-                    else if(c - 'A' < 6) { digit = c - 'A'; }
-                    else if(c - 'a' < 6) { digit = c - 'a'; }
-                    else                 { assert(false); }
-                    b += mult * digit;
-                    mult /= 16;
-                }
-                bytes[bytesUsed++] = b;
-
-                reader_.popFrontN(2);
-            }
-            dchar character;
-            bytesUsed = getDchar(bytes[0 .. bytesUsed], reader_, character);
-            output ~= character;
-            return output;
-        }
-
-
-        /// Scan a line break, if any.
-        ///
-        /// Transforms:
-        ///   '\r\n'      :   '\n'
-        ///   '\r'        :   '\n'
-        ///   '\n'        :   '\n'
-        ///   '\u0085'    :   '\n'
-        ///   '\u2028'    :   '\u2028'
-        ///   '\u2029     :   '\u2029'
-        ///   no break    :   '\0'
-        dchar scanLineBreak() @safe
-        {
-            // Fast path for ASCII line breaks.
-            const b = reader_.front;
-            if(b < 0x80)
-            {
-                if(b == '\n' || b == '\r')
-                {
-                    if(reader_.save().startsWith("\r\n")) { reader_.popFrontN(2); }
-                    else { reader_.popFront(); }
-                    return '\n';
-                }
-                return '\0';
-            }
-
-            const c = reader_.front;
-            if(c == '\x85')
-            {
-                reader_.popFront();
-                return '\n';
-            }
-            if(c == '\u2028' || c == '\u2029')
-            {
-                reader_.popFront();
-                return c;
-            }
-            return '\0';
-            //switch(reader_.save().startsWith("\r\n", "\r", "\n", "\u0085", "\u2028"d, "\u2029"d)) {
-            //    default: return '\0';
-            //    case 1: reader_.popFrontN(2); return '\n';
-            //    case 2,3,4: reader_.popFront(); return '\n';
-            //    case 5: reader_.popFront(); return '\u2028';
-            //    case 6: reader_.popFront(); return '\u2029';
-            //}
-        }
+    const c = reader_.front;
+    if(c == '\x85')
+    {
+        reader_.popFront();
+        return '\n';
+    }
+    if(c == '\u2028' || c == '\u2029')
+    {
+        reader_.popFront();
+        return c;
+    }
+    return '\0';
+    //switch(reader_.save().startsWith("\r\n", "\r", "\n", "\u0085", "\u2028"d, "\u2029"d)) {
+    //    default: return '\0';
+    //    case 1: reader_.popFrontN(2); return '\n';
+    //    case 2,3,4: reader_.popFront(); return '\n';
+    //    case 5: reader_.popFront(); return '\u2028';
+    //    case 6: reader_.popFront(); return '\u2029';
+    //}
+}
+unittest {
+    string str = "\r\n";
+    assert(str.scanLineBreak() == '\n');
+    assert(str == "");
+    str = "\r";
+    assert(str.scanLineBreak() == '\n');
+    assert(str == "");
+    str = "\n";
+    assert(str.scanLineBreak() == '\n');
+    assert(str == "");
+    str = "\u0085";
+    assert(str.scanLineBreak() == '\n');
+    assert(str == "");
+    str = "\u2028";
+    assert(str.scanLineBreak() == '\u2028');
+    assert(str == "");
+    str = "\u2029";
+    assert(str.scanLineBreak() == '\u2029');
+    assert(str == "");
+    str = "";
+    assert(str.scanLineBreak() == '\0');
+    assert(str == "");
+    str = "b";
+    assert(str.scanLineBreak() == '\0');
+    assert(str == "b");
+    str = "\nb";
+    assert(str.scanLineBreak() == '\n');
+    assert(str == "b");
 }
