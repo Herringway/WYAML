@@ -88,15 +88,6 @@ T readText(T = char[])(string path) out(result) {
         return (cast(dchar[])buf).to!T;
     }
     return (cast(char[])buf).to!T;
-    //try {
-    //    return std.file.readText!T(path);
-    //} catch (std.utf.UTFException) {
-    //    auto buffer = cast(T)std.file.read(path);
-    //    foreach (ref character; buffer)
-    //        character = character.swapEndian();
-    //    buffer.validate();
-    //    return buffer;
-    //}
 }
 
 /// Get an UTF-16 byte order mark.
