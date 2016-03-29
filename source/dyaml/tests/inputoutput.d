@@ -12,6 +12,7 @@ version(unittest)
 
 import std.array;
 import std.meta;
+import std.utf;
 
 import dyaml.tests.common;
 
@@ -27,13 +28,6 @@ void testUnicodeInput(bool verbose, string unicodeFilename)
 
     Node output = Loader(data).load();
     assert(output.as!string == expected);
-
-    //foreach(buffer; [cast(void[])(bom16() ~ data.to!(wchar[])),
-    //                 cast(void[])(bom32() ~ data.to!(dchar[]))])
-    //{
-    //    output = Loader(buffer).load();
-    //    assert(output.as!string == expected);
-    //}
 }
 
 
