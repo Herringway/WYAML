@@ -55,7 +55,7 @@ final class Reader
         // Index of the current character in the buffer.
         size_t charIndex_ = 0;
         // Number of characters (code points) in buffer_.
-        size_t characterCount_ = 0;
+        deprecated size_t characterCount_ = 0;
 
         // Current line in file.
         uint line_;
@@ -65,13 +65,13 @@ final class Reader
         // The number of consecutive ASCII characters starting at bufferOffset_.
         //
         // Used to minimize UTF-8 decoding.
-        size_t upcomingASCII_ = 0;
+        deprecated size_t upcomingASCII_ = 0;
 
         // Index to buffer_ where the last decoded character starts.
-        size_t lastDecodedBufferOffset_ = 0;
+        deprecated size_t lastDecodedBufferOffset_ = 0;
         // Offset, relative to charIndex_, of the last decoded character,
         // in code points, not chars.
-        size_t lastDecodedCharOffset_ = 0;
+        deprecated size_t lastDecodedCharOffset_ = 0;
 
     public:
         /// Construct a Reader.
@@ -102,12 +102,11 @@ final class Reader
 
             checkASCII();
         }
-        private this() @safe {
-
-        }
-        /// Optimized version of peek() for the case where peek index is 0.
-        dchar front() @safe
-        {
+        private this() @safe { }
+        dchar front() @safe out(result) {
+            //ENABLE WHEN NULL REMOVED
+            //assert(isPrintableChar(result));
+        } body {
             if(upcomingASCII_ > 0)            { return buffer_[bufferOffset_]; }
             if(characterCount_ <= charIndex_) { return '\0'; }
 
@@ -183,7 +182,7 @@ final class Reader
 
 private:
         // Update upcomingASCII_ (should be called forward()ing over a UTF-8 sequence)
-        void checkASCII()
+        deprecated void checkASCII()
         {
             upcomingASCII_ = countASCII(buffer_[bufferOffset_ .. $]);
         }
@@ -192,7 +191,7 @@ private:
         // lastDecodedCharOffset_/lastDecodedBufferOffset_ and update them.
         //
         // Does not advance the buffer position. Used in peek() and slice().
-        dchar decodeNext()
+        deprecated dchar decodeNext()
         {
             assert(lastDecodedBufferOffset_ < buffer_.length,
                    "Attempted to decode past the end of YAML buffer");
@@ -228,7 +227,7 @@ private:
 //                            this first.
 // $(D char[] utf8)           input converted to UTF-8. May be a slice of input.
 // $(D size_t characterCount) Number of characters (code points) in input.
-auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure nothrow
+deprecated auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure nothrow
 {
     // Documented in function ddoc.
     struct Result
@@ -304,108 +303,13 @@ auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure nothrow
 
     return result;
 }
-
-/// Determine if all characters (code points, not bytes) in a string are printable.
-bool isPrintableValidUTF8(const char[] chars) @trusted pure nothrow @nogc
-{
-    // This is oversized (only 128 entries are necessary) simply because having 256
-    // entries improves performance... for some reason (alignment?)
-    bool[256] printable = [false, false, false, false, false, false, false, false,
-                           false, true,  true,  false, false, true,  false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-                           true,  true,  true,  true, true,  true,  true,  true,
-
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false,
-                           false, false, false, false, false, false, false, false];
-
-    for(size_t index = 0; index < chars.length;)
-    {
-        // Fast path for ASCII.
-        // Both this while() block and the if() block below it are optimized, unrolled
-        // versions of the for() block below them; the while()/if() block could be
-        // removed without affecting logic, but both help increase performance.
-        size_t asciiCount = countASCII(chars[index .. $]);
-        // 8 ASCII iterations unrolled, looping while there are at most 8 ASCII chars.
-        while(asciiCount > 8)
-        {
-            const dchar b0 = chars[index];
-            const dchar b1 = chars[index + 1];
-            const dchar b2 = chars[index + 2];
-            const dchar b3 = chars[index + 3];
-            const dchar b4 = chars[index + 4];
-            const dchar b5 = chars[index + 5];
-            const dchar b6 = chars[index + 6];
-            const dchar b7 = chars[index + 7];
-
-            index += 8;
-            asciiCount -= 8;
-
-            const all = printable[b0] & printable[b1] & printable[b2] & printable[b3] &
-                        printable[b4] & printable[b5] & printable[b6] & printable[b1];
-            if(!all)
-            {
-                return false;
-            }
-        }
-        // 4 ASCII iterations unrolled
-        if(asciiCount > 4)
-        {
-            const char b0 = chars[index];
-            const char b1 = chars[index + 1];
-            const char b2 = chars[index + 2];
-            const char b3 = chars[index + 3];
-
-            index += 4;
-            asciiCount -= 4;
-
-            if(!printable[b0]) { return false; }
-            if(!printable[b1]) { return false; }
-            if(!printable[b2]) { return false; }
-            if(!printable[b3]) { return false; }
-        }
-        // Any remaining ASCII chars. This is really the only code needed to handle
-        // ASCII, the above if() and while() blocks are just an optimization.
-        for(; asciiCount > 0; --asciiCount)
-        {
-            const char b = chars[index];
-            ++index;
-            if(b >= 0x20)    { continue; }
-            if(printable[b]) { continue; }
-            return false;
-        }
-
-        if(index == chars.length) { break; }
-        index++;
-    }
+bool isPrintableChar(in dchar val) pure @safe nothrow @nogc {
+    if (val < 0x20 && !val.among(0x09, 0x0A, 0x0D))
+        return false;
+    if (val < 0xA0 && val >= 0x80 && val != 0x85)
+        return false;
+    if (val.among(0x7F, 0xFFFE, 0xFFFF))
+        return false;
     return true;
 }
 
