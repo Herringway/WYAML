@@ -3,14 +3,14 @@
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
-module dyaml;
+module wyaml;
 
-public import dyaml.constructor;
-public import dyaml.dumper;
-public import dyaml.exception;
-public import dyaml.linebreak;
-public import dyaml.loader;
-public import dyaml.representer;
-public import dyaml.resolver;
-public import dyaml.style;
-public import dyaml.node;
+public import wyaml.constructor;
+public import wyaml.dumper;
+public import wyaml.exception;
+public import wyaml.linebreak;
+public import wyaml.loader;
+public import wyaml.representer;
+public import wyaml.resolver;
+public import wyaml.style;
+public import wyaml.node;
