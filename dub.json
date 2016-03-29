@@ -1,18 +1,16 @@
 {
-    "name": "dyaml",
+    "name": "wyaml",
     "description": "YAML parser and emitter",
-    "authors": [ "Ferdinand Majerech" ],
-    "libs": [],
-    "importPaths": ["source"],
+    "authors": [ "Ferdinand Majerech", "Cameron \"Herringway\" Ross" ],
     "license": "Boost 1.0",
     "dependencies": { "tinyendian" : { "version" : "~>0.1.0" } },
-    "homepage": "https://github.com/kiith-sa/D-YAML",
-    "copyright": "Copyright © 2011-2014, Ferdinand Majerech",
+    "homepage": "https://github.com/Herringway/WYAML",
+    "copyright": "Copyright © 2011-2014, Ferdinand Majerech, Modified work copyright © 2016 Cameron Ross",
     "configurations": [
         {
             "name": "library",
             "targetType": "library",
-            "excludedSourceFiles": ["source/dyaml/tests/*"]
+            "excludedSourceFiles": ["source/wyaml/tests/*"]
         },
         {
             "name": "unittest",
@@ -23,5 +21,14 @@
             "targetType": "library",
             "versions": ["verboseTest"]
         }
+    ],
+    "subPackages": [
+        "examples/constructor",
+        "examples/getting_started",
+        "examples/representer",
+        "examples/resolver",
+        "examples/yaml_bench",
+        "examples/yaml_gen",
+        "examples/yaml_stats",
     ]
 }

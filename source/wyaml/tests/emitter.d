@@ -1,0 +1,205 @@
+
+//          Copyright Ferdinand Majerech 2011-2014.
+// Distributed under the Boost Software License, Version 1.0.
+//    (See accompanying file LICENSE_1_0.txt or copy at
+//          http://www.boost.org/LICENSE_1_0.txt)
+
+module wyaml.tests.emitter;
+
+
+version(unittest)
+{
+
+import std.algorithm;
+import std.outbuffer;
+import std.range;
+import std.typecons;
+
+import wyaml.dumper;
+import wyaml.event;
+import wyaml.tests.common;
+import wyaml.token;
+
+
+/// Determine if events in events1 are equivalent to events in events2.
+///
+/// Params:  events1 = First event array to compare.
+///          events2 = Second event array to compare.
+///
+/// Returns: true if the events are equivalent, false otherwise.
+bool compareEvents(Event[] events1, Event[] events2)
+{
+    if(events1.length != events2.length){return false;}
+
+    for(uint e = 0; e < events1.length; ++e)
+    {
+        auto e1 = events1[e];
+        auto e2 = events2[e];
+
+        //Different event types.
+        if(e1.id != e2.id){return false;}
+        //Different anchor (if applicable).
+        if([EventID.SequenceStart,
+            EventID.MappingStart,
+            EventID.Alias,
+            EventID.Scalar].canFind(e1.id)
+            && !e1.anchor.isNull && !e2.anchor.isNull
+            && e1.anchor != e2.anchor)
+        {
+            return false;
+        }
+        //Different collection tag (if applicable).
+        if([EventID.SequenceStart, EventID.MappingStart].canFind(e1.id) && !e1.tag.isNull && !e2.tag.isNull && e1.tag != e2.tag)
+        {
+            return false;
+        }
+        if(e1.id == EventID.Scalar)
+        {
+            //Different scalar tag (if applicable).
+            if(![e1.implicit, e1.implicit_2, e2.implicit, e2.implicit_2].canFind(true)
+               && e1.tag != e2.tag)
+            {
+                return false;
+            }
+            //Different scalar value.
+            if(e1.value != e2.value)
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/// Test emitter by getting events from parsing a file, emitting them, parsing
+/// the emitted result and comparing events from parsing the emitted result with
+/// originally parsed events.
+///
+/// Params:  verbose           = Print verbose output?
+///          dataFilename      = YAML file to parse.
+///          canonicalFilename = Canonical YAML file used as dummy to determine
+///                              which data files to load.
+void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilename)
+{
+    //Must exist due to Anchor, Tags reference counts.
+    auto loader = Loader(readText!(char[])(dataFilename));
+    auto events = cast(Event[])loader.parse();
+    auto emitStream = new OutBuffer;
+    Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(events);
+
+    if(verbose)
+    {
+        writeln(dataFilename);
+        writeln("ORIGINAL:\n", readText(dataFilename));
+        writeln("OUTPUT:\n", emitStream.toString);
+    }
+
+    auto loader2        = Loader(emitStream.toString().dup);
+    loader2.name        = "TEST";
+    loader2.constructor = new Constructor;
+    loader2.resolver    = new Resolver;
+    auto newEvents = cast(Event[])loader2.parse();
+    assert(compareEvents(events, newEvents));
+}
+
+/// Test emitter by getting events from parsing a canonical YAML file, emitting
+/// them both in canonical and normal format, parsing the emitted results and
+/// comparing events from parsing the emitted result with originally parsed events.
+///
+/// Params:  verbose           = Print verbose output?
+///          canonicalFilename = Canonical YAML file to parse.
+void testEmitterOnCanonical(bool verbose, string canonicalFilename)
+{
+    //Must exist due to Anchor, Tags reference counts.
+    auto loader = Loader(readText!(char[])(canonicalFilename));
+    auto events = cast(Event[])loader.parse();
+    foreach(canonical; [false, true])
+    {
+        auto emitStream = new OutBuffer;
+        auto dumper = Dumper(outputRangeObject!(ubyte[])(emitStream));
+        dumper.canonical = canonical;
+        dumper.emit(events);
+        if(verbose)
+        {
+            writeln("OUTPUT (canonical=", canonical, "):\n",
+                    emitStream.toString());
+        }
+        auto loader2        = Loader(emitStream.toString().dup);
+        loader2.name        = "TEST";
+        loader2.constructor = new Constructor;
+        loader2.resolver    = new Resolver;
+        auto newEvents = cast(Event[])loader2.parse();
+        assert(compareEvents(events, newEvents));
+    }
+}
+
+/// Test emitter by getting events from parsing a file, emitting them with all
+/// possible scalar and collection styles, parsing the emitted results and
+/// comparing events from parsing the emitted result with originally parsed events.
+///
+/// Params:  verbose           = Print verbose output?
+///          dataFilename      = YAML file to parse.
+///          canonicalFilename = Canonical YAML file used as dummy to determine
+///                              which data files to load.
+void testEmitterStyles(bool verbose, string dataFilename, string canonicalFilename)
+{
+    foreach(filename; [dataFilename, canonicalFilename])
+    {
+        //must exist due to Anchor, Tags reference counts
+        auto loader = Loader(readText!(char[])(canonicalFilename));
+        auto events = cast(Event[])loader.parse();
+        foreach(flowStyle; [CollectionStyle.Block, CollectionStyle.Flow])
+        {
+            foreach(style; [ScalarStyle.Literal, ScalarStyle.Folded,
+                            ScalarStyle.DoubleQuoted, ScalarStyle.SingleQuoted,
+                            ScalarStyle.Plain])
+            {
+                Event[] styledEvents;
+                foreach(event; events)
+                {
+                    if(event.id == EventID.Scalar)
+                    {
+                        event = scalarEvent(Mark(), Mark(), event.anchor, event.tag,
+                                            tuple(event.implicit, event.implicit_2),
+                                            event.value, style);
+                    }
+                    else if(event.id == EventID.SequenceStart)
+                    {
+                        event = sequenceStartEvent(Mark(), Mark(), event.anchor,
+                                                   event.tag, event.implicit, flowStyle);
+                    }
+                    else if(event.id == EventID.MappingStart)
+                    {
+                        event = mappingStartEvent(Mark(), Mark(), event.anchor,
+                                                  event.tag, event.implicit, flowStyle);
+                    }
+                    styledEvents ~= event;
+                }
+                auto emitStream = new OutBuffer;
+                Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(styledEvents);
+                if(verbose)
+                {
+                    writeln("OUTPUT (", filename, ", ", to!string(flowStyle), ", ",
+                            to!string(style), ")");
+                    writeln(emitStream.toString);
+                }
+                auto loader2        = Loader(emitStream.toString().dup);
+                loader2.name        = "TEST";
+                loader2.constructor = new Constructor;
+                loader2.resolver    = new Resolver;
+                auto newEvents = cast(Event[])loader2.parse();
+                assert(compareEvents(events, newEvents));
+            }
+        }
+    }
+}
+
+unittest
+{
+    writeln("D:YAML Emitter unittest");
+    run("testEmitterOnData",      &testEmitterOnData,      ["data", "canonical"]);
+    run("testEmitterOnCanonical", &testEmitterOnCanonical, ["canonical"]);
+    run("testEmitterStyles",      &testEmitterStyles,      ["data", "canonical"]);
+}
+
+} // version(unittest)
