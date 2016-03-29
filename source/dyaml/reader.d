@@ -62,12 +62,6 @@ final class Reader
         // Current column in file.
         uint column_;
 
-        version(unittest)
-        {
-            // Endianness of the input before it was converted (for testing)
-            Endian endian_;
-        }
-
         // The number of consecutive ASCII characters starting at bufferOffset_.
         //
         // Used to minimize UTF-8 decoding.
@@ -98,14 +92,7 @@ final class Reader
                                           "to 2 or 4 bytes, respectively");
             }
 
-            version(unittest) { endian_ = endianResult.endian; }
-
             auto utf8Result = toUTF8(endianResult.array, endianResult.encoding);
-            const msg = utf8Result.errorMessage;
-            if(msg !is null)
-            {
-                throw new ReaderException("Error when converting to UTF-8: " ~ msg);
-            }
 
             buffer_ = utf8Result.utf8;
             //buffer_ = buffer;
@@ -113,9 +100,6 @@ final class Reader
             characterCount_ = utf8Result.characterCount;
             //characterCount_ = buffer.length;
 
-            // Check that all characters in buffer are printable.
-            enforce(isPrintableValidUTF8(buffer_),
-                    new ReaderException("Special unicode characters are not allowed"));
             checkASCII();
         }
         private this() @safe {
@@ -149,9 +133,6 @@ final class Reader
 
         bool empty() @safe const {
             return characterCount_ <= charIndex_;
-        }
-        char[] opSlice(const size_t start, const size_t end) @safe {
-            return buffer_[start..end];
         }
 
         /// Move current position forward by one character.
@@ -491,7 +472,6 @@ void testPeekPrefixForward(R)()
     char[] data = "data".dup;
     auto reader = new R(data);
     assert(reader.save().startsWith("data"));
-    assert(reader[0..4] == "data");
     reader.popFrontN(2);
 }
 
