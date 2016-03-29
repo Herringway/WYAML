@@ -216,7 +216,7 @@ Result execute(F ...)(const string testName, void function(bool, F) testFunction
         testFunction(verbose, parameters);
         if(!verbose){write(".");}
     }
-    catch(Throwable e)
+    catch(Exception e)
     {
         info = to!string(typeid(e)) ~ "\n" ~ to!string(e);
         kind = (typeid(e) is typeid(AssertError)) ? TestStatus.Failure : TestStatus.Error;
