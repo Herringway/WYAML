@@ -62,11 +62,6 @@ final class Reader
         // Current column in file.
         uint column_;
 
-        // The number of consecutive ASCII characters starting at bufferOffset_.
-        //
-        // Used to minimize UTF-8 decoding.
-        deprecated size_t upcomingASCII_ = 0;
-
         // Index to buffer_ where the last decoded character starts.
         deprecated size_t lastDecodedBufferOffset_ = 0;
         // Offset, relative to charIndex_, of the last decoded character,
@@ -83,7 +78,7 @@ final class Reader
         ///
         /// Throws:  ReaderException on a UTF decoding error or if there are
         ///          nonprintable Unicode characters illegal in YAML.
-        this(void[] buffer) @trusted pure //!nothrow
+        this(char[] buffer) @trusted pure //!nothrow
         {
             auto endianResult = fixUTFByteOrder(cast(ubyte[])buffer);
             if(endianResult.bytesStripped > 0)
@@ -100,14 +95,12 @@ final class Reader
             characterCount_ = utf8Result.characterCount;
             //characterCount_ = buffer.length;
 
-            checkASCII();
         }
         private this() @safe { }
         dchar front() @safe out(result) {
             //ENABLE WHEN NULL REMOVED
             //assert(isPrintableChar(result));
         } body {
-            if(upcomingASCII_ > 0)            { return buffer_[bufferOffset_]; }
             if(characterCount_ <= charIndex_) { return '\0'; }
 
             lastDecodedCharOffset_   = 0;
@@ -124,7 +117,6 @@ final class Reader
             output.characterCount_ = characterCount_;
             output.line_ = line_;
             output.column_ = column_;
-            output.upcomingASCII_ = upcomingASCII_;
             output.lastDecodedBufferOffset_ = lastDecodedBufferOffset_;
             output.lastDecodedCharOffset_ = lastDecodedCharOffset_;
             return output;
@@ -141,22 +133,6 @@ final class Reader
             lastDecodedBufferOffset_ = bufferOffset_;
             lastDecodedCharOffset_ = 0;
 
-            // ASCII
-            if(upcomingASCII_ > 0)
-            {
-                --upcomingASCII_;
-                const c = buffer_[bufferOffset_++];
-
-                if(c == '\n' || (c == '\r' && buffer_[bufferOffset_] != '\n'))
-                {
-                    ++line_;
-                    column_ = 0;
-                    return;
-                }
-                ++column_;
-                return;
-            }
-
             const c = decode(buffer_, bufferOffset_);
 
             // New line. (can compare with '\n' without decoding since it's ASCII)
@@ -167,7 +143,6 @@ final class Reader
             }
             else if(c != '\uFEFF') { ++column_; }
 
-            checkASCII();
         }
 
 @safe pure:
@@ -181,11 +156,6 @@ final class Reader
         uint column() const { return column_; }
 
 private:
-        // Update upcomingASCII_ (should be called forward()ing over a UTF-8 sequence)
-        deprecated void checkASCII()
-        {
-            upcomingASCII_ = countASCII(buffer_[bufferOffset_ .. $]);
-        }
 
         // Decode the next character relative to
         // lastDecodedCharOffset_/lastDecodedBufferOffset_ and update them.
@@ -311,47 +281,6 @@ bool isPrintableChar(in dchar val) pure @safe nothrow @nogc {
     if (val.among(0x7F, 0xFFFE, 0xFFFF))
         return false;
     return true;
-}
-
-/// Counts the number of ASCII characters in buffer until the first UTF-8 sequence.
-///
-/// Used to determine how many characters we can process without decoding.
-size_t countASCII(const(char)[] buffer) @trusted pure nothrow @nogc
-{
-    size_t count = 0;
-
-    // The topmost bit in ASCII characters is always 0
-    enum ulong Mask8  = 0x7f7f7f7f7f7f7f7f;
-    enum uint Mask4   = 0x7f7f7f7f;
-    enum ushort Mask2 = 0x7f7f;
-
-    // Start by checking in 8-byte chunks.
-    while(buffer.length >= Mask8.sizeof)
-    {
-        const block  = *cast(typeof(Mask8)*)buffer.ptr;
-        const masked = Mask8 & block;
-        if(masked != block) { break; }
-        count += Mask8.sizeof;
-        buffer = buffer[Mask8.sizeof .. $];
-    }
-
-    // If 8 bytes didn't match, try 4, 2 bytes.
-    import std.typetuple;
-    foreach(Mask; TypeTuple!(Mask4, Mask2))
-    {
-        if(buffer.length < Mask.sizeof) { continue; }
-        const block  = *cast(typeof(Mask)*)buffer.ptr;
-        const masked = Mask & block;
-        if(masked != block) { continue; }
-        count += Mask.sizeof;
-        buffer = buffer[Mask.sizeof .. $];
-    }
-
-    // If even a 2-byte chunk didn't match, test just one byte.
-    if(buffer.empty || buffer[0] >= 0x80) { return count; }
-    ++count;
-
-    return count;
 }
 // Unittests.
 
