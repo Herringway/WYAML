@@ -56,3 +56,4 @@ Thumbs.db
 perf.data
 perf.data.old
 callgrind.out.*
+*.lst
