@@ -94,6 +94,16 @@ class UnexpectedTokenWithMarkException : YAMLException {
     }
 }
 
+/// Block chomping types.
+enum Chomping
+{
+    /// Strip all trailing line breaks. '-' indicator.
+    Strip,
+    /// Line break of the last line is preserved, others discarded. Default.
+    Clip,
+    /// All trailing line breaks are preserved. '+' indicator.
+    Keep
+}
 /// Generates tokens from data provided by a Reader.
 final class Scanner
 {
@@ -123,16 +133,6 @@ final class Scanner
             bool isNull;
         }
 
-        /// Block chomping types.
-        enum Chomping
-        {
-            /// Strip all trailing line breaks. '-' indicator.
-            Strip,
-            /// Line break of the last line is preserved, others discarded. Default.
-            Clip,
-            /// All trailing line breaks are preserved. '+' indicator.
-            Keep
-        }
 
         /// Reader used to read from a file/stream.
         Reader reader_;
@@ -779,25 +779,6 @@ final class Scanner
                    (c == '-' || (flowLevel_ == 0 && c.among!('?', ':')));
         }
 
-        /// Move to the next non-space character.
-        void findNextNonSpace() @safe
-        {
-            reader_.until!(x => x != ' ').walkLength;
-        }
-
-        /// Scan a string of alphanumeric or "-_" characters.
-        auto scanAlphaNumeric(string name) @system
-        {
-            auto output = reader_.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
-            enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader_.front));
-            return output;
-        }
-
-        /// Scan all characters until next line break.
-        auto scanToNextBreak() @safe
-        {
-            return reader_.until!(x => x.among!allBreaks).array;
-        }
 
 
         /// Move to next token in the file/stream.
@@ -824,9 +805,9 @@ final class Scanner
 
             for(;;)
             {
-                findNextNonSpace();
+                findNextNonSpace(reader_);
                 if (reader_.empty) break;
-                if(reader_.front == '#') { scanToNextBreak(); }
+                if(reader_.front == '#') { scanToNextBreak(reader_); }
                 if(scanLineBreak(reader_) != '\0')
                 {
                     if(flowLevel_ == 0) { allowSimpleKey_ = true; }
@@ -846,13 +827,13 @@ final class Scanner
             reader_.popFront();
 
             // Scan directive name
-            const name = scanDirectiveName();
+            const name = scanDirectiveName(reader_);
 
             // Index where tag handle ends and suffix starts in a tag directive value.
             uint tagHandleEnd = uint.max;
             dchar[] value;
-            if(name == "YAML")     { value = scanYAMLDirectiveValue(); }
-            else if(name == "TAG") { value = scanTagDirectiveValue(tagHandleEnd); }
+            if(name == "YAML")     { value = scanYAMLDirectiveValue(reader_); }
+            else if(name == "TAG") { value = scanTagDirectiveValue(reader_, tagHandleEnd); }
 
             Mark endMark = reader_.mark;
 
@@ -862,87 +843,13 @@ final class Scanner
             else
             {
                 directive = DirectiveType.Reserved;
-                scanToNextBreak();
+                scanToNextBreak(reader_);
             }
 
-            scanDirectiveIgnoredLine();
+            scanDirectiveIgnoredLine(reader_);
             return directiveToken(startMark, endMark, value.toUTF8.dup, directive, tagHandleEnd);
         }
 
-        /// Scan name of a directive token.
-        auto scanDirectiveName() @system
-        {
-            // Scan directive name.
-            auto output = scanAlphaNumeric("a directive");
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "alphanumeric, '-' or '_'", reader_.front));
-            return output;
-        }
-
-        /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
-        auto scanYAMLDirectiveValue() @system
-        {
-            dchar[] output;
-            findNextNonSpace();
-
-            output ~= scanYAMLDirectiveNumber();
-
-            enforce(reader_.front == '.', new UnexpectedTokenException("directive", "digit or '.'", reader_.front));
-            // Skip the '.'.
-            reader_.popFront();
-
-            output ~= '.';
-            output ~= scanYAMLDirectiveNumber();
-
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "digit or '.'", reader_.front));
-            return output;
-        }
-
-        /// Scan a number from a YAML directive.
-        auto scanYAMLDirectiveNumber() @system
-        {
-            enforce(reader_.front.isDigit, new UnexpectedTokenException("directive", "digit", reader_.front));
-            return reader_.until!(x => x.isDigit)(OpenRight.no).array;
-        }
-
-        /// Scan value of a tag directive.
-        ///
-        /// Returns: Length of tag handle (which is before tag prefix) in scanned data
-        auto scanTagDirectiveValue(out uint handleLength) @system
-        {
-            dchar[] output;
-            findNextNonSpace();
-            output ~= scanTagDirectiveHandle();
-            handleLength = cast(uint)(output.length);
-            findNextNonSpace();
-            output ~= scanTagDirectivePrefix();
-
-            return output;
-        }
-
-        /// Scan handle of a tag directive.
-        auto scanTagDirectiveHandle() @system
-        {
-            auto output = scanTagHandle(reader_, "directive");
-            enforce(reader_.front == ' ', new UnexpectedTokenException("directive", "' '", reader_.front));
-            return output;
-        }
-
-        /// Scan prefix of a tag directive.
-        auto scanTagDirectivePrefix() @system
-        {
-            auto output = scanTagURI(reader_, "directive");
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader_.front));
-            return output;
-        }
-
-        /// Scan (and ignore) ignored line after a directive.
-        void scanDirectiveIgnoredLine() @safe
-        {
-            findNextNonSpace();
-            if(reader_.front == '#') { scanToNextBreak(); }
-            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader_.front));
-            scanLineBreak(reader_);
-        }
 
 
         /// Scan an alias or an anchor.
@@ -962,8 +869,8 @@ final class Scanner
             reader_.popFront();
 
             char[] value;
-            if(i == '*') { value = scanAlphaNumeric("an alias").toUTF8.dup; }
-            else         { value = scanAlphaNumeric("an anchor").toUTF8.dup; }
+            if(i == '*') { value = scanAlphaNumeric(reader_, "an alias").toUTF8.dup; }
+            else         { value = scanAlphaNumeric(reader_, "an anchor").toUTF8.dup; }
 
 
             enforce(reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", "alphanumeric, '-' or '_'", reader_.front));
@@ -1043,11 +950,11 @@ final class Scanner
             // Scan the header.
             reader_.popFront();
 
-            const indicators = scanBlockScalarIndicators();
+            const indicators = scanBlockScalarIndicators(reader_);
 
             const chomping   = indicators[0];
             const increment  = indicators[1];
-            scanBlockScalarIgnoredLine();
+            scanBlockScalarIgnoredLine(reader_);
 
             // Determine the indentation level and go to the first non-empty line.
             Mark endMark;
@@ -1060,13 +967,13 @@ final class Scanner
             if(increment == int.min)
             {
                 uint indentation;
-                newSlice ~= scanBlockScalarIndentation(indentation, endMark);
+                newSlice ~= scanBlockScalarIndentation(reader_, indentation, endMark);
                 indent  = max(indent, indentation);
             }
             else
             {
                 indent += increment - 1;
-                newSlice ~= scanBlockScalarBreaks(indent, endMark);
+                newSlice ~= scanBlockScalarBreaks(reader_, indent, endMark);
             }
 
             dchar lineBreak = '\0';
@@ -1078,14 +985,14 @@ final class Scanner
                 newSlice = [];
                 const bool leadingNonSpace = !reader_.front.among!(whiteSpaces);
                 // This is where the 'interesting' non-whitespace data gets read.
-                slice ~= scanToNextBreak();
+                slice ~= scanToNextBreak(reader_);
                 lineBreak = scanLineBreak(reader_);
 
                 fullLen = slice.length+newSlice.length;
                 startLen = 0;
                 // The line breaks should actually be written _after_ the if() block
                 // below. We work around that by inserting
-                newSlice ~= scanBlockScalarBreaks(indent, endMark);
+                newSlice ~= scanBlockScalarBreaks(reader_, indent, endMark);
 
                 // This will not run during the last iteration (see the if() vs the
                 // while()), hence breaksTransaction rollback (which happens after this
@@ -1139,117 +1046,6 @@ final class Scanner
             return scalarToken(startMark, endMark, slice.toUTF8.dup, style);
         }
 
-        /// Scan chomping and indentation indicators of a scalar token.
-        Tuple!(Chomping, int) scanBlockScalarIndicators() @safe
-        {
-            auto chomping = Chomping.Clip;
-            int increment = int.min;
-            dchar c       = reader_.front;
-
-            /// Indicators can be in any order.
-            if(getChomping(c, chomping))
-            {
-                getIncrement(c, increment);
-            }
-            else
-            {
-                const gotIncrement = getIncrement(c, increment);
-                if(gotIncrement) { getChomping(c, chomping); }
-            }
-
-            enforce(c.among!(allWhiteSpace), new UnexpectedTokenException("block scalar", "chomping or indentation indicator", c));
-
-            return tuple(chomping, increment);
-        }
-
-        /// Get chomping indicator, if detected. Return false otherwise.
-        ///
-        /// Used in scanBlockScalarIndicators.
-        ///
-        /// Params:
-        ///
-        /// c        = The character that may be a chomping indicator.
-        /// chomping = Write the chomping value here, if detected.
-        bool getChomping(ref dchar c, ref Chomping chomping) @safe
-        {
-            if(!c.among!(chompIndicators)) { return false; }
-            chomping = c == '+' ? Chomping.Keep : Chomping.Strip;
-            reader_.popFront();
-            c = reader_.front;
-            return true;
-        }
-
-        /// Get increment indicator, if detected. Return false otherwise.
-        ///
-        /// Used in scanBlockScalarIndicators.
-        ///
-        /// Params:
-        ///
-        /// c         = The character that may be an increment indicator.
-        ///             If an increment indicator is detected, this will be updated to
-        ///             the next character in the Reader.
-        /// increment = Write the increment value here, if detected.
-        /// startMark = Mark for error messages.
-        bool getIncrement(ref dchar c, ref int increment) @safe
-        {
-            if(!c.isDigit) { return false; }
-            // Convert a digit to integer.
-            increment = c - '0';
-            assert(increment < 10 && increment >= 0, "Digit has invalid value");
-            enforce(increment > 0, new UnexpectedTokenException("block scalar", "1-9", '0'));
-
-            reader_.popFront();
-            c = reader_.front;
-            return true;
-        }
-
-        /// Scan (and ignore) ignored line in a block scalar.
-        void scanBlockScalarIgnoredLine() @safe
-        {
-            findNextNonSpace();
-            if(reader_.front == '#') { scanToNextBreak(); }
-
-            enforce(reader_.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader_.front));
-
-            scanLineBreak(reader_);
-            return;
-        }
-
-        /// Scan indentation in a block scalar, returning line breaks, max indent and end mark.
-        auto scanBlockScalarIndentation(out uint maxIndent, out Mark endMark) @system
-        {
-            dchar[] output;
-            while(!reader_.empty && reader_.front.among!(newLinesPlusSpaces))
-            {
-                if(reader_.front != ' ')
-                {
-                    output ~= scanLineBreak(reader_);
-                    endMark = reader_.mark;
-                    continue;
-                }
-                reader_.popFront();
-                maxIndent = max(reader_.column, maxIndent);
-            }
-
-            return output;
-        }
-
-        /// Scan line breaks at lower or specified indentation in a block scalar.
-        auto scanBlockScalarBreaks(const uint indent, out Mark end) @trusted
-        {
-            end = reader_.mark;
-            dchar[] output;
-
-            while(!reader_.empty)
-            {
-                while(!reader_.empty && reader_.column < indent && reader_.front == ' ') { reader_.popFront(); }
-                if(!reader_.front.among!(newLines))  { break; }
-                output ~= scanLineBreak(reader_);
-                end = reader_.mark;
-            }
-
-            return output;
-        }
 
         /// Scan a quoted flow scalar token with specified quotes.
         Token scanFlowScalar(const ScalarStyle quotes) @trusted
@@ -1258,143 +1054,19 @@ final class Scanner
             const quote     = reader_.front;
             reader_.popFront();
 
-            dchar[] slice = scanFlowScalarNonSpaces(quotes);
+            dchar[] slice = scanFlowScalarNonSpaces(reader_, quotes);
 
-            while(reader_.front != quote)
+            while(!reader_.empty && reader_.front != quote)
             {
-                slice ~= scanFlowScalarSpaces();
-                slice ~= scanFlowScalarNonSpaces(quotes);
+                slice ~= scanFlowScalarSpaces(reader_);
+                slice ~= scanFlowScalarNonSpaces(reader_, quotes);
             }
+            enforce (!reader_.empty, new UnexpectedSequenceException("quoted flow scalar", "EOF"));
             reader_.popFront();
 
             return scalarToken(startMark, reader_.mark, slice.toUTF8.dup, quotes);
         }
 
-        /// Scan nonspace characters in a flow scalar.
-        auto scanFlowScalarNonSpaces(const ScalarStyle quotes)
-            //@safe
-        {
-            dchar[] output;
-            for(;;) with(ScalarStyle)
-            {
-                dchar c = void;
-
-                output ~= reader_.until!(x => x.among!(allWhiteSpacePlusQuotesAndSlashes)).array;
-                if (reader_.empty)
-                    break;
-                c = reader_.front;
-                if(quotes == SingleQuoted && c == '\'' && reader_.save().drop(1).front == '\'')
-                {
-                    reader_.popFrontN(2);
-                    output ~= '\'';
-                }
-                else if((quotes == DoubleQuoted && c == '\'') ||
-                        (quotes == SingleQuoted && c.among!('"', '\\')))
-                {
-                    reader_.popFront();
-                    output ~= c;
-                }
-                else if(quotes == DoubleQuoted && c == '\\')
-                {
-                    reader_.popFront();
-                    c = reader_.front;
-                    if(c.among!(wyaml.escapes.escapeSeqs))
-                    {
-                        reader_.popFront();
-                        output ~= ['\\', c];
-                    }
-                    else if(c.among!(wyaml.escapes.escapeHexSeq))
-                    {
-                        const hexLength = wyaml.escapes.escapeHexLength(c);
-                        reader_.popFront();
-
-                        auto v = reader_.take(hexLength);
-                        auto hex = v.save().array;
-                        enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", "escape sequence of hexadecimal numbers", v.until!(x => x.isHexDigit).front));
-
-                        output ~= '\\';
-                        output ~= c;
-                        output ~= hex;
-                        parse!int(hex, 16u);
-                    }
-                    else if(c.among!(newLines))
-                    {
-                        scanLineBreak(reader_);
-                        output ~= scanFlowScalarBreaks();
-                    }
-                    else
-                    {
-                        throw new UnexpectedTokenException("double quoted scalar", "valid escape character", c);
-                    }
-                }
-                else
-                    break;
-            }
-            return output;
-        }
-
-        /// Scan space characters in a flow scalar.
-        auto scanFlowScalarSpaces() @system
-        {
-            dchar[] output;
-            // Increase length as long as we see whitespace.
-            dchar[] whitespaces;
-            while(reader_.front.among!(whiteSpaces)) {
-                whitespaces ~= reader_.front;
-                reader_.popFront();
-            }
-
-            enforce(!reader_.empty, new UnexpectedSequenceException("quoted scalar", "end of stream"));
-            const c = reader_.front;
-
-            // Spaces not followed by a line break.
-            if(!c.among!(newLines))
-            {
-                output ~= whitespaces;
-                return output;
-            }
-
-            // There's a line break after the spaces.
-            const lineBreak = scanLineBreak(reader_);
-
-            if(lineBreak != '\n') { output ~= lineBreak; }
-
-            bool extraBreaks;
-            output ~= scanFlowScalarBreaks(extraBreaks);
-
-            // No extra breaks, one normal line break. Replace it with a space.
-            if(lineBreak == '\n' && !extraBreaks) { output ~= ' '; }
-
-            return output;
-        }
-
-        /// Scan line breaks in a flow scalar.
-        dchar[] scanFlowScalarBreaks()
-        {
-            bool waste;
-            return scanFlowScalarBreaks(waste);
-        }
-        auto scanFlowScalarBreaks(out bool extraBreaks)
-        {
-            dchar[] output;
-            for(;;)
-            {
-                // Instead of checking indentation, we check for document separators.
-                enforce(!reader_.save().startsWith("---", "...") ||
-                   !reader_.save().drop(3).front.among!(allWhiteSpace), new UnexpectedSequenceException("quoted scalar", "document separator"));
-
-                // Skip any whitespaces.
-                reader_.until!(x => !x.among!whiteSpaces).walkLength;
-
-                // Encountered a non-whitespace non-linebreak character, so we're done.
-                if (reader_.empty || !reader_.front.among!(newLines)) break;
-
-                const lineBreak = scanLineBreak(reader_);
-                extraBreaks = true;
-                output ~= lineBreak;
-            }
-            return output;
-        }
 
         /// Scan plain scalar token (no block, no quotes).
         Token scanPlain() @trusted
@@ -1480,7 +1152,337 @@ final class Scanner
             return scalarToken(startMark, endMark, slice.toUTF8.dup, ScalarStyle.Plain);
         }
 }
+/// Move to the next non-space character.
+void findNextNonSpace(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    reader.until!(x => x != ' ').walkLength;
+}
 
+/// Scan a string of alphanumeric or "-_" characters.
+auto scanAlphaNumeric(T)(ref T reader, string name) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    auto output = reader.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
+    enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader.front));
+    return output;
+}
+
+/// Scan all characters until next line break.
+auto scanToNextBreak(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    return reader.until!(x => x.among!allBreaks).array;
+}
+/// Scan name of a directive token.
+auto scanDirectiveName(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    // Scan directive name.
+    auto output = scanAlphaNumeric(reader, "a directive");
+    enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "alphanumeric, '-' or '_'", reader.front));
+    return output;
+}
+
+/// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
+auto scanYAMLDirectiveValue(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    dchar[] output;
+    findNextNonSpace(reader);
+
+    output ~= scanYAMLDirectiveNumber(reader);
+
+    enforce(reader.front == '.', new UnexpectedTokenException("directive", "digit or '.'", reader.front));
+    // Skip the '.'.
+    reader.popFront();
+
+    output ~= '.';
+    output ~= scanYAMLDirectiveNumber(reader);
+
+    enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "digit or '.'", reader.front));
+    return output;
+}
+
+/// Scan a number from a YAML directive.
+auto scanYAMLDirectiveNumber(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    enforce(reader.front.isDigit, new UnexpectedTokenException("directive", "digit", reader.front));
+    return reader.until!(x => x.isDigit)(OpenRight.no).array;
+}
+
+/// Scan value of a tag directive.
+///
+/// Returns: Length of tag handle (which is before tag prefix) in scanned data
+auto scanTagDirectiveValue(T)(ref T reader, out uint handleLength) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    dchar[] output;
+    findNextNonSpace(reader);
+    output ~= scanTagDirectiveHandle(reader);
+    handleLength = cast(uint)(output.length);
+    findNextNonSpace(reader);
+    output ~= scanTagDirectivePrefix(reader);
+
+    return output;
+}
+
+/// Scan handle of a tag directive.
+auto scanTagDirectiveHandle(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    auto output = scanTagHandle(reader, "directive");
+    enforce(reader.front == ' ', new UnexpectedTokenException("directive", "' '", reader.front));
+    return output;
+}
+
+/// Scan prefix of a tag directive.
+auto scanTagDirectivePrefix(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    auto output = scanTagURI(reader, "directive");
+    enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader.front));
+    return output;
+}
+
+/// Scan (and ignore) ignored line after a directive.
+void scanDirectiveIgnoredLine(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    findNextNonSpace(reader);
+    if(reader.front == '#') { scanToNextBreak(reader); }
+    enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader.front));
+    scanLineBreak(reader);
+}
+/// Scan chomping and indentation indicators of a scalar token.
+Tuple!(Chomping, int) scanBlockScalarIndicators(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    auto chomping = Chomping.Clip;
+    int increment = int.min;
+    dchar c       = reader.front;
+
+    /// Indicators can be in any order.
+    if(getChomping(reader, c, chomping))
+    {
+        getIncrement(reader, c, increment);
+    }
+    else
+    {
+        const gotIncrement = getIncrement(reader, c, increment);
+        if(gotIncrement) { getChomping(reader, c, chomping); }
+    }
+
+    enforce(c.among!(allWhiteSpace), new UnexpectedTokenException("block scalar", "chomping or indentation indicator", c));
+
+    return tuple(chomping, increment);
+}
+
+/// Get chomping indicator, if detected. Return false otherwise.
+///
+/// Used in scanBlockScalarIndicators.
+///
+/// Params:
+///
+/// c        = The character that may be a chomping indicator.
+/// chomping = Write the chomping value here, if detected.
+bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    if(!c.among!(chompIndicators)) { return false; }
+    chomping = c == '+' ? Chomping.Keep : Chomping.Strip;
+    reader.popFront();
+    c = reader.front;
+    return true;
+}
+
+/// Get increment indicator, if detected. Return false otherwise.
+///
+/// Used in scanBlockScalarIndicators.
+///
+/// Params:
+///
+/// c         = The character that may be an increment indicator.
+///             If an increment indicator is detected, this will be updated to
+///             the next character in the Reader.
+/// increment = Write the increment value here, if detected.
+/// startMark = Mark for error messages.
+bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    if(!c.isDigit) { return false; }
+    // Convert a digit to integer.
+    increment = c - '0';
+    assert(increment < 10 && increment >= 0, "Digit has invalid value");
+    enforce(increment > 0, new UnexpectedTokenException("block scalar", "1-9", '0'));
+
+    reader.popFront();
+    c = reader.front;
+    return true;
+}
+
+/// Scan (and ignore) ignored line in a block scalar.
+void scanBlockScalarIgnoredLine(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    findNextNonSpace(reader);
+    if(reader.front == '#') { scanToNextBreak(reader); }
+
+    enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader.front));
+
+    scanLineBreak(reader);
+    return;
+}
+
+/// Scan indentation in a block scalar, returning line breaks, max indent and end mark.
+auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent, out Mark endMark) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    dchar[] output;
+    while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
+    {
+        if(reader.front != ' ')
+        {
+            output ~= scanLineBreak(reader);
+            endMark = reader.mark;
+            continue;
+        }
+        reader.popFront();
+        maxIndent = max(reader.column, maxIndent);
+    }
+
+    return output;
+}
+
+/// Scan line breaks at lower or specified indentation in a block scalar.
+auto scanBlockScalarBreaks(T)(ref T reader, const uint indent, out Mark end) @trusted if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    end = reader.mark;
+    dchar[] output;
+
+    while(!reader.empty)
+    {
+        while(!reader.empty && reader.column < indent && reader.front == ' ') { reader.popFront(); }
+        if(!reader.front.among!(newLines))  { break; }
+        output ~= scanLineBreak(reader);
+        end = reader.mark;
+    }
+
+    return output;
+}
+/// Scan nonspace characters in a flow scalar.
+auto scanFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+    //@safe
+{
+    dchar[] output;
+    for(;;) with(ScalarStyle)
+    {
+        dchar c = void;
+
+        output ~= reader.until!(x => x.among!(allWhiteSpacePlusQuotesAndSlashes)).array;
+        if (reader.empty)
+            break;
+        c = reader.front;
+        if(quotes == SingleQuoted && c == '\'' && !reader.save().drop(1).empty && reader.save().drop(1).front == '\'')
+        {
+            reader.popFrontN(2);
+            output ~= '\'';
+        }
+        else if((quotes == DoubleQuoted && c == '\'') ||
+                (quotes == SingleQuoted && c.among!('"', '\\')))
+        {
+            reader.popFront();
+            output ~= c;
+        }
+        else if(quotes == DoubleQuoted && c == '\\')
+        {
+            reader.popFront();
+            c = reader.front;
+            if(c.among!(wyaml.escapes.escapeSeqs))
+            {
+                reader.popFront();
+                output ~= ['\\', c];
+            }
+            else if(c.among!(wyaml.escapes.escapeHexSeq))
+            {
+                const hexLength = wyaml.escapes.escapeHexLength(c);
+                reader.popFront();
+
+                auto v = reader.take(hexLength);
+                auto hex = v.save().array;
+                enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", "escape sequence of hexadecimal numbers", v.until!(x => x.isHexDigit).front));
+
+                output ~= '\\';
+                output ~= c;
+                output ~= hex;
+                parse!int(hex, 16u);
+            }
+            else if(c.among!(newLines))
+            {
+                scanLineBreak(reader);
+                output ~= scanFlowScalarBreaks(reader);
+            }
+            else
+            {
+                throw new UnexpectedTokenException("double quoted scalar", "valid escape character", c);
+            }
+        }
+        else
+            break;
+    }
+    return output;
+}
+/// Scan space characters in a flow scalar.
+auto scanFlowScalarSpaces(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+{
+    dchar[] output;
+    // Increase length as long as we see whitespace.
+    dchar[] whitespaces;
+    while(reader.front.among!(whiteSpaces)) {
+        whitespaces ~= reader.front;
+        reader.popFront();
+    }
+
+    enforce(!reader.empty, new UnexpectedSequenceException("quoted scalar", "end of stream"));
+    const c = reader.front;
+
+    // Spaces not followed by a line break.
+    if(!c.among!(newLines))
+    {
+        output ~= whitespaces;
+        return output;
+    }
+
+    // There's a line break after the spaces.
+    const lineBreak = scanLineBreak(reader);
+
+    if(lineBreak != '\n') { output ~= lineBreak; }
+
+    bool extraBreaks;
+    output ~= scanFlowScalarBreaks(reader, extraBreaks);
+
+    // No extra breaks, one normal line break. Replace it with a space.
+    if(lineBreak == '\n' && !extraBreaks) { output ~= ' '; }
+
+    return output;
+}
+/// Scan line breaks in a flow scalar.
+dchar[] scanFlowScalarBreaks(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+    bool waste;
+    return scanFlowScalarBreaks(reader, waste);
+}
+auto scanFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+    dchar[] output;
+    for(;;)
+    {
+        // Instead of checking indentation, we check for document separators.
+        enforce(!reader.end(), new UnexpectedSequenceException("quoted scalar", "document separator"));
+
+        // Skip any whitespaces.
+        reader.until!(x => !x.among!whiteSpaces).walkLength;
+
+        // Encountered a non-whitespace non-linebreak character, so we're done.
+        if (reader.empty || !reader.front.among!(newLines)) break;
+
+        const lineBreak = scanLineBreak(reader);
+        extraBreaks = true;
+        output ~= lineBreak;
+    }
+    return output;
+}
+unittest {
+    auto str = "     ";
+    assert(str.scanFlowScalarBreaks() == "");
+
+    str = " \n  ";
+    assert(str.scanFlowScalarBreaks() == "");
+}
 bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
     return reader.save().startsWith("---", "...")
             && reader.save().drop(3).front.among!(allWhiteSpace);
