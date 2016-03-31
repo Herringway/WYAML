@@ -215,9 +215,6 @@ struct Node
         // Node collection style. Used to remember style this node was loaded with.
         CollectionStyle collectionStyle = CollectionStyle.Invalid;
 
-        static assert(Value.sizeof <= 24, "Unexpected YAML value size");
-        static assert(Node.sizeof <= 48, "Unexpected YAML node size");
-
         // If scalarCtorNothrow!T is true, scalar node ctor from T can be nothrow.
         //
         // TODO

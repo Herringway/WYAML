@@ -90,8 +90,6 @@ struct Token
     /// Get string representation of the token ID.
     @property string idString() @safe pure const {return id.to!string;}
 }
-static assert(Token.sizeof <= 32, "Token has unexpected size");
-
 
 @safe pure nothrow @nogc:
 
