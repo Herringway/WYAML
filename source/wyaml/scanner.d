@@ -57,7 +57,7 @@ package:
 alias newLines = AliasSeq!('\n', '\r', '\u0085', '\u2028', '\u2029');
 alias newLinesPlusSpaces = AliasSeq!(newLines, ' ');
 alias whiteSpaces = AliasSeq!(' ', '\t');
-alias allBreaks = AliasSeq!(newLines, '\0');
+alias allBreaks = AliasSeq!(newLines);
 alias allWhiteSpace = AliasSeq!(whiteSpaces, allBreaks);
 alias allWhiteSpacePlusQuotesAndSlashes = AliasSeq!(allWhiteSpace, '\'', '"', '\\');
 alias chompIndicators = AliasSeq!('+', '-');

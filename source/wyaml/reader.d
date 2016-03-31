@@ -130,8 +130,6 @@ final class Reader
         void popFront() @trusted
         {
             ++charIndex_;
-            lastDecodedBufferOffset_ = bufferOffset_;
-            lastDecodedCharOffset_ = 0;
 
             const c = decode(buffer_, bufferOffset_);
 
@@ -167,12 +165,6 @@ private:
                    "Attempted to decode past the end of YAML buffer");
             const char b = buffer_[lastDecodedBufferOffset_];
             ++lastDecodedCharOffset_;
-            // ASCII
-            if(b < 0x80)
-            {
-                ++lastDecodedBufferOffset_;
-                return b;
-            }
 
             return decode(buffer_, lastDecodedBufferOffset_);
         }
