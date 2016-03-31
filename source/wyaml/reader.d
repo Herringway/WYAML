@@ -50,7 +50,7 @@ final class Reader
         char[] buffer_ = null;
 
         // Current position within buffer. Only data after this position can be read.
-        size_t bufferOffset_ = 0;
+        deprecated size_t bufferOffset_ = 0;
 
         // Index of the current character in the buffer.
         size_t charIndex_ = 0;
@@ -64,9 +64,6 @@ final class Reader
 
         // Index to buffer_ where the last decoded character starts.
         deprecated size_t lastDecodedBufferOffset_ = 0;
-        // Offset, relative to charIndex_, of the last decoded character,
-        // in code points, not chars.
-        deprecated size_t lastDecodedCharOffset_ = 0;
 
     public:
         /// Construct a Reader.
@@ -100,9 +97,8 @@ final class Reader
         dchar front() @safe out(result) {
             assert(isPrintableChar(result));
         } body {
-            lastDecodedCharOffset_   = 0;
             lastDecodedBufferOffset_ = bufferOffset_;
-            return decodeNext();
+            return decode(buffer_, lastDecodedBufferOffset_);
         }
 
         ///Returns a copy
@@ -115,7 +111,6 @@ final class Reader
             output.line_ = line_;
             output.column_ = column_;
             output.lastDecodedBufferOffset_ = lastDecodedBufferOffset_;
-            output.lastDecodedCharOffset_ = lastDecodedCharOffset_;
             return output;
         }
 
@@ -125,7 +120,7 @@ final class Reader
 
         /// Move current position forward by one character.
         void popFront() @trusted in {
-            assert(characterCount_ > charIndex_);
+            assert(!empty);
         } body {
             ++charIndex_;
 
@@ -150,22 +145,6 @@ final class Reader
 
         /// Get current column number.
         uint column() const { return column_; }
-
-private:
-
-        // Decode the next character relative to
-        // lastDecodedCharOffset_/lastDecodedBufferOffset_ and update them.
-        //
-        // Does not advance the buffer position. Used in peek() and slice().
-        deprecated dchar decodeNext()
-        {
-            assert(lastDecodedBufferOffset_ < buffer_.length,
-                   "Attempted to decode past the end of YAML buffer");
-            const char b = buffer_[lastDecodedBufferOffset_];
-            ++lastDecodedCharOffset_;
-
-            return decode(buffer_, lastDecodedBufferOffset_);
-        }
 }
 
 private:
