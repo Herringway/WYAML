@@ -98,11 +98,8 @@ final class Reader
         }
         private this() @safe { }
         dchar front() @safe out(result) {
-            //ENABLE WHEN NULL REMOVED
-            //assert(isPrintableChar(result));
+            assert(isPrintableChar(result));
         } body {
-            if(characterCount_ <= charIndex_) { return '\0'; }
-
             lastDecodedCharOffset_   = 0;
             lastDecodedBufferOffset_ = bufferOffset_;
             return decodeNext();
@@ -127,8 +124,9 @@ final class Reader
         }
 
         /// Move current position forward by one character.
-        void popFront() @trusted
-        {
+        void popFront() @trusted in {
+            assert(characterCount_ > charIndex_);
+        } body {
             ++charIndex_;
 
             const c = decode(buffer_, bufferOffset_);

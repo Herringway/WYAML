@@ -1099,13 +1099,15 @@ final class Scanner
                         if (savedReader.empty)
                             break;
                         savedReader.popFront();
-                        const cNext = savedReader.front;
                         if(c.among!(allWhiteSpace) ||
-                           (c == ':' && cNext.among!(allWhiteSpace)))
+                           (c == ':' && (savedReader.empty || savedReader.front.among!(allWhiteSpace))))
                         {
                             break;
                         }
                         ++length;
+                        if (savedReader.empty)
+                            break;
+                        const cNext = savedReader.front;
                         c = cNext;
                     }
                 }
@@ -1503,11 +1505,12 @@ auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) @system if (isIn
 
     // Get as many plain spaces as there are.
     dchar[] whitespaces;
-    while(reader.front == ' ') {
+    while(!reader.empty && reader.front == ' ') {
         whitespaces ~= reader.front;
         reader.popFront();
     }
-
+    if (reader.empty)
+        return output;
     dchar c = reader.front;
     // No newline after the spaces (if any)
     if(!c.among!(newLines))
