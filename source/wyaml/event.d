@@ -38,12 +38,6 @@ enum EventID : ubyte
     MappingStart,    /// Mapping start
     MappingEnd       /// Mapping end
 }
-
-/**
- * YAML event produced by parser.
- *
- * 48 bytes on 64bit.
- */
 struct Event
 {
     @disable int opCmp(ref Event);
@@ -89,8 +83,6 @@ struct Event
 
     ///Get string representation of the token ID.
     @property string idString() const @system {return to!string(id);}
-
-    static assert(Event.sizeof <= 48, "Event struct larger than expected");
 }
 
 /**
