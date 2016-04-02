@@ -47,7 +47,7 @@ final class Reader
 {
     private:
         // Buffer of currently loaded characters.
-        char[] buffer_ = null;
+        string buffer_ = void;
 
         // Current position within buffer. Only data after this position can be read.
         deprecated size_t bufferOffset_ = 0;
@@ -75,7 +75,7 @@ final class Reader
         ///
         /// Throws:  ReaderException on a UTF decoding error or if there are
         ///          nonprintable Unicode characters illegal in YAML.
-        this(char[] buffer) @trusted pure //!nothrow
+        this(in char[] buffer) @trusted pure //!nothrow
         {
             auto endianResult = fixUTFByteOrder(cast(ubyte[])buffer);
             if(endianResult.bytesStripped > 0)
@@ -86,7 +86,7 @@ final class Reader
 
             auto utf8Result = toUTF8(endianResult.array, endianResult.encoding);
 
-            buffer_ = utf8Result.utf8;
+            buffer_ = utf8Result.utf8.idup;
             //buffer_ = buffer;
 
             characterCount_ = utf8Result.characterCount;
@@ -94,7 +94,7 @@ final class Reader
 
         }
         private this() @safe { }
-        dchar front() @safe out(result) {
+        immutable(dchar) front() @safe out(result) {
             assert(isPrintableChar(result));
         } body {
             lastDecodedBufferOffset_ = bufferOffset_;

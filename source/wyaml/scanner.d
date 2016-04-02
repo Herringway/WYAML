@@ -1611,7 +1611,7 @@ dchar[] scanURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputR
     while(!reader.empty && reader.front == '%') {
         reader.popFront();
         uriBuf ~= '%';
-        dchar[] nextTwo = reader.take(2).array;
+        dstring nextTwo = reader.take(2).array;
         static if(isForwardRange!T)
             reader.popFrontN(2);
         if(!nextTwo.all!isHexDigit)
