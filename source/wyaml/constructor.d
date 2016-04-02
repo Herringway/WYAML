@@ -22,6 +22,7 @@ import std.exception;
 import std.stdio;
 import std.regex;
 import std.string;
+import std.traits;
 import std.typecons;
 import std.utf;
 
@@ -65,11 +66,11 @@ final class Constructor
 {
     private:
         // Constructor functions from scalars.
-        Node.Value delegate(ref Node)[Tag] fromScalar_;
+        Node.Value function(ref Node)[Tag] fromScalar_;
         // Constructor functions from sequences.
-        Node.Value delegate(ref Node)[Tag] fromSequence_;
+        Node.Value function(ref Node)[Tag] fromSequence_;
         // Constructor functions from mappings.
-        Node.Value delegate(ref Node)[Tag] fromMapping_;
+        Node.Value function(ref Node)[Tag] fromMapping_;
 
     public:
         /// Construct a Constructor.
@@ -83,23 +84,23 @@ final class Constructor
         {
             if(!defaultConstructors){return;}
 
-            addConstructorScalar("tag:yaml.org,2002:null",      &constructNull);
-            addConstructorScalar("tag:yaml.org,2002:bool",      &constructBool);
-            addConstructorScalar("tag:yaml.org,2002:int",       &constructLong);
-            addConstructorScalar("tag:yaml.org,2002:float",     &constructReal);
-            addConstructorScalar("tag:yaml.org,2002:binary",    &constructBinary);
-            addConstructorScalar("tag:yaml.org,2002:timestamp", &constructTimestamp);
-            addConstructorScalar("tag:yaml.org,2002:str",       &constructString);
+            addConstructorScalar!constructNull("tag:yaml.org,2002:null");
+            addConstructorScalar!constructBool("tag:yaml.org,2002:bool");
+            addConstructorScalar!constructLong("tag:yaml.org,2002:int");
+            addConstructorScalar!constructReal("tag:yaml.org,2002:float");
+            addConstructorScalar!constructBinary("tag:yaml.org,2002:binary");
+            addConstructorScalar!constructTimestamp("tag:yaml.org,2002:timestamp");
+            addConstructorScalar!constructString("tag:yaml.org,2002:str");
 
             ///In a mapping, the default value is kept as an entry with the '=' key.
-            addConstructorScalar("tag:yaml.org,2002:value",     &constructString);
+            addConstructorScalar!constructString("tag:yaml.org,2002:value");
 
-            addConstructorSequence("tag:yaml.org,2002:omap",    &constructOrderedMap);
-            addConstructorSequence("tag:yaml.org,2002:pairs",   &constructPairs);
-            addConstructorMapping("tag:yaml.org,2002:set",      &constructSet);
-            addConstructorSequence("tag:yaml.org,2002:seq",     &constructSequence);
-            addConstructorMapping("tag:yaml.org,2002:map",      &constructMap);
-            addConstructorScalar("tag:yaml.org,2002:merge",     &constructMerge);
+            addConstructorSequence!constructOrderedMap("tag:yaml.org,2002:omap");
+            addConstructorSequence!constructPairs("tag:yaml.org,2002:pairs");
+            addConstructorMapping!constructSet("tag:yaml.org,2002:set");
+            addConstructorSequence!constructSequence("tag:yaml.org,2002:seq");
+            addConstructorMapping!constructMap("tag:yaml.org,2002:map");
+            addConstructorScalar!constructMerge("tag:yaml.org,2002:merge");
         }
 
         /** Add a constructor function from scalar.
@@ -169,13 +170,9 @@ final class Constructor
          * }
          * --------------------
          */
-        void addConstructorScalar(T)(const string tag, T function(ref Node) ctor)
-            @safe nothrow
-        {
-            const t = Tag(tag);
-            auto deleg = addConstructor!T(t, ctor);
-            (*delegates!string)[t] = deleg;
-        }
+         template addConstructorScalar(alias ctor) {
+            alias addConstructorScalar = addConstructor!(string, ctor);
+         }
 
         /** Add a constructor function from sequence.
          *
@@ -220,13 +217,9 @@ final class Constructor
          * }
          * --------------------
          */
-        void addConstructorSequence(T)(const string tag, T function(ref Node) ctor)
-            @safe nothrow
-        {
-            const t = Tag(tag);
-            auto deleg = addConstructor!T(t, ctor);
-            (*delegates!(Node[]))[t] = deleg;
-        }
+         template addConstructorSequence(alias ctor) {
+            alias addConstructorSequence = addConstructor!(Node[], ctor);
+         }
 
         /** Add a constructor function from a mapping.
          *
@@ -271,13 +264,9 @@ final class Constructor
          * }
          * --------------------
          */
-        void addConstructorMapping(T)(const string tag, T function(ref Node) ctor)
-            @safe nothrow
-        {
-            const t = Tag(tag);
-            auto deleg = addConstructor!T(t, ctor);
-            (*delegates!(Node.Pair[]))[t] = deleg;
-        }
+         template addConstructorMapping(alias ctor) {
+            alias addConstructorMapping = addConstructor!(Node.Pair[], ctor);
+         }
 
     package:
         /*
@@ -300,27 +289,23 @@ final class Constructor
                         is(T == Node[])      ? "sequence" :
                         is(T == Node.Pair[]) ? "mapping"  :
                                                "ERROR";
-            enforce((tag in *delegates!T) !is null,
+
+            enforce((tag in delegateLocation!T) !is null,
                     new ConstructorException("No constructor function from " ~ type ~
                               " for tag " ~ tag.get(), start, end));
 
             Node node = Node(value);
-            try
-            {
-                static if(is(U : ScalarStyle))
-                {
-                    return Node.rawNode((*delegates!T)[tag](node), start, tag,
-                                        style, CollectionStyle.Invalid);
-                }
-                else static if(is(U : CollectionStyle))
-                {
-                    return Node.rawNode((*delegates!T)[tag](node), start, tag,
-                                        ScalarStyle.Invalid, style);
-                }
-                else static assert(false);
-            }
-            catch(Exception e)
-            {
+            try {
+                static if(is(U : ScalarStyle)) {
+                    alias scalarStyle = style;
+                    alias collectionStyle = CollectionStyle.Invalid;
+                } else static if(is(U : CollectionStyle)) {
+                    alias scalarStyle = ScalarStyle.Invalid;
+                    alias collectionStyle = style;
+                } else static assert(false);
+                return Node.rawNode(delegateLocation!T[tag](node), start, tag,
+                                    scalarStyle, collectionStyle);
+            } catch(Exception e) {
                 throw new ConstructorException("Error constructing " ~ typeid(T).toString()
                                 ~ ":\n" ~ e.msg, start, end);
             }
@@ -333,9 +318,10 @@ final class Constructor
          * Params:  tag  = Tag for the function to handle.
          *          ctor = Constructor function.
          */
-        auto addConstructor(T)(const Tag tag, T function(ref Node) ctor)
+        void addConstructor(T, alias ctor)(const string tagIn)
             @safe nothrow
         {
+            const tag = Tag(tagIn);
             assert((tag in fromScalar_) is null &&
                    (tag in fromSequence_) is null &&
                    (tag in fromMapping_) is null,
@@ -343,23 +329,24 @@ final class Constructor
                    "specified. Can't specify another one.");
 
 
-            return (ref Node n)
+            auto dg = (ref Node n)
             {
-                static if(Node.allowed!T){return Node.value(ctor(n));}
-                else                     {return Node.userValue(ctor(n));}
+                static if(Node.allowed!(ReturnType!ctor)){return Node.value(ctor(n));}
+                else                                     {return Node.userValue(ctor(n));}
             };
+            delegateLocation!T[tag] = dg;
         }
-
-        //Get the array of constructor functions for scalar, sequence or mapping.
-        @property auto delegates(T)() @safe pure nothrow @nogc
-        {
-            static if(is(T : string))          {return &fromScalar_;}
-            else static if(is(T : Node[]))     {return &fromSequence_;}
-            else static if(is(T : Node.Pair[])){return &fromMapping_;}
-            else static assert(false);
+        template delegateLocation(T) {
+            static if (is(T: string))
+                alias delegateLocation = fromScalar_;
+            else static if (is(T: Node[]))
+                alias delegateLocation = fromSequence_;
+            else static if (is(T: Node.Pair[]))
+                alias delegateLocation = fromMapping_;
+            else //Can't do anything with this type
+                static assert(false);
         }
 }
-
 
 /// Construct a _null _node.
 YAMLNull constructNull(ref Node node) @safe pure nothrow @nogc
@@ -879,7 +866,7 @@ unittest
     char[] data = "!mystruct 1:2:3".dup;
     auto loader = Loader(data);
     auto constructor = new Constructor;
-    constructor.addConstructorScalar("!mystruct", &constructMyStructScalar);
+    constructor.addConstructorScalar!constructMyStructScalar("!mystruct");
     loader.constructor = constructor;
     Node node = loader.load();
 
@@ -891,7 +878,7 @@ unittest
     char[] data = "!mystruct [1, 2, 3]".dup;
     auto loader = Loader(data);
     auto constructor = new Constructor;
-    constructor.addConstructorSequence("!mystruct", &constructMyStructSequence);
+    constructor.addConstructorSequence!constructMyStructSequence("!mystruct");
     loader.constructor = constructor;
     Node node = loader.load();
 
@@ -903,7 +890,7 @@ unittest
     char[] data = "!mystruct {x: 1, y: 2, z: 3}".dup;
     auto loader = Loader(data);
     auto constructor = new Constructor;
-    constructor.addConstructorMapping("!mystruct", &constructMyStructMapping);
+    constructor.addConstructorMapping!constructMyStructMapping("!mystruct");
     loader.constructor = constructor;
     Node node = loader.load();
 
