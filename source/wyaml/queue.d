@@ -72,32 +72,6 @@ struct Queue(T)
             length_ = 0;
         }
 
-        /// Start iterating over the queue.
-        void startIteration() @safe pure nothrow @nogc
-        {
-            cursor_ = first_;
-        }
-
-        /// Get next element in the queue.
-        ref const(T) next() @safe pure nothrow @nogc
-        in
-        {
-            assert(!empty);
-            assert(cursor_ !is null);
-        }
-        body
-        {
-            const previous = cursor_;
-            cursor_ = cursor_.next_;
-            return previous.payload_;
-        }
-
-        /// Are we done iterating?
-        bool iterationOver() @safe pure nothrow const @nogc
-        {
-            return cursor_ is null;
-        }
-
         /// Push new item to the queue.
         void push(T item) @trusted nothrow
         {
@@ -106,33 +80,6 @@ struct Queue(T)
             if(first_ is null) { first_      = newLast; }
             last_ = newLast;
             ++length_;
-        }
-
-        /// Insert a new item putting it to specified index in the linked list.
-        void insert(T item, const size_t idx) @trusted nothrow
-        in
-        {
-            assert(idx <= length_);
-        }
-        body
-        {
-            if(idx == 0)
-            {
-                first_ = newNode(item, first_);
-                ++length_;
-            }
-            // Adding before last added element, so we can just push.
-            else if(idx == length_) { push(item); }
-            else
-            {
-                // Get the element before one we're inserting.
-                Node* current = first_;
-                foreach(i; 1 .. idx) { current = current.next_; }
-
-                // Insert a new node after current, and put current.next_ behind it.
-                current.next_ = newNode(item, current.next_);
-                ++length_;
-            }
         }
 
         /// Return the next element in the queue and remove it.
@@ -180,6 +127,17 @@ struct Queue(T)
         size_t length() @safe pure nothrow const @nogc
         {
             return length_;
+        }
+        int opApply(int delegate(ref T) nothrow dg) nothrow {
+            cursor_ = first_;
+            int result;
+            while (cursor_ !is null) {
+                result = dg(cursor_.payload_);
+                if (result)
+                    return result;
+                cursor_ = cursor_.next_;
+            }
+            return result;
         }
 
 private:
@@ -237,17 +195,4 @@ unittest
     {
         queue.push(i);
     }
-
-    array = 42 ~ array[0 .. 3] ~ 42 ~ array[3 .. $] ~ 42;
-    queue.insert(42, 3);
-    queue.insert(42, 0);
-    queue.insert(42, queue.length);
-
-    int[] array2;
-    while(!queue.empty)
-    {
-        array2 ~= queue.pop();
-    }
-
-    assert(array == array2);
 }

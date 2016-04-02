@@ -584,13 +584,19 @@ final class Scanner
                 assert(idx >= 0);
 
                 // Add KEY.
+                Token[] tokens;
+                while(!tokens_.empty)
+                    tokens ~= tokens_.pop();
+                assert(tokens_.empty);
                 // Manually inserting since tokens are immutable (need linked list).
-                tokens_.insert(keyToken(keyMark, keyMark), idx);
-
-                // If this key starts a new block mapping, we need to add BLOCK-MAPPING-START.
-                if(flowLevel_ == 0 && addIndent(key.column))
-                {
-                    tokens_.insert(blockMappingStartToken(keyMark, keyMark), idx);
+                foreach (i, token; tokens) {
+                    if (i == idx) {
+                        // If this key starts a new block mapping, we need to add BLOCK-MAPPING-START.
+                        if(flowLevel_ == 0 && addIndent(key.column))
+                            tokens_.push(blockMappingStartToken(keyMark, keyMark));
+                        tokens_.push(keyToken(keyMark, keyMark));
+                    }
+                    tokens_.push(token);
                 }
 
                 // There cannot be two simple keys in a row.

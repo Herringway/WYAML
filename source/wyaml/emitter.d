@@ -256,15 +256,8 @@ struct Emitter
         bool needEvents(in uint count) @system nothrow
         {
             int level = 0;
-
-            //Rather ugly, but good enough for now.
-            //Couldn't be bothered writing a range as events_ should eventually
-            //become a Phobos queue/linked list.
-            events_.startIteration();
-            events_.next();
-            while(!events_.iterationOver())
+            foreach(event; events_)
             {
-                const event = events_.next();
                 if(event.id.among(EventID.DocumentStart, EventID.SequenceStart, EventID.MappingStart))   {++level;}
                 else if(event.id.among(EventID.DocumentEnd, EventID.SequenceEnd, EventID.MappingEnd)){--level;}
                 else if(event.id == EventID.StreamStart){level = -1;}
