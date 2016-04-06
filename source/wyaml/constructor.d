@@ -329,7 +329,7 @@ final class Constructor
                    "specified. Can't specify another one.");
 
 
-            auto dg = (ref Node n)
+            Node.Value function(ref Node) dg = (ref Node n)
             {
                 static if(Node.allowed!(ReturnType!ctor)){return Node.value(ctor(n));}
                 else                                     {return Node.userValue(ctor(n));}
