@@ -545,9 +545,9 @@ SysTime constructTimestamp(ref Node node)
 {
     string value = node.as!string;
 
-    auto YMDRegexp = regex("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)");
-    auto HMSRegexp = regex("^[Tt \t]+([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(\\.[0-9]*)?");
-    auto TZRegexp  = regex("^[ \t]*Z|([-+][0-9][0-9]?)(:[0-9][0-9])?");
+    auto YMDRegexp = ctRegex!("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)");
+    auto HMSRegexp = ctRegex!("^[Tt \t]+([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(\\.[0-9]*)?");
+    auto TZRegexp  = ctRegex!("^[ \t]*Z|([-+][0-9][0-9]?)(:[0-9][0-9])?");
 
     try
     {
