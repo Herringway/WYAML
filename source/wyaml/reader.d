@@ -50,20 +50,12 @@ final class Reader
         string buffer_ = void;
 
         // Current position within buffer. Only data after this position can be read.
-        deprecated size_t bufferOffset_ = 0;
-
-        // Index of the current character in the buffer.
-        size_t charIndex_ = 0;
-        // Number of characters (code points) in buffer_.
-        deprecated size_t characterCount_ = 0;
+        size_t bufferOffset_ = 0;
 
         // Current line in file.
         uint line_;
         // Current column in file.
         uint column_;
-
-        // Index to buffer_ where the last decoded character starts.
-        deprecated size_t lastDecodedBufferOffset_ = 0;
 
     public:
         /// Construct a Reader.
@@ -86,18 +78,15 @@ final class Reader
 
             auto utf8Result = toUTF8(endianResult.array, endianResult.encoding);
 
-            buffer_ = utf8Result.utf8.idup;
+            buffer_ = utf8Result.idup;
             //buffer_ = buffer;
-
-            characterCount_ = utf8Result.characterCount;
-            //characterCount_ = buffer.length;
 
         }
         private this() @safe { }
         immutable(dchar) front() @safe out(result) {
             assert(isPrintableChar(result));
         } body {
-            lastDecodedBufferOffset_ = bufferOffset_;
+            auto lastDecodedBufferOffset_ = bufferOffset_;
             return decode(buffer_, lastDecodedBufferOffset_);
         }
 
@@ -106,23 +95,19 @@ final class Reader
             auto output = new Reader();
             output.buffer_ = buffer_;
             output.bufferOffset_ = bufferOffset_;
-            output.charIndex_ = charIndex_;
-            output.characterCount_ = characterCount_;
             output.line_ = line_;
             output.column_ = column_;
-            output.lastDecodedBufferOffset_ = lastDecodedBufferOffset_;
             return output;
         }
 
         bool empty() @safe const {
-            return characterCount_ <= charIndex_;
+            return bufferOffset_ >= buffer_.length;
         }
 
         /// Move current position forward by one character.
         void popFront() @trusted in {
             assert(!empty);
         } body {
-            ++charIndex_;
 
             const c = decode(buffer_, bufferOffset_);
 
@@ -166,17 +151,10 @@ private:
 //                            this first.
 // $(D char[] utf8)           input converted to UTF-8. May be a slice of input.
 // $(D size_t characterCount) Number of characters (code points) in input.
-deprecated auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure nothrow
+deprecated char[] toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure
 {
-    // Documented in function ddoc.
-    struct Result
-    {
-        string errorMessage;
-        char[] utf8;
-        size_t characterCount;
-    }
 
-    Result result;
+    char[] result;
 
     // Encode input_ into UTF-8 if it's encoded as UTF-16 or UTF-32.
     //
@@ -186,7 +164,7 @@ deprecated auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure not
     // result = A Result struct to put encoded result and any error messages to.
     //
     // On error, result.errorMessage will be set.
-    static void encode(C)(C[] input, ref Result result) @safe pure
+    static void encode(C)(C[] input, ref char[] result) @safe pure
     {
         // We can do UTF-32->UTF-8 in place because all UTF-8 sequences are 4 or
         // less bytes.
@@ -195,31 +173,21 @@ deprecated auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure not
             char[4] encodeBuf;
             auto utf8 = cast(char[])input;
             auto length = 0;
-            foreach(dchar c; input)
-            {
-                ++result.characterCount;
-                // ASCII
-                if(c < 0x80)
-                {
-                    utf8[length++] = cast(char)c;
-                    continue;
-                }
-
+            foreach(dchar c; input) {
                 const encodeResult = std.utf.encode(encodeBuf, c);
                 utf8[length .. length + encodeResult] = encodeBuf[0 .. encodeResult];
                 length += encodeResult;
             }
-            result.utf8 = utf8[0 .. length];
+            result = utf8[0 .. length];
         }
         // Unfortunately we can't do UTF-16 in place so we just use std.conv.to
         else
         {
-            result.characterCount = std.utf.count(input);
-            result.utf8 = input.to!(char[]);
+            result = input.to!(char[]);
         }
     }
 
-    try final switch(encoding)
+    final switch(encoding)
     {
         case UTFEncoding.UTF_8:
             encode(cast(char[])input, result);
@@ -232,12 +200,6 @@ deprecated auto toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure not
             assert(input.length % 4 == 0, "UTF-32 buffer size must be a multiple of 4");
             encode(cast(dchar[])input, result);
             break;
-    }
-    catch(ConvException e) { result.errorMessage = e.msg; }
-    catch(UTFException e)  { result.errorMessage = e.msg; }
-    catch(Exception e)
-    {
-        assert(false, "Unexpected exception in encode(): " ~ e.msg);
     }
 
     return result;
@@ -252,21 +214,6 @@ bool isPrintableChar(in dchar val) pure @safe nothrow @nogc {
     return true;
 }
 // Unittests.
-
-void testEndian(R)()
-{
-    writeln(typeid(R).toString() ~ ": endian unittest");
-    void endian_test(char[] data, Encoding encoding_expected, Endian endian_expected)
-    {
-        auto reader = new R(data);
-        //assert(reader.encoding == encoding_expected);
-        //assert(reader.endian_ == endian_expected);
-    }
-    ubyte[] little_endian_utf_16 = [0xFF, 0xFE, 0x7A, 0x00];
-    ubyte[] big_endian_utf_16 = [0xFE, 0xFF, 0x00, 0x7A];
-    endian_test(little_endian_utf_16, Encoding.UTF_16, Endian.littleEndian);
-    endian_test(big_endian_utf_16, Encoding.UTF_16, Endian.bigEndian);
-}
 
 void testPeekPrefixForward(R)()
 {
@@ -305,7 +252,6 @@ void test1Byte(R)()
 
 unittest
 {
-    //testEndian!Reader();
     testPeekPrefixForward!Reader();
     testUTF!Reader();
     test1Byte!Reader();
