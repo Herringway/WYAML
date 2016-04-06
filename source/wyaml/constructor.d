@@ -615,8 +615,6 @@ SysTime constructTimestamp(ref Node node)
 }
 unittest
 {
-    writeln("D:YAML construction timestamp unittest");
-
     string timestamp(string value)
     {
         auto node = Node(value);
@@ -686,8 +684,6 @@ Node.Pair[] constructOrderedMap(ref Node node)
 }
 unittest
 {
-    writeln("D:YAML construction ordered map unittest");
-
     alias Node.Pair Pair;
 
     Node[] alternateTypes(uint length)
@@ -757,8 +753,6 @@ Node[] constructSet(ref Node node)
 }
 unittest
 {
-    writeln("D:YAML construction set unittest");
-
     Node.Pair[] set(uint length)
     {
         Node.Pair[] pairs;

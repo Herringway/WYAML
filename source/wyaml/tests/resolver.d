@@ -18,18 +18,17 @@ import wyaml.tests.common;
 /**
  * Implicit tag resolution unittest.
  *
- * Params:  verbose        = Print verbose output?
- *          dataFilename   = File with unittest data.
+ * Params:  dataFilename   = File with unittest data.
  *          detectFilename = Dummy filename used to specify which data filenames to use.
  */
-void testImplicitResolver(bool verbose, string dataFilename, string detectFilename)
+void testImplicitResolver(string dataFilename, string detectFilename)
 {
     char[] correctTag;
     Node node;
 
     scope(failure)
     {
-        if(true)
+        version(verboseTest)
         {
             writeln("Correct tag: ", correctTag);
             writeln("Node: ", node.debugString);

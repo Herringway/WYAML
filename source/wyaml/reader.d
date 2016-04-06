@@ -217,7 +217,6 @@ bool isPrintableChar(in dchar val) pure @safe nothrow @nogc {
 
 void testPeekPrefixForward(R)()
 {
-    writeln(typeid(R).toString() ~ ": peek/prefix/forward unittest");
     char[] data = "data".dup;
     auto reader = new R(data);
     assert(reader.save().startsWith("data"));
@@ -226,7 +225,6 @@ void testPeekPrefixForward(R)()
 
 void testUTF(R)()
 {
-    writeln(typeid(R).toString() ~ ": UTF formats unittest");
     dchar[] data = cast(dchar[])"data";
     void utf_test(T)(T[] data)
     {
@@ -241,7 +239,6 @@ void testUTF(R)()
 
 void test1Byte(R)()
 {
-    writeln(typeid(R).toString() ~ ": 1 byte file unittest");
     char[] data = [97];
 
     auto reader = new R(data);

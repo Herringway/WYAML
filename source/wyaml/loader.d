@@ -340,12 +340,9 @@ unittest
                         "blue:  '#0000ff'".dup;
 
     auto colors = Loader(yaml_input).load();
-
-    foreach(string color, string value; colors)
-    {
-        import std.stdio;
-        writeln(color, " is ", value, " in HTML/CSS");
-    }
+    assert(colors["red"] == "#ff0000");
+    assert(colors["green"] == "#00ff00");
+    assert(colors["blue"] == "#0000ff");
 }
 
 unittest

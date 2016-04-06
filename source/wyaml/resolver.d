@@ -218,8 +218,6 @@ final class Resolver
 
 unittest
 {
-    writeln("D:YAML Resolver unittest");
-
     auto resolver = new Resolver();
 
     bool tagMatch(string tag, string[] values)

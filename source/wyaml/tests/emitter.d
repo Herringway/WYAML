@@ -75,11 +75,10 @@ bool compareEvents(Event[] events1, Event[] events2)
 /// the emitted result and comparing events from parsing the emitted result with
 /// originally parsed events.
 ///
-/// Params:  verbose           = Print verbose output?
-///          dataFilename      = YAML file to parse.
+/// Params:  dataFilename      = YAML file to parse.
 ///          canonicalFilename = Canonical YAML file used as dummy to determine
 ///                              which data files to load.
-void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilename)
+void testEmitterOnData(string dataFilename, string canonicalFilename)
 {
     //Must exist due to Anchor, Tags reference counts.
     auto loader = Loader(readText!(char[])(dataFilename));
@@ -87,7 +86,7 @@ void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilena
     auto emitStream = new OutBuffer;
     Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(events);
 
-    if(verbose)
+    version(verboseTest)
     {
         writeln(dataFilename);
         writeln("ORIGINAL:\n", readText(dataFilename));
@@ -106,9 +105,8 @@ void testEmitterOnData(bool verbose, string dataFilename, string canonicalFilena
 /// them both in canonical and normal format, parsing the emitted results and
 /// comparing events from parsing the emitted result with originally parsed events.
 ///
-/// Params:  verbose           = Print verbose output?
-///          canonicalFilename = Canonical YAML file to parse.
-void testEmitterOnCanonical(bool verbose, string canonicalFilename)
+/// Params:  canonicalFilename = Canonical YAML file to parse.
+void testEmitterOnCanonical(string canonicalFilename)
 {
     //Must exist due to Anchor, Tags reference counts.
     auto loader = Loader(readText!(char[])(canonicalFilename));
@@ -119,7 +117,7 @@ void testEmitterOnCanonical(bool verbose, string canonicalFilename)
         auto dumper = Dumper(outputRangeObject!(ubyte[])(emitStream));
         dumper.canonical = canonical;
         dumper.emit(events);
-        if(verbose)
+        version(verboseTest)
         {
             writeln("OUTPUT (canonical=", canonical, "):\n",
                     emitStream.toString());
@@ -137,11 +135,10 @@ void testEmitterOnCanonical(bool verbose, string canonicalFilename)
 /// possible scalar and collection styles, parsing the emitted results and
 /// comparing events from parsing the emitted result with originally parsed events.
 ///
-/// Params:  verbose           = Print verbose output?
-///          dataFilename      = YAML file to parse.
+/// Params:  dataFilename      = YAML file to parse.
 ///          canonicalFilename = Canonical YAML file used as dummy to determine
 ///                              which data files to load.
-void testEmitterStyles(bool verbose, string dataFilename, string canonicalFilename)
+void testEmitterStyles(string dataFilename, string canonicalFilename)
 {
     foreach(filename; [dataFilename, canonicalFilename])
     {
@@ -177,7 +174,7 @@ void testEmitterStyles(bool verbose, string dataFilename, string canonicalFilena
                 }
                 auto emitStream = new OutBuffer;
                 Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(styledEvents);
-                if(verbose)
+                version(verboseTest)
                 {
                     writeln("OUTPUT (", filename, ", ", to!string(flowStyle), ", ",
                             to!string(style), ")");

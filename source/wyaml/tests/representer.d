@@ -10,9 +10,10 @@ module wyaml.tests.representer;
 version(unittest)
 {
 
-import std.path;
+import std.array;
 import std.exception;
 import std.outbuffer;
+import std.path;
 import std.range;
 import std.typecons;
 
@@ -22,11 +23,10 @@ import wyaml.tests.constructor;
 
 /// Representer unittest.
 ///
-/// Params:  verbose      = Print verbose output?
-///          codeFilename = File name to determine test case from.
+/// Params:  codeFilename = File name to determine test case from.
 ///                         Nothing is read from this file, it only exists
 ///                         to specify that we need a matching unittest.
-void testRepresenterTypes(bool verbose, string codeFilename)
+void testRepresenterTypes(string codeFilename)
 {
     string baseName = codeFilename.baseName.stripExtension;
     enforce((baseName in wyaml.tests.constructor.expected) !is null,
@@ -40,7 +40,7 @@ void testRepresenterTypes(bool verbose, string codeFilename)
 
         scope(failure)
         {
-            if(verbose)
+            version(verboseTest)
             {
                 writeln("Expected nodes:");
                 foreach(ref n; expectedNodes){writeln(n.debugString, "\n---\n");}
@@ -66,12 +66,11 @@ void testRepresenterTypes(bool verbose, string codeFilename)
         auto loader        = Loader(emitStream.toString().dup);
         loader.name        = "TEST";
         loader.constructor = constructor;
-        readNodes          = loader.loadAll();
+        readNodes          = loader.loadAll().array;
 
-        assert(expectedNodes.length == readNodes.length);
-        foreach(n; 0 .. expectedNodes.length)
+        foreach(expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength))
         {
-            assert(expectedNodes[n].equals!(No.useTag)(readNodes[n]));
+            assert(expected.equals!(No.useTag)(read));
         }
     //}
 }

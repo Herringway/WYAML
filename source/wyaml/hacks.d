@@ -41,7 +41,6 @@ ScalarStyle scalarStyleHack(ref const(Node) node) @safe nothrow
 }
 unittest
 {
-    writeln("D:YAML scalarStyleHack getter unittest");
     auto node = Node(5);
     assert(node.scalarStyleHack() == ScalarStyle.Invalid);
 }
@@ -59,7 +58,6 @@ CollectionStyle collectionStyleHack(ref const(Node) node) @safe nothrow
 }
 unittest
 {
-    writeln("D:YAML collectionStyleHack getter unittest");
     auto node = Node([1, 2, 3, 4, 5]);
     assert(node.collectionStyleHack() == CollectionStyle.Invalid);
 }
@@ -79,7 +77,6 @@ void scalarStyleHack(ref Node node, const ScalarStyle rhs) @safe nothrow
 ///
 unittest
 {
-    writeln("D:YAML scalarStyleHack setter unittest");
     auto node = Node(5);
     node.scalarStyleHack = ScalarStyle.DoubleQuoted;
     assert(node.scalarStyleHack() == ScalarStyle.DoubleQuoted);
@@ -99,7 +96,6 @@ void collectionStyleHack(ref Node node, const CollectionStyle rhs) @safe nothrow
 ///
 unittest
 {
-    writeln("D:YAML collectionStyleHack setter unittest");
     auto node = Node([1, 2, 3, 4, 5]);
     node.collectionStyleHack = CollectionStyle.Block;
     assert(node.collectionStyleHack() == CollectionStyle.Block);

@@ -1536,7 +1536,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node opIndex unittest");
     alias Node.Value Value;
     alias Node.Pair Pair;
 
@@ -1550,7 +1549,6 @@ unittest
 }
 unittest
 {
-    writeln("D:YAML Node opIndex unittest");
     alias Node.Value Value;
     alias Node.Pair Pair;
 
@@ -1584,7 +1582,6 @@ unittest
 // Unittest for contains() and containsKey().
 unittest
 {
-    writeln("D:YAML Node contains/containsKey unittest");
     auto seq = Node([1, 2, 3, 4, 5]);
     assert(seq.contains(3));
     assert(seq.contains(5));
@@ -1636,8 +1633,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node opIndexAssign unittest");
-
     with(Node([1, 2, 3, 4, 3]))
     {
         opIndexAssign(42, 3);
@@ -1668,8 +1663,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node opApply unittest 1");
-
     alias Node.Value Value;
     alias Node.Pair Pair;
 
@@ -1694,8 +1687,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node opApply unittest 2");
-
     alias Node.Value Value;
     alias Node.Pair Pair;
 
@@ -1745,8 +1736,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node add unittest 1");
-
     with(Node([1, 2, 3, 4]))
     {
         add(5.0f);
@@ -1756,7 +1745,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node add unittest 2");
     with(Node([1, 2], [3, 4]))
     {
         add(5, "6");
@@ -1766,7 +1754,6 @@ unittest
 
 unittest
 {
-    writeln(`D:YAML Node opBinaryRight!"in" unittest`);
     auto mapping = Node(["foo", "baz"], ["bar", "qux"]);
     assert("bad" !in mapping && ("bad" in mapping) is null);
     Node* foo = "foo" in mapping;
@@ -1779,7 +1766,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node remove unittest");
     with(Node([1, 2, 3, 4, 3]))
     {
         remove(3);
@@ -1805,7 +1791,6 @@ unittest
 
 unittest
 {
-    writeln("D:YAML Node removeAt unittest");
     with(Node([1, 2, 3, 4, 3]))
     {
         removeAt(3);
@@ -1825,11 +1810,6 @@ unittest
         removeAt(YAMLNull());
         assert(length == 2);
     }
-}
-
-unittest
-{
-    writeln("Node(42).toHash(): ", Node(42).toHash());
 }
 
 package:

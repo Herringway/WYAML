@@ -17,9 +17,8 @@ import std.algorithm;
 
 // Try reading entire file through Reader, expecting an error (the file is invalid).
 //
-// Params:  verbose = Print verbose output?
-//          data    = Stream to read.
-void testStreamError(bool verbose, string fileName)
+// Params:  data    = Stream to read.
+void testStreamError(string fileName)
 {
     try
     {
@@ -29,7 +28,7 @@ void testStreamError(bool verbose, string fileName)
     }
     catch(ReaderException e)
     {
-        if(verbose) { writeln(typeid(e).toString(), "\n", e); }
+        version(verboseTest) { writeln(typeid(e).toString(), "\n", e); }
     }
 }
 

@@ -19,9 +19,8 @@ import wyaml.tests.common;
 
 /// Unicode input unittest. Tests various encodings.
 ///
-/// Params:  verbose         = Print verbose output?
-///          unicodeFilename = File name to read from.
-void testUnicodeInput(bool verbose, string unicodeFilename)
+/// Params:  unicodeFilename = File name to read from.
+void testUnicodeInput(string unicodeFilename)
 {
     auto data     = readText!(char[])(unicodeFilename);
     auto expected = data.split().join(" ");

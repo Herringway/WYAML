@@ -19,11 +19,10 @@ import wyaml.token;
 /**
  * Test tokens output by scanner.
  *
- * Params:  verbose        = Print verbose output?
- *          dataFilename   = File to scan.
+ * Params:  dataFilename   = File to scan.
  *          tokensFilename = File containing expected tokens.
  */
-void testTokens(bool verbose, string dataFilename, string tokensFilename)
+void testTokens(string dataFilename, string tokensFilename)
 {
     //representations of YAML tokens in tokens file.
     auto replace = [TokenID.Directive          : "%"   ,
@@ -49,7 +48,7 @@ void testTokens(bool verbose, string dataFilename, string tokensFilename)
     auto tokens2 = readText(tokensFilename).split();
     scope(exit)
     {
-        if(verbose){writeln("tokens1: ", tokens1, "\ntokens2: ", tokens2);}
+        version(verboseTest) {writeln("tokens1: ", tokens1, "\ntokens2: ", tokens2);}
     }
 
     auto loader = Loader(readText!(char[])(dataFilename));
@@ -67,18 +66,17 @@ void testTokens(bool verbose, string dataFilename, string tokensFilename)
 /**
  * Test scanner by scanning a file, expecting no errors.
  *
- * Params:  verbose           = Print verbose output?
- *          dataFilename      = File to scan.
+ * Params:  dataFilename      = File to scan.
  *          canonicalFilename = Another file to scan, in canonical YAML format.
  */
-void testScanner(bool verbose, string dataFilename, string canonicalFilename)
+void testScanner(string dataFilename, string canonicalFilename)
 {
     foreach(filename; [dataFilename, canonicalFilename])
     {
         string[] tokens;
         scope(exit)
         {
-            if(verbose){writeln(tokens);}
+            version(verboseTest) {writeln(tokens);}
         }
         auto loader = Loader(readText!(char[])(filename));
         foreach(ref token; loader.scan()){tokens ~= to!string(token.id);}

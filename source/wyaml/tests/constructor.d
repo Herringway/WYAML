@@ -10,9 +10,11 @@ module wyaml.tests.constructor;
 version(unittest)
 {
 
+import std.array;
 import std.datetime;
 import std.exception;
 import std.path;
+import std.range;
 import std.string;
 import std.typecons;
 
@@ -386,12 +388,11 @@ Node representStruct(ref Node node, Representer representer)
 /**
  * Constructor unittest.
  *
- * Params:  verbose      = Print verbose output?
- *          dataFilename = File name to read from.
+ * Params:  dataFilename = File name to read from.
  *          codeDummy    = Dummy .code filename, used to determine that
  *                         .data file with the same name should be used in this test.
  */
-void testConstructor(bool verbose, string dataFilename, string codeDummy)
+void testConstructor(string dataFilename, string codeDummy)
 {
     string base = dataFilename.baseName.stripExtension;
     enforce((base in expected) !is null,
@@ -408,24 +409,12 @@ void testConstructor(bool verbose, string dataFilename, string codeDummy)
     Node[] exp = expected[base];
 
     //Compare with expected results document by document.
-    size_t i = 0;
-    foreach(node; loader)
+    foreach(node, expected; lockstep(loader.loadAll(), exp, StoppingPolicy.requireSameLength))
     {
-        if(!node.equals!(No.useTag)(exp[i]))
-        {
-            if(verbose)
-            {
-                writeln("Expected value:");
-                writeln(exp[i].debugString);
-                writeln("\n");
-                writeln("Actual value:");
-                writeln(node.debugString);
-            }
-            assert(false);
-        }
-        ++i;
+        scope(failure)
+            writeComparison(expected, node);
+        assert(node.equals!(No.useTag)(expected));
     }
-    assert(i == exp.length);
 }
 
 

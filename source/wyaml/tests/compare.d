@@ -9,7 +9,7 @@ module wyaml.tests.compare;
 
 version(unittest)
 {
-
+import std.range;
 import wyaml.tests.common;
 import wyaml.token;
 
@@ -18,16 +18,14 @@ import wyaml.token;
 /// Params:  verbose           = Print verbose output?
 ///          dataFilename      = YAML file to parse.
 ///          canonicalFilename = Another file to parse, in canonical YAML format.
-void testParser(bool verbose, string dataFilename, string canonicalFilename)
+void testParser(string dataFilename, string canonicalFilename)
 {
     auto dataEvents = Loader(readText!(char[])(dataFilename)).parse();
     auto canonicalEvents = Loader(readText!(char[])(canonicalFilename)).parse();
 
-    assert(dataEvents.length == canonicalEvents.length);
-
-    foreach(e; 0 .. dataEvents.length)
+    foreach(test, canon; lockstep(dataEvents, canonicalEvents, StoppingPolicy.requireSameLength))
     {
-        assert(dataEvents[e].id == canonicalEvents[e].id);
+        assert(test.id == canon.id);
     }
 }
 
@@ -37,26 +35,16 @@ void testParser(bool verbose, string dataFilename, string canonicalFilename)
 /// Params:  verbose           = Print verbose output?
 ///          dataFilename      = YAML file to load.
 ///          canonicalFilename = Another file to load, in canonical YAML format.
-void testLoader(bool verbose, string dataFilename, string canonicalFilename)
+void testLoader(string dataFilename, string canonicalFilename)
 {
     auto data = Loader(readText!(char[])(dataFilename)).loadAll();
     auto canonical = Loader(readText!(char[])(canonicalFilename)).loadAll();
 
-    assert(data.length == canonical.length, "Unequal node count");
-    foreach(n; 0 .. data.length)
+    foreach(test, canon; lockstep(data, canonical, StoppingPolicy.requireSameLength))
     {
-        if(data[n] != canonical[n])
-        {
-            if(verbose)
-            {
-                writeln("Normal value:");
-                writeln(data[n].debugString);
-                writeln("\n");
-                writeln("Canonical value:");
-                writeln(canonical[n].debugString);
-            }
-            assert(false, "testLoader(" ~ dataFilename ~ ", " ~ canonicalFilename ~ ") failed");
-        }
+        scope(failure)
+            writeComparison(canon, test);
+        assert(test == canon, "testLoader(" ~ dataFilename ~ ", " ~ canonicalFilename ~ ") failed");
     }
 }
 

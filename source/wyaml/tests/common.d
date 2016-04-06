@@ -35,13 +35,11 @@ package:
  *          unittestExt  = Extensions of data files needed for the unittest.
  *          skipExt      = Extensions that must not be used for the unittest.
  */
-void run(F ...)(string testName, void function(bool, F) testFunction,
+void run(F ...)(string testName, void function(F) testFunction,
                 string[] unittestExt, string[] skipExt = [])
 {
     immutable string dataDir = "test/data";
     auto testFilenames = findTestFilenames(dataDir);
-    bool verbose = false;
-    version(verboseTest) verbose = true;
 
     Result[] results;
     if(unittestExt.length > 0)
@@ -59,16 +57,24 @@ void run(F ...)(string testName, void function(bool, F) testFunction,
                 if(extensions.canFind(ext)){continue outer;}
             }
 
-            results ~= execute!F(testName, testFunction, filenames, verbose);
+            results ~= execute!F(testName, testFunction, filenames);
         }
     }
     else
     {
-        results ~= execute!F(testName, testFunction, cast(string[])[], verbose);
+        results ~= execute!F(testName, testFunction, cast(string[])[]);
     }
-    display(results, verbose);
+    display(results);
 }
-
+void writeComparison(T)(T expected, T actual) {
+    version(verboseTest) {
+        writeln("Expected value:");
+        writeln(expected.debugString);
+        writeln("\n");
+        writeln("Actual value:");
+        writeln(actual.debugString);
+    }
+}
 T readText(T = char[])(string path) out(result) {
     validate(result);
 } body {
@@ -193,14 +199,13 @@ body
  * Params:  testName     = Name of the unittest.
  *          testFunction = Unittest function.
  *          filenames    = Names of input files to test with.
- *          verbose      = Print verbose output?
  *
  * Returns: Information about the results of the unittest.
  */
-Result execute(F ...)(const string testName, void function(bool, F) testFunction,
-                      string[] filenames, const bool verbose)
+Result execute(F ...)(const string testName, void function(F) testFunction,
+                      string[] filenames)
 {
-    if(verbose)
+    version(verboseTest)
     {
         writeln("===========================================================================");
         writeln(testName ~ "(" ~ filenames.join(", ") ~ ")...");
@@ -213,14 +218,15 @@ Result execute(F ...)(const string testName, void function(bool, F) testFunction
         //Convert filenames to parameters tuple and call the test function.
         F parameters;
         stringsToTuple!(F.length - 1, F)(parameters, filenames);
-        testFunction(verbose, parameters);
-        if(!verbose){write(".");}
+        testFunction(parameters);
+        version(verboseTest){} else {write(".");}
     }
     catch(Exception e)
     {
         info = to!string(typeid(e)) ~ "\n" ~ to!string(e);
         kind = (typeid(e) is typeid(AssertError)) ? TestStatus.Failure : TestStatus.Error;
-        write((verbose ? to!string(e) : to!string(kind)) ~ " ");
+        version(verboseTest) write(e.to!string);
+        else write(kind.to!string ~ " ");
     }
 
     stdout.flush();
@@ -232,23 +238,23 @@ Result execute(F ...)(const string testName, void function(bool, F) testFunction
  * Display unittest results.
  *
  * Params:  results = Unittest results.
- *          verbose = Print verbose output?
  */
-void display(Result[] results, const bool verbose)
+void display(Result[] results)
 {
-    if(results.length > 0 && !verbose){write("\n");}
+    version(verboseTest) {} else
+      if(results.length > 0){write("\n");}
 
     size_t failures = 0;
     size_t errors = 0;
 
-    if(verbose)
+    version(verboseTest)
     {
         writeln("===========================================================================");
     }
     //Results of each test.
     foreach(result; results)
     {
-        if(verbose)
+        version(verboseTest)
         {
             writeln(result.name, "(" ~ result.filenames.join(", ") ~ "): ",
                     to!string(result.kind));

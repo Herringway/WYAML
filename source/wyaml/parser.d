@@ -16,6 +16,7 @@ import std.array;
 import std.container;
 import std.conv;
 import std.exception;
+import std.meta;
 import std.typecons;
 
 import wyaml.anchor;
@@ -112,8 +113,8 @@ final class Parser
 {
     private:
         ///Default tag handle shortcuts and replacements.
-        static TagDirective[] defaultTagDirectives_ =
-            [TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:")];
+        alias defaultTagDirectives_ =
+            AliasSeq!(TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:"));
 
         ///Scanner providing YAML tokens.
         Scanner scanner_;
@@ -258,7 +259,7 @@ final class Parser
             if(!scanner_.checkToken(TokenID.Directive, TokenID.DocumentStart,
                                     TokenID.StreamEnd))
             {
-                tagDirectives_  = defaultTagDirectives_;
+                tagDirectives_  = [defaultTagDirectives_];
                 const token = scanner_.peekToken();
 
                 states_ ~= &parseDocumentEnd;
@@ -369,7 +370,7 @@ final class Parser
             TagDirective[] value = tagDirectives_;
 
             //Add any default tag handles that haven't been overridden.
-            foreach(ref defaultPair; defaultTagDirectives_)
+            foreach(defaultPair; defaultTagDirectives_)
             {
                 bool found = false;
                 foreach(ref pair; tagDirectives_) if(defaultPair.handle == pair.handle)
