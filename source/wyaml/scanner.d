@@ -1177,35 +1177,73 @@ auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unq
     assert(test == ":");
 }
 /// Move to the next non-space character.
-void findNextNonSpace(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void findNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    reader.until!(x => x != ' ').walkLength;
+    auto length = reader.until!(x => x != ' ').walkLength;
+    static if(isArray!T)
+        reader.popFrontN(length);
 }
-
+@safe pure unittest {
+    auto str = "";
+    str.findNextNonSpace();
+    assert(str == "");
+    str = "        c";
+    str.findNextNonSpace();
+    assert(str == "c");
+}
 /// Scan a string of alphanumeric or "-_" characters.
-auto scanAlphaNumeric(T)(ref T reader, string name) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto output = reader.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
-    enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader.front));
+    enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader.empty ? '\x04' : reader.front));
+    static if(isArray!T)
+        reader.popFrontN(output.length);
     return output;
 }
-
+@safe pure unittest {
+    auto str = "";
+    assertThrown(str.scanAlphaNumeric());
+    str = "1234";
+    assert(str.scanAlphaNumeric() == "1234");
+    assert(str == "");
+    str = "abc";
+    assert(str.scanAlphaNumeric() == "abc");
+    assert(str == "");
+    str = "1234abc";
+    assert(str.scanAlphaNumeric() == "1234abc");
+    assert(str == "");
+    str = "12 34";
+    assert(str.scanAlphaNumeric() == "12");
+    assert(str == " 34");
+    str = " 1234";
+    assertThrown(str.scanAlphaNumeric());
+}
 /// Scan all characters until next line break.
-auto scanToNextBreak(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanToNextBreak(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     return reader.until!(x => x.among!allBreaks).array;
 }
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    assert(str.scanToNextBreak() == "");
+}
 /// Scan name of a directive token.
-auto scanDirectiveName(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     // Scan directive name.
     auto output = scanAlphaNumeric(reader, "a directive");
     enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "alphanumeric, '-' or '_'", reader.front));
     return output;
 }
-
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    //assertThrown(str.scanDirectiveName());
+    str = "test ";
+    assert(str.scanDirectiveName() == "test");
+    //assert(str == " ");
+}
 /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
-auto scanYAMLDirectiveValue(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     findNextNonSpace(reader);
@@ -1223,17 +1261,33 @@ auto scanYAMLDirectiveValue(T)(ref T reader) @system if (isForwardRange!T && is(
     return output;
 }
 
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    //assertThrown(str.scanYAMLDirectiveValue());
+    str = "1.2 ";
+    assert(str.scanYAMLDirectiveValue() == "1.2");
+}
 /// Scan a number from a YAML directive.
-auto scanYAMLDirectiveNumber(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     enforce(reader.front.isDigit, new UnexpectedTokenException("directive", "digit", reader.front));
-    return reader.until!(x => x.isDigit)(OpenRight.no).array;
+    auto output = reader.until!(x => x.isDigit)(OpenRight.no).array;
+    static if (isArray!T)
+        reader.popFrontN(output.length);
+    return output;
 }
 
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    //assertThrown(str.scanYAMLDirectiveNumber());
+    str = "1 ";
+    assert(str.scanYAMLDirectiveNumber() == "1");
+    assert(str == " ");
+}
 /// Scan value of a tag directive.
 ///
 /// Returns: Length of tag handle (which is before tag prefix) in scanned data
-auto scanTagDirectiveValue(T)(ref T reader, out uint handleLength) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanTagDirectiveValue(T)(ref T reader, out uint handleLength) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     findNextNonSpace(reader);
@@ -1244,33 +1298,60 @@ auto scanTagDirectiveValue(T)(ref T reader, out uint handleLength) @system if (i
 
     return output;
 }
+/*@safe pure*/ unittest { //ADD MORE
+    auto str = "";
+    uint handleLength;
+    //assertThrown(str.scanTagDirectiveValue(handleLength));
+    str = " !! !test ";
+    assert(str.scanTagDirectiveValue(handleLength) == "!!!test");
+    assert(handleLength == 2);
+}
 
 /// Scan handle of a tag directive.
-auto scanTagDirectiveHandle(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto output = scanTagHandle(reader, "directive");
     enforce(reader.front == ' ', new UnexpectedTokenException("directive", "' '", reader.front));
     return output;
 }
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    //assertThrown(str.scanTagDirectiveHandle());
+    str = "!! ";
+    assert(str.scanTagDirectiveHandle() == "!!");
+}
 
 /// Scan prefix of a tag directive.
-auto scanTagDirectivePrefix(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto output = scanTagURI(reader, "directive");
     enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader.front));
     return output;
 }
+/*@safe pure*/ unittest { //ADD MORE
+    auto str = "";
+    //assertThrown(str.scanTagDirectivePrefix());
+    str = " ";
+    assertThrown(str.scanTagDirectivePrefix());
+}
 
 /// Scan (and ignore) ignored line after a directive.
-void scanDirectiveIgnoredLine(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void scanDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     findNextNonSpace(reader);
     if(reader.front == '#') { scanToNextBreak(reader); }
     enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader.front));
     scanLineBreak(reader);
 }
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    //assertNotThrown(str.scanDirectiveIgnoredLine());
+    str = "\n";
+    assertNotThrown(str.scanDirectiveIgnoredLine());
+    assert(str == "");
+}
 /// Scan chomping and indentation indicators of a scalar token.
-Tuple!(Chomping, int) scanBlockScalarIndicators(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+Tuple!(Chomping, int) scanBlockScalarIndicators(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto chomping = Chomping.Clip;
     int increment = int.min;
@@ -1292,6 +1373,12 @@ Tuple!(Chomping, int) scanBlockScalarIndicators(T)(ref T reader) @safe if (isFor
     return tuple(chomping, increment);
 }
 
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    //assert(str.scanBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
+    str = " ";
+    assert(str.scanBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
+}
 /// Get chomping indicator, if detected. Return false otherwise.
 ///
 /// Used in scanBlockScalarIndicators.
@@ -1300,7 +1387,7 @@ Tuple!(Chomping, int) scanBlockScalarIndicators(T)(ref T reader) @safe if (isFor
 ///
 /// c        = The character that may be a chomping indicator.
 /// chomping = Write the chomping value here, if detected.
-bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     if(!c.among!(chompIndicators)) { return false; }
     chomping = c == '+' ? Chomping.Keep : Chomping.Strip;
@@ -1309,6 +1396,12 @@ bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) @safe if (
     return true;
 }
 
+@safe pure unittest { //ADD MORE
+    dchar c;
+    Chomping chomping;
+    auto str = "";
+    assert(str.getChomping(c, chomping) == false);
+}
 /// Get increment indicator, if detected. Return false otherwise.
 ///
 /// Used in scanBlockScalarIndicators.
@@ -1320,7 +1413,7 @@ bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) @safe if (
 ///             the next character in the Reader.
 /// increment = Write the increment value here, if detected.
 /// startMark = Mark for error messages.
-bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     if(!c.isDigit) { return false; }
     // Convert a digit to integer.
@@ -1333,8 +1426,14 @@ bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) @safe if (isF
     return true;
 }
 
+@safe pure unittest { //ADD MORE
+    dchar c;
+    int inc;
+    auto str = "";
+    assert(str.getIncrement(c, inc) == false);
+}
 /// Scan (and ignore) ignored line in a block scalar.
-void scanBlockScalarIgnoredLine(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void scanBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     findNextNonSpace(reader);
     if(reader.front == '#') { scanToNextBreak(reader); }
@@ -1345,8 +1444,14 @@ void scanBlockScalarIgnoredLine(T)(ref T reader) @safe if (isForwardRange!T && i
     return;
 }
 
-/// Scan indentation in a block scalar, returning line breaks, max indent and end mark.
-auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    //assertThrown(str.scanBlockScalarIgnoredLine());
+    str = "\n";
+    assertNotThrown(str.scanBlockScalarIgnoredLine());
+}
+/// Scan indentation in a block scalar, returning line breaks and max indent.
+auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
@@ -1362,9 +1467,14 @@ auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent) @system if 
 
     return output;
 }
-
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    uint maxIndent;
+    assert(str.scanBlockScalarIndentation(maxIndent) == "");
+    assert(maxIndent == 0);
+}
 /// Scan line breaks at lower or specified indentation in a block scalar.
-auto scanBlockScalarBreaks(T)(ref T reader, const uint indent) @trusted if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
 
@@ -1377,9 +1487,12 @@ auto scanBlockScalarBreaks(T)(ref T reader, const uint indent) @trusted if (isFo
 
     return output;
 }
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    assert(str.scanBlockScalarBreaks(0) == "");
+}
 /// Scan nonspace characters in a flow scalar.
 auto scanFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
-    //@safe
 {
     dchar[] output;
     for(;;) with(ScalarStyle)
@@ -1439,12 +1552,17 @@ auto scanFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFo
     }
     return output;
 }
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    assert(str.scanFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == "");
+    assert(str.scanFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == "");
+}
 /// Scan space characters in a flow scalar.
-auto scanFlowScalarSpaces(T)(ref T reader) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
-    // Increase length as long as we see whitespace.
     dchar[] whitespaces;
+    enforce(!reader.empty, new UnexpectedSequenceException("quoted scalar", "end of stream"));
     while(reader.front.among!(whiteSpaces)) {
         whitespaces ~= reader.front;
         reader.popFront();
@@ -1473,6 +1591,24 @@ auto scanFlowScalarSpaces(T)(ref T reader) @system if (isForwardRange!T && is(Un
 
     return output;
 }
+@safe pure unittest {
+    auto str = "";
+    assertThrown(str.scanFlowScalarSpaces());
+    //str = " ";
+    //assertThrown(str.scanFlowScalarSpaces());
+    str = " a";
+    assert(str.scanFlowScalarSpaces() == " ");
+    assert(str == "a");
+    str = "\ta";
+    assert(str.scanFlowScalarSpaces() == "\t");
+    assert(str == "a");
+    str = "  \t\t \ta";
+    assert(str.scanFlowScalarSpaces() == "  \t\t \t");
+    assert(str == "a");
+    str = " \na"; //is this behaviour correct...?
+    assert(str.scanFlowScalarSpaces() == " ");
+    assert(str == "a");
+}
 /// Scan line breaks in a flow scalar.
 dchar[] scanFlowScalarBreaks(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
     bool waste;
@@ -1497,7 +1633,7 @@ auto scanFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRa
     }
     return output;
 }
-unittest {
+@safe pure unittest {
     auto str = "     ";
     assert(str.scanFlowScalarBreaks() == "");
 
@@ -1508,7 +1644,7 @@ bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar
     return reader.save().startsWith("---", "...")
             && reader.save().drop(3).front.among!(allWhiteSpace);
 }
-unittest {
+@safe pure unittest {
     assert("---\r\n".end);
     assert("...\n".end);
     assert(!"...a".end);
@@ -1516,7 +1652,7 @@ unittest {
     //assert("".end);
 }
 /// Scan spaces in a plain scalar.
-auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) @system if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     // The specification is really confusing about tabs in plain scalars.
@@ -1566,8 +1702,13 @@ auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) @system if (isIn
     if(lineBreak == '\n' && !extraBreaks) { output ~= ' '; }
     return output;
 }
+@safe pure unittest { //ADD MORE
+    auto str = "";
+    bool allowSimpleKey;
+    assert(str.scanPlainSpaces(allowSimpleKey) == "");
+}
 /// Scan handle of a tag token.
-auto scanTagHandle(T)(ref T reader, string name = "tag handle") @system
+auto scanTagHandle(T)(ref T reader, string name = "tag handle")
 {
     dchar c = reader.front;
     enforce(c == '!', new UnexpectedTokenException(name, "'!'", c));
@@ -1585,17 +1726,19 @@ auto scanTagHandle(T)(ref T reader, string name = "tag handle") @system
         ++length;
     }
 
-    return reader.take(length).array;
-
+    auto output = reader.take(length).array;
+    static if (isArray!T)
+        reader.popFrontN(output.length);
+    return output;
     //return chain(reader.take(1), reader.drop(1).until!(x => !(x.isAlphaNum || x.among!('-', '_')))).array;
 }
-unittest {
+@safe pure unittest {
     auto str = "!!wordswords ";
     assert(str.scanTagHandle() == "!!");
-    assert(str == "!!wordswords ");
+    assert(str == "wordswords ");
 }
 /// Scan URI in a tag token.
-auto scanTagURI(T)(ref T reader, string name = "URI") @trusted if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))  {
+auto scanTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))  {
     // Note: we do not check if URI is well-formed.
     dchar[] output;
     while(!reader.empty && (reader.front.isAlphaNum || reader.front.among!(miscValidURIChars))) {
@@ -1610,7 +1753,7 @@ auto scanTagURI(T)(ref T reader, string name = "URI") @trusted if (isInputRange!
     enforce(output.length > 0, new UnexpectedTokenException(name, "URI", reader.front));
     return output;
 }
-unittest {
+/*@safe pure*/ unittest {
     auto str = "http://example.com";
     assert(str.scanTagURI() == "http://example.com");
 
@@ -1633,7 +1776,7 @@ dchar[] scanURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputR
     }
     return decodeComponent(uriBuf).to!(dchar[]);
 }
-unittest {
+/*@safe pure*/ unittest {
     //it's a space!
     auto str = "%20";
     assert(str.scanURIEscapes() == " ");
@@ -1688,7 +1831,7 @@ unittest {
 ///   '\u2028'    :   '\u2028'
 ///   '\u2029     :   '\u2029'
 ///   no break    :   '\0'
-dchar scanLineBreak(T)(ref T reader_) @safe if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dchar scanLineBreak(T)(ref T reader_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
     // Fast path for ASCII line breaks.
     if (reader_.empty)
         return '\0';
@@ -1724,7 +1867,7 @@ dchar scanLineBreak(T)(ref T reader_) @safe if (isInputRange!T && is(Unqual!(Ele
     //    case 6: reader_.popFront(); return '\u2029';
     //}
 }
-unittest {
+@safe pure unittest {
     string str = "\r\n";
     assert(str.scanLineBreak() == '\n');
     assert(str == "");
