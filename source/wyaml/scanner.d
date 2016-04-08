@@ -811,10 +811,10 @@ final class Scanner
 
             for(;;)
             {
-                findNextNonSpace(reader_);
+                reader_.skipToNextNonSpace();
                 if (reader_.empty) break;
-                if(reader_.front == '#') { scanToNextBreak(reader_); }
-                if(scanLineBreak(reader_) != '\0')
+                if(reader_.front == '#') { reader_.popToNextBreak(); }
+                if(reader_.popLineBreak() != '\0')
                 {
                     if(flowLevel_ == 0) { allowSimpleKey_ = true; }
                 }
@@ -833,13 +833,13 @@ final class Scanner
             reader_.popFront();
 
             // Scan directive name
-            const name = scanDirectiveName(reader_);
+            const name = reader_.popDirectiveName();
 
             // Index where tag handle ends and suffix starts in a tag directive value.
             uint tagHandleEnd = uint.max;
             dchar[] value;
-            if(name == "YAML")     { value = scanYAMLDirectiveValue(reader_); }
-            else if(name == "TAG") { value = scanTagDirectiveValue(reader_, tagHandleEnd); }
+            if(name == "YAML")     { value = reader_.popYAMLDirectiveValue(); }
+            else if(name == "TAG") { value = reader_.popTagDirectiveValue(tagHandleEnd); }
 
             Mark endMark = reader_.mark;
 
@@ -849,10 +849,10 @@ final class Scanner
             else
             {
                 directive = DirectiveType.Reserved;
-                scanToNextBreak(reader_);
+                reader_.popToNextBreak();
             }
 
-            scanDirectiveIgnoredLine(reader_);
+            reader_.skipDirectiveIgnoredLine();
             return directiveToken(startMark, endMark, value.toUTF8.dup, directive, tagHandleEnd);
         }
 
@@ -875,8 +875,8 @@ final class Scanner
             reader_.popFront();
 
             char[] value;
-            if(i == '*') { value = scanAlphaNumeric(reader_, "an alias").toUTF8.dup; }
-            else         { value = scanAlphaNumeric(reader_, "an anchor").toUTF8.dup; }
+            if(i == '*') { value = reader_.popAlphaNumeric("an alias").toUTF8.dup; }
+            else         { value = reader_.popAlphaNumeric("an anchor").toUTF8.dup; }
 
 
             enforce(reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", "alphanumeric, '-' or '_'", reader_.front));
@@ -903,7 +903,7 @@ final class Scanner
                 reader_.popFrontN(2);
 
                 handleEnd = 0;
-                slice ~= scanTagURI(reader_, "tag");
+                slice ~= reader_.popTagURI("tag");
                 enforce(reader_.front == '>', new UnexpectedTokenException("tag", "'>'", reader_.front));
                 reader_.popFront();
             }
@@ -931,7 +931,7 @@ final class Scanner
 
                 if(useHandle)
                 {
-                    slice ~= scanTagHandle(reader_, "tag");
+                    slice ~= reader_.popTagHandle("tag");
                     handleEnd = cast(uint)slice.length;
                 }
                 else
@@ -941,7 +941,7 @@ final class Scanner
                     handleEnd = cast(uint)slice.length;
                 }
 
-                slice ~= scanTagURI(reader_, "tag");
+                slice ~= reader_.popTagURI("tag");
             }
 
             enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("tag", "' '", reader_.front));
@@ -956,11 +956,11 @@ final class Scanner
             // Scan the header.
             reader_.popFront();
 
-            const indicators = scanBlockScalarIndicators(reader_);
+            const indicators = reader_.popBlockScalarIndicators();
 
             const chomping   = indicators[0];
             const increment  = indicators[1];
-            scanBlockScalarIgnoredLine(reader_);
+            reader_.skipBlockScalarIgnoredLine();
 
             // Determine the indentation level and go to the first non-empty line.
             uint indent = max(1, indent_ + 1);
@@ -972,13 +972,13 @@ final class Scanner
             if(increment == int.min)
             {
                 uint indentation;
-                newSlice ~= scanBlockScalarIndentation(reader_, indentation);
+                newSlice ~= reader_.popBlockScalarIndentation(indentation);
                 indent  = max(indent, indentation);
             }
             else
             {
                 indent += increment - 1;
-                newSlice ~= scanBlockScalarBreaks(reader_, indent);
+                newSlice ~= reader_.popBlockScalarBreaks(indent);
             }
             Mark endMark = reader_.mark;
 
@@ -991,14 +991,14 @@ final class Scanner
                 newSlice = [];
                 const bool leadingNonSpace = !reader_.front.among!(whiteSpaces);
                 // This is where the 'interesting' non-whitespace data gets read.
-                slice ~= scanToNextBreak(reader_);
-                lineBreak = scanLineBreak(reader_);
+                slice ~= reader_.popToNextBreak();
+                lineBreak = reader_.popLineBreak();
 
                 fullLen = slice.length+newSlice.length;
                 startLen = 0;
                 // The line breaks should actually be written _after_ the if() block
                 // below. We work around that by inserting
-                newSlice ~= scanBlockScalarBreaks(reader_, indent);
+                newSlice ~= reader_.popBlockScalarBreaks(indent);
 
                 // This will not run during the last iteration (see the if() vs the
                 // while()), hence breaksTransaction rollback (which happens after this
@@ -1060,12 +1060,12 @@ final class Scanner
             const quote     = reader_.front;
             reader_.popFront();
 
-            dchar[] slice = scanFlowScalarNonSpaces(reader_, quotes);
+            dchar[] slice = reader_.popFlowScalarNonSpaces(quotes);
 
             while(!reader_.empty && reader_.front != quote)
             {
-                slice ~= scanFlowScalarSpaces(reader_);
-                slice ~= scanFlowScalarNonSpaces(reader_, quotes);
+                slice ~= reader_.popFlowScalarSpaces();
+                slice ~= reader_.popFlowScalarNonSpaces(quotes);
             }
             enforce (!reader_.empty, new UnexpectedSequenceException("quoted flow scalar", "EOF"));
             reader_.popFront();
@@ -1103,7 +1103,7 @@ final class Scanner
                 newSlice = [];
 
                 const startLength = slice.length;
-                newSlice ~= scanPlainSpaces(reader_, allowSimpleKey_);
+                newSlice ~= reader_.popPlainSpaces(allowSimpleKey_);
                 if(startLength == newSlice.length+slice.length ||
                    (flowLevel_ == 0 && reader_.column < indent))
                 {
@@ -1177,7 +1177,7 @@ auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unq
     assert(test == ":");
 }
 /// Move to the next non-space character.
-void findNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void skipToNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto length = reader.until!(x => x != ' ').walkLength;
     static if(isArray!T)
@@ -1185,14 +1185,14 @@ void findNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elemen
 }
 @safe pure unittest {
     auto str = "";
-    str.findNextNonSpace();
+    str.skipToNextNonSpace();
     assert(str == "");
     str = "        c";
-    str.findNextNonSpace();
+    str.skipToNextNonSpace();
     assert(str == "c");
 }
 /// Scan a string of alphanumeric or "-_" characters.
-auto scanAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto output = reader.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
     enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader.empty ? '\x04' : reader.front));
@@ -1202,60 +1202,60 @@ auto scanAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwa
 }
 @safe pure unittest {
     auto str = "";
-    assertThrown(str.scanAlphaNumeric());
+    assertThrown(str.popAlphaNumeric());
     str = "1234";
-    assert(str.scanAlphaNumeric() == "1234");
+    assert(str.popAlphaNumeric() == "1234");
     assert(str == "");
     str = "abc";
-    assert(str.scanAlphaNumeric() == "abc");
+    assert(str.popAlphaNumeric() == "abc");
     assert(str == "");
     str = "1234abc";
-    assert(str.scanAlphaNumeric() == "1234abc");
+    assert(str.popAlphaNumeric() == "1234abc");
     assert(str == "");
     str = "12 34";
-    assert(str.scanAlphaNumeric() == "12");
+    assert(str.popAlphaNumeric() == "12");
     assert(str == " 34");
     str = " 1234";
-    assertThrown(str.scanAlphaNumeric());
+    assertThrown(str.popAlphaNumeric());
 }
 /// Scan all characters until next line break.
-auto scanToNextBreak(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popToNextBreak(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     return reader.until!(x => x.among!allBreaks).array;
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    assert(str.scanToNextBreak() == "");
+    assert(str.popToNextBreak() == "");
 }
 /// Scan name of a directive token.
-auto scanDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     // Scan directive name.
-    auto output = scanAlphaNumeric(reader, "a directive");
+    auto output = reader.popAlphaNumeric("a directive");
     enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "alphanumeric, '-' or '_'", reader.front));
     return output;
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.scanDirectiveName());
+    //assertThrown(str.popDirectiveName());
     str = "test ";
-    assert(str.scanDirectiveName() == "test");
+    assert(str.popDirectiveName() == "test");
     //assert(str == " ");
 }
 /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
-auto scanYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
-    findNextNonSpace(reader);
+    reader.skipToNextNonSpace();
 
-    output ~= scanYAMLDirectiveNumber(reader);
+    output ~= reader.popYAMLDirectiveNumber();
 
     enforce(reader.front == '.', new UnexpectedTokenException("directive", "digit or '.'", reader.front));
     // Skip the '.'.
     reader.popFront();
 
     output ~= '.';
-    output ~= scanYAMLDirectiveNumber(reader);
+    output ~= reader.popYAMLDirectiveNumber();
 
     enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "digit or '.'", reader.front));
     return output;
@@ -1263,12 +1263,12 @@ auto scanYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.scanYAMLDirectiveValue());
+    //assertThrown(str.popYAMLDirectiveValue());
     str = "1.2 ";
-    assert(str.scanYAMLDirectiveValue() == "1.2");
+    assert(str.popYAMLDirectiveValue() == "1.2");
 }
 /// Scan a number from a YAML directive.
-auto scanYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     enforce(reader.front.isDigit, new UnexpectedTokenException("directive", "digit", reader.front));
     auto output = reader.until!(x => x.isDigit)(OpenRight.no).array;
@@ -1279,79 +1279,79 @@ auto scanYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.scanYAMLDirectiveNumber());
+    //assertThrown(str.popYAMLDirectiveNumber());
     str = "1 ";
-    assert(str.scanYAMLDirectiveNumber() == "1");
+    assert(str.popYAMLDirectiveNumber() == "1");
     assert(str == " ");
 }
 /// Scan value of a tag directive.
 ///
 /// Returns: Length of tag handle (which is before tag prefix) in scanned data
-auto scanTagDirectiveValue(T)(ref T reader, out uint handleLength) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popTagDirectiveValue(T)(ref T reader, out uint handleLength) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
-    findNextNonSpace(reader);
-    output ~= scanTagDirectiveHandle(reader);
+    reader.skipToNextNonSpace();
+    output ~= reader.popTagDirectiveHandle();
     handleLength = cast(uint)(output.length);
-    findNextNonSpace(reader);
-    output ~= scanTagDirectivePrefix(reader);
+    reader.skipToNextNonSpace();
+    output ~= reader.popTagDirectivePrefix();
 
     return output;
 }
 /*@safe pure*/ unittest { //ADD MORE
     auto str = "";
     uint handleLength;
-    //assertThrown(str.scanTagDirectiveValue(handleLength));
+    //assertThrown(str.popTagDirectiveValue(handleLength));
     str = " !! !test ";
-    assert(str.scanTagDirectiveValue(handleLength) == "!!!test");
+    assert(str.popTagDirectiveValue(handleLength) == "!!!test");
     assert(handleLength == 2);
 }
 
 /// Scan handle of a tag directive.
-auto scanTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    auto output = scanTagHandle(reader, "directive");
+    auto output = reader.popTagHandle("directive");
     enforce(reader.front == ' ', new UnexpectedTokenException("directive", "' '", reader.front));
     return output;
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.scanTagDirectiveHandle());
+    //assertThrown(str.popTagDirectiveHandle());
     str = "!! ";
-    assert(str.scanTagDirectiveHandle() == "!!");
+    assert(str.popTagDirectiveHandle() == "!!");
 }
 
 /// Scan prefix of a tag directive.
-auto scanTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    auto output = scanTagURI(reader, "directive");
+    auto output = reader.popTagURI("directive");
     enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader.front));
     return output;
 }
 /*@safe pure*/ unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.scanTagDirectivePrefix());
+    //assertThrown(str.popTagDirectivePrefix());
     str = " ";
-    assertThrown(str.scanTagDirectivePrefix());
+    assertThrown(str.popTagDirectivePrefix());
 }
 
 /// Scan (and ignore) ignored line after a directive.
-void scanDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void skipDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    findNextNonSpace(reader);
-    if(reader.front == '#') { scanToNextBreak(reader); }
+    reader.skipToNextNonSpace();
+    if(reader.front == '#') { reader.popToNextBreak(); }
     enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader.front));
-    scanLineBreak(reader);
+    reader.popLineBreak();
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertNotThrown(str.scanDirectiveIgnoredLine());
+    //assertNotThrown(str.skipDirectiveIgnoredLine());
     str = "\n";
-    assertNotThrown(str.scanDirectiveIgnoredLine());
+    assertNotThrown(str.skipDirectiveIgnoredLine());
     assert(str == "");
 }
 /// Scan chomping and indentation indicators of a scalar token.
-Tuple!(Chomping, int) scanBlockScalarIndicators(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto chomping = Chomping.Clip;
     int increment = int.min;
@@ -1375,13 +1375,13 @@ Tuple!(Chomping, int) scanBlockScalarIndicators(T)(ref T reader) if (isForwardRa
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assert(str.scanBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
+    //assert(str.popBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
     str = " ";
-    assert(str.scanBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
+    assert(str.popBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
 }
 /// Get chomping indicator, if detected. Return false otherwise.
 ///
-/// Used in scanBlockScalarIndicators.
+/// Used in popBlockScalarIndicators.
 ///
 /// Params:
 ///
@@ -1404,7 +1404,7 @@ bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) if (isForw
 }
 /// Get increment indicator, if detected. Return false otherwise.
 ///
-/// Used in scanBlockScalarIndicators.
+/// Used in popBlockScalarIndicators.
 ///
 /// Params:
 ///
@@ -1433,32 +1433,32 @@ bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isForward
     assert(str.getIncrement(c, inc) == false);
 }
 /// Scan (and ignore) ignored line in a block scalar.
-void scanBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    findNextNonSpace(reader);
-    if(reader.front == '#') { scanToNextBreak(reader); }
+    reader.skipToNextNonSpace();
+    if(reader.front == '#') { reader.popToNextBreak(); }
 
     enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader.front));
 
-    scanLineBreak(reader);
+    reader.popLineBreak();
     return;
 }
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.scanBlockScalarIgnoredLine());
+    //assertThrown(str.skipBlockScalarIgnoredLine());
     str = "\n";
-    assertNotThrown(str.scanBlockScalarIgnoredLine());
+    assertNotThrown(str.skipBlockScalarIgnoredLine());
 }
 /// Scan indentation in a block scalar, returning line breaks and max indent.
-auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
     {
         if(reader.front != ' ')
         {
-            output ~= scanLineBreak(reader);
+            output ~= reader.popLineBreak();
             continue;
         }
         reader.popFront();
@@ -1470,11 +1470,11 @@ auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwa
 @safe pure unittest { //ADD MORE
     auto str = "";
     uint maxIndent;
-    assert(str.scanBlockScalarIndentation(maxIndent) == "");
+    assert(str.popBlockScalarIndentation(maxIndent) == "");
     assert(maxIndent == 0);
 }
 /// Scan line breaks at lower or specified indentation in a block scalar.
-auto scanBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
 
@@ -1482,17 +1482,17 @@ auto scanBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRang
     {
         while(!reader.empty && reader.column < indent && reader.front == ' ') { reader.popFront(); }
         if(!reader.front.among!(newLines))  { break; }
-        output ~= scanLineBreak(reader);
+        output ~= reader.popLineBreak();
     }
 
     return output;
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    assert(str.scanBlockScalarBreaks(0) == "");
+    assert(str.popBlockScalarBreaks(0) == "");
 }
 /// Scan nonspace characters in a flow scalar.
-auto scanFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     for(;;) with(ScalarStyle)
@@ -1539,8 +1539,8 @@ auto scanFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFo
             }
             else if(c.among!(newLines))
             {
-                scanLineBreak(reader);
-                output ~= scanFlowScalarBreaks(reader);
+                reader.popLineBreak();
+                output ~= reader.popFlowScalarBreaks();
             }
             else
             {
@@ -1554,11 +1554,11 @@ auto scanFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFo
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    assert(str.scanFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == "");
-    assert(str.scanFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == "");
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == "");
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == "");
 }
 /// Scan space characters in a flow scalar.
-auto scanFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     dchar[] whitespaces;
@@ -1579,12 +1579,12 @@ auto scanFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(El
     }
 
     // There's a line break after the spaces.
-    const lineBreak = scanLineBreak(reader);
+    const lineBreak = reader.popLineBreak();
 
     if(lineBreak != '\n') { output ~= lineBreak; }
 
     bool extraBreaks;
-    output ~= scanFlowScalarBreaks(reader, extraBreaks);
+    output ~= reader.popFlowScalarBreaks(extraBreaks);
 
     // No extra breaks, one normal line break. Replace it with a space.
     if(lineBreak == '\n' && !extraBreaks) { output ~= ' '; }
@@ -1593,28 +1593,28 @@ auto scanFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(El
 }
 @safe pure unittest {
     auto str = "";
-    assertThrown(str.scanFlowScalarSpaces());
+    assertThrown(str.popFlowScalarSpaces());
     //str = " ";
-    //assertThrown(str.scanFlowScalarSpaces());
+    //assertThrown(str.popFlowScalarSpaces());
     str = " a";
-    assert(str.scanFlowScalarSpaces() == " ");
+    assert(str.popFlowScalarSpaces() == " ");
     assert(str == "a");
     str = "\ta";
-    assert(str.scanFlowScalarSpaces() == "\t");
+    assert(str.popFlowScalarSpaces() == "\t");
     assert(str == "a");
     str = "  \t\t \ta";
-    assert(str.scanFlowScalarSpaces() == "  \t\t \t");
+    assert(str.popFlowScalarSpaces() == "  \t\t \t");
     assert(str == "a");
     str = " \na"; //is this behaviour correct...?
-    assert(str.scanFlowScalarSpaces() == " ");
+    assert(str.popFlowScalarSpaces() == " ");
     assert(str == "a");
 }
 /// Scan line breaks in a flow scalar.
-dchar[] scanFlowScalarBreaks(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dchar[] popFlowScalarBreaks(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
     bool waste;
-    return scanFlowScalarBreaks(reader, waste);
+    return reader.popFlowScalarBreaks(waste);
 }
-auto scanFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
     dchar[] output;
     for(;;)
     {
@@ -1627,7 +1627,7 @@ auto scanFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRa
         // Encountered a non-whitespace non-linebreak character, so we're done.
         if (reader.empty || !reader.front.among!(newLines)) break;
 
-        const lineBreak = scanLineBreak(reader);
+        const lineBreak = reader.popLineBreak();
         extraBreaks = true;
         output ~= lineBreak;
     }
@@ -1635,10 +1635,10 @@ auto scanFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRa
 }
 @safe pure unittest {
     auto str = "     ";
-    assert(str.scanFlowScalarBreaks() == "");
+    assert(str.popFlowScalarBreaks() == "");
 
     str = " \n  ";
-    assert(str.scanFlowScalarBreaks() == "");
+    assert(str.popFlowScalarBreaks() == "");
 }
 bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
     return reader.save().startsWith("---", "...")
@@ -1652,7 +1652,7 @@ bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar
     //assert("".end);
 }
 /// Scan spaces in a plain scalar.
-auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     // The specification is really confusing about tabs in plain scalars.
@@ -1676,7 +1676,7 @@ auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange
     }
 
     // Newline after the spaces (if any)
-    const lineBreak = scanLineBreak(reader);
+    const lineBreak = reader.popLineBreak();
     allowSimpleKey_ = true;
 
 
@@ -1690,7 +1690,7 @@ auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange
         if(reader.front == ' ') { reader.popFront(); }
         else
         {
-            const lBreak = scanLineBreak(reader);
+            const lBreak = reader.popLineBreak();
             extraBreaks  = true;
             output ~= lBreak;
 
@@ -1705,10 +1705,10 @@ auto scanPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange
 @safe pure unittest { //ADD MORE
     auto str = "";
     bool allowSimpleKey;
-    assert(str.scanPlainSpaces(allowSimpleKey) == "");
+    assert(str.popPlainSpaces(allowSimpleKey) == "");
 }
 /// Scan handle of a tag token.
-auto scanTagHandle(T)(ref T reader, string name = "tag handle")
+auto popTagHandle(T)(ref T reader, string name = "tag handle")
 {
     dchar c = reader.front;
     enforce(c == '!', new UnexpectedTokenException(name, "'!'", c));
@@ -1734,16 +1734,16 @@ auto scanTagHandle(T)(ref T reader, string name = "tag handle")
 }
 @safe pure unittest {
     auto str = "!!wordswords ";
-    assert(str.scanTagHandle() == "!!");
+    assert(str.popTagHandle() == "!!");
     assert(str == "wordswords ");
 }
 /// Scan URI in a tag token.
-auto scanTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))  {
+auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))  {
     // Note: we do not check if URI is well-formed.
     dchar[] output;
     while(!reader.empty && (reader.front.isAlphaNum || reader.front.among!(miscValidURIChars))) {
         if(reader.front == '%')
-            output ~= scanURIEscapes(reader, name);
+            output ~= reader.popURIEscapes(name);
         if (reader.empty)
             break;
         output ~= reader.front;
@@ -1755,13 +1755,13 @@ auto scanTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(U
 }
 /*@safe pure*/ unittest {
     auto str = "http://example.com";
-    assert(str.scanTagURI() == "http://example.com");
+    assert(str.popTagURI() == "http://example.com");
 
     str = "http://example.com/%20";
-    assert(str.scanTagURI() == "http://example.com/ ");
+    assert(str.popTagURI() == "http://example.com/ ");
 }
 /// Scan URI escape sequences.
-dchar[] scanURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dchar[] popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
     import std.uri : decodeComponent;
     dchar[] uriBuf;
     while(!reader.empty && reader.front == '%') {
@@ -1779,46 +1779,46 @@ dchar[] scanURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputR
 /*@safe pure*/ unittest {
     //it's a space!
     auto str = "%20";
-    assert(str.scanURIEscapes() == " ");
+    assert(str.popURIEscapes() == " ");
     assert(str == "");
 
     //not an escape
     str = "2";
-    assert(str.scanURIEscapes() == "");
+    assert(str.popURIEscapes() == "");
     assert(str == "2");
 
     //empty
     str = "";
-    assert(str.scanURIEscapes() == "");
+    assert(str.popURIEscapes() == "");
     assert(str == "");
 
     //invalid escape
     str = "%H";
-    assertThrown(str.scanURIEscapes());
+    assertThrown(str.popURIEscapes());
 
     //2-byte char
     str = "%C3%A2";
-    assert(str.scanURIEscapes() == "â");
+    assert(str.popURIEscapes() == "â");
     assert(str == "");
 
     //3-byte char
     str = "%E2%9C%A8";
-    assert(str.scanURIEscapes() == "✨");
+    assert(str.popURIEscapes() == "✨");
     assert(str == "");
 
     //4-byte char
     str = "%F0%9D%84%A0";
-    assert(str.scanURIEscapes() == "𝄠");
+    assert(str.popURIEscapes() == "𝄠");
     assert(str == "");
 
     //two 1-byte chars
     str = "%20%20";
-    assert(str.scanURIEscapes() == "  ");
+    assert(str.popURIEscapes() == "  ");
     assert(str == "");
 
     //ditto, but with non-escape char
     str = "%20%20s";
-    assert(str.scanURIEscapes() == "  ");
+    assert(str.popURIEscapes() == "  ");
     assert(str == "s");
 }
 /// Scan a line break, if any.
@@ -1831,7 +1831,7 @@ dchar[] scanURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputR
 ///   '\u2028'    :   '\u2028'
 ///   '\u2029     :   '\u2029'
 ///   no break    :   '\0'
-dchar scanLineBreak(T)(ref T reader_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dchar popLineBreak(T)(ref T reader_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
     // Fast path for ASCII line breaks.
     if (reader_.empty)
         return '\0';
@@ -1869,30 +1869,30 @@ dchar scanLineBreak(T)(ref T reader_) if (isInputRange!T && is(Unqual!(ElementTy
 }
 @safe pure unittest {
     string str = "\r\n";
-    assert(str.scanLineBreak() == '\n');
+    assert(str.popLineBreak() == '\n');
     assert(str == "");
     str = "\r";
-    assert(str.scanLineBreak() == '\n');
+    assert(str.popLineBreak() == '\n');
     assert(str == "");
     str = "\n";
-    assert(str.scanLineBreak() == '\n');
+    assert(str.popLineBreak() == '\n');
     assert(str == "");
     str = "\u0085";
-    assert(str.scanLineBreak() == '\n');
+    assert(str.popLineBreak() == '\n');
     assert(str == "");
     str = "\u2028";
-    assert(str.scanLineBreak() == '\u2028');
+    assert(str.popLineBreak() == '\u2028');
     assert(str == "");
     str = "\u2029";
-    assert(str.scanLineBreak() == '\u2029');
+    assert(str.popLineBreak() == '\u2029');
     assert(str == "");
     str = "";
-    assert(str.scanLineBreak() == '\0');
+    assert(str.popLineBreak() == '\0');
     assert(str == "");
     str = "b";
-    assert(str.scanLineBreak() == '\0');
+    assert(str.popLineBreak() == '\0');
     assert(str == "b");
     str = "\nb";
-    assert(str.scanLineBreak() == '\n');
+    assert(str.popLineBreak() == '\n');
     assert(str == "b");
 }
