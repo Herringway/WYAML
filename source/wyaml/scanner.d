@@ -1093,57 +1093,11 @@ final class Scanner
             while(!reader_.empty && reader_.front != '#')
             {
                 // Scan the entire plain scalar.
-                size_t length = 0;
-                dchar c = void;
-                // Moved the if() out of the loop for optimization.
-                if(flowLevel_ == 0)
-                {
-                    auto savedReader = reader_.save();
-                    c = savedReader.front;
-                    for(;;)
-                    {
-                        if (savedReader.empty)
-                            break;
-                        savedReader.popFront();
-                        if(c.among!(allWhiteSpace) ||
-                           (c == ':' && (savedReader.empty || savedReader.front.among!(allWhiteSpace))))
-                        {
-                            break;
-                        }
-                        ++length;
-                        if (savedReader.empty)
-                            break;
-                        const cNext = savedReader.front;
-                        c = cNext;
-                    }
-                }
-                else
-                {
-                    for(;;)
-                    {
-                        c = reader_.save().drop(length).front;
-                        if(c.among!(allWhiteSpace, ',', ':', '?', squareBrackets, curlyBraces))
-                        {
-                            break;
-                        }
-                        ++length;
-                    }
-                }
-
-                // It's not clear what we should do with ':' in the flow context.
-                if(flowLevel_ > 0 && c == ':' &&
-                   !reader_.save().drop(length + 1).front.among!(allWhiteSpace, ',', squareBrackets, curlyBraces))
-                {
-                    throw new UnexpectedSequenceException("plain scalar", ":");
-                }
-
-                if(length == 0) { break; }
-
-                allowSimpleKey_ = false;
-
-                newSlice ~= reader_.take(length).array;
-
+                auto l = reader_.popScalar(flowLevel_);
+                if (l.length == 0) break;
+                newSlice ~= l;
                 endMark = reader_.mark;
+                allowSimpleKey_ = false;
 
                 slice ~= newSlice;
                 newSlice = [];
@@ -1159,6 +1113,68 @@ final class Scanner
 
             return scalarToken(startMark, endMark, slice.toUTF8.dup, ScalarStyle.Plain);
         }
+}
+auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+    dchar c = void;
+    size_t length;
+    // Moved the if() out of the loop for optimization.
+    if(flowLevel == 0) {
+        auto savedReader = reader.save();
+        c = savedReader.front;
+        for(;;)
+        {
+            if (savedReader.empty)
+                break;
+            savedReader.popFront();
+            if(c.among!(allWhiteSpace) ||
+               (c == ':' && (savedReader.empty || savedReader.front.among!(allWhiteSpace))))
+            {
+                break;
+            }
+            ++length;
+            if (savedReader.empty)
+                break;
+            const cNext = savedReader.front;
+            c = cNext;
+        }
+    }
+    else {
+        for(;;)
+        {
+            c = reader.save().drop(length).front;
+            if(c.among!(allWhiteSpace, ',', ':', '?', squareBrackets, curlyBraces))
+            {
+                break;
+            }
+            ++length;
+        }
+        // It's not clear what we should do with ':' in the flow context.
+        if(c == ':' && (reader.save().drop(length+1).empty ||
+               !reader.save().drop(length + 1).front.among!(allWhiteSpace, ',', squareBrackets, curlyBraces)))
+        {
+            throw new UnexpectedSequenceException("plain scalar", ":");
+        }
+    }
+
+    auto output = reader.takeExactly(length).array;
+    static if(isArray!T)
+        reader.popFrontN(length);
+    return output;
+}
+@safe pure unittest {
+    auto test = "simpleword ";
+    assert(test.popScalar(0) == "simpleword");
+    assert(test == " ");
+
+    test = "aaa:";
+    assertThrown(test.popScalar(1));
+
+    test = ":";
+    assertThrown(test.popScalar(1));
+
+    test = ":";
+    assert(test.popScalar(0) == "");
+    assert(test == ":");
 }
 /// Move to the next non-space character.
 void findNextNonSpace(T)(ref T reader) @safe if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
