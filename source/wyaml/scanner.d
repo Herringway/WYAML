@@ -963,7 +963,6 @@ final class Scanner
             scanBlockScalarIgnoredLine(reader_);
 
             // Determine the indentation level and go to the first non-empty line.
-            Mark endMark;
             uint indent = max(1, indent_ + 1);
 
             dchar[] slice;
@@ -973,14 +972,15 @@ final class Scanner
             if(increment == int.min)
             {
                 uint indentation;
-                newSlice ~= scanBlockScalarIndentation(reader_, indentation, endMark);
+                newSlice ~= scanBlockScalarIndentation(reader_, indentation);
                 indent  = max(indent, indentation);
             }
             else
             {
                 indent += increment - 1;
-                newSlice ~= scanBlockScalarBreaks(reader_, indent, endMark);
+                newSlice ~= scanBlockScalarBreaks(reader_, indent);
             }
+            Mark endMark = reader_.mark;
 
             dchar lineBreak = '\0';
             size_t fullLen = 0;
@@ -998,7 +998,7 @@ final class Scanner
                 startLen = 0;
                 // The line breaks should actually be written _after_ the if() block
                 // below. We work around that by inserting
-                newSlice ~= scanBlockScalarBreaks(reader_, indent, endMark);
+                newSlice ~= scanBlockScalarBreaks(reader_, indent);
 
                 // This will not run during the last iteration (see the if() vs the
                 // while()), hence breaksTransaction rollback (which happens after this
@@ -1346,7 +1346,7 @@ void scanBlockScalarIgnoredLine(T)(ref T reader) @safe if (isForwardRange!T && i
 }
 
 /// Scan indentation in a block scalar, returning line breaks, max indent and end mark.
-auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent, out Mark endMark) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent) @system if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dchar[] output;
     while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
@@ -1354,7 +1354,6 @@ auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent, out Mark en
         if(reader.front != ' ')
         {
             output ~= scanLineBreak(reader);
-            endMark = reader.mark;
             continue;
         }
         reader.popFront();
@@ -1365,9 +1364,8 @@ auto scanBlockScalarIndentation(T)(ref T reader, out uint maxIndent, out Mark en
 }
 
 /// Scan line breaks at lower or specified indentation in a block scalar.
-auto scanBlockScalarBreaks(T)(ref T reader, const uint indent, out Mark end) @trusted if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto scanBlockScalarBreaks(T)(ref T reader, const uint indent) @trusted if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    end = reader.mark;
     dchar[] output;
 
     while(!reader.empty)
@@ -1375,7 +1373,6 @@ auto scanBlockScalarBreaks(T)(ref T reader, const uint indent, out Mark end) @tr
         while(!reader.empty && reader.column < indent && reader.front == ' ') { reader.popFront(); }
         if(!reader.front.among!(newLines))  { break; }
         output ~= scanLineBreak(reader);
-        end = reader.mark;
     }
 
     return output;
