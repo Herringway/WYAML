@@ -77,6 +77,9 @@ class UnexpectedTokenException : YAMLException {
     this(string context, string expected, dchar got, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super("Expected %s in %s, got %s".format(expected, context, got), file, line);
     }
+    this(string context, string expected, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super("Expected %s in %s, got end of range".format(expected, context), file, line);
+    }
 }
 class UnexpectedSequenceException : YAMLException {
     this(string context, string unexpected, string file = __FILE__, size_t line = __LINE__) @safe pure {
@@ -1237,10 +1240,10 @@ auto popDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elemen
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.popDirectiveName());
+    assertThrown(str.popDirectiveName());
     str = "test ";
     assert(str.popDirectiveName() == "test");
-    //assert(str == " ");
+    assert(str == " ");
 }
 /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
 auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
@@ -1263,13 +1266,15 @@ auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.popYAMLDirectiveValue());
+    assertThrown(str.popYAMLDirectiveValue());
     str = "1.2 ";
     assert(str.popYAMLDirectiveValue() == "1.2");
+    assert(str == " ");
 }
 /// Scan a number from a YAML directive.
 auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
+    enforce(!reader.empty, new UnexpectedTokenException("directive", "digit"));
     enforce(reader.front.isDigit, new UnexpectedTokenException("directive", "digit", reader.front));
     auto output = reader.until!(x => x.isDigit)(OpenRight.no).array;
     static if (isArray!T)
@@ -1279,7 +1284,7 @@ auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.popYAMLDirectiveNumber());
+    assertThrown(str.popYAMLDirectiveNumber());
     str = "1 ";
     assert(str.popYAMLDirectiveNumber() == "1");
     assert(str == " ");
@@ -1301,10 +1306,11 @@ auto popTagDirectiveValue(T)(ref T reader, out uint handleLength) if (isForwardR
 /*@safe pure*/ unittest { //ADD MORE
     auto str = "";
     uint handleLength;
-    //assertThrown(str.popTagDirectiveValue(handleLength));
+    assertThrown(str.popTagDirectiveValue(handleLength));
     str = " !! !test ";
     assert(str.popTagDirectiveValue(handleLength) == "!!!test");
     assert(handleLength == 2);
+    assert(str == " ");
 }
 
 /// Scan handle of a tag directive.
@@ -1316,7 +1322,7 @@ auto popTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.popTagDirectiveHandle());
+    assertThrown(str.popTagDirectiveHandle());
     str = "!! ";
     assert(str.popTagDirectiveHandle() == "!!");
 }
@@ -1330,7 +1336,7 @@ auto popTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 }
 /*@safe pure*/ unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.popTagDirectivePrefix());
+    assertThrown(str.popTagDirectivePrefix());
     str = " ";
     assertThrown(str.popTagDirectivePrefix());
 }
@@ -1339,13 +1345,15 @@ auto popTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 void skipDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     reader.skipToNextNonSpace();
+    if (reader.empty)
+        return;
     if(reader.front == '#') { reader.popToNextBreak(); }
     enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader.front));
     reader.popLineBreak();
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertNotThrown(str.skipDirectiveIgnoredLine());
+    assertNotThrown(str.skipDirectiveIgnoredLine());
     str = "\n";
     assertNotThrown(str.skipDirectiveIgnoredLine());
     assert(str == "");
@@ -1355,6 +1363,8 @@ Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isForwardRan
 {
     auto chomping = Chomping.Clip;
     int increment = int.min;
+    if (reader.empty)
+        return tuple(chomping, increment);
     dchar c       = reader.front;
 
     /// Indicators can be in any order.
@@ -1375,7 +1385,7 @@ Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isForwardRan
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assert(str.popBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
+    assert(str.popBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
     str = " ";
     assert(str.popBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
 }
@@ -1436,6 +1446,7 @@ bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isForward
 void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     reader.skipToNextNonSpace();
+    enforce(!reader.empty, new UnexpectedTokenException("block scalar", "comment or line break"));
     if(reader.front == '#') { reader.popToNextBreak(); }
 
     enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader.front));
@@ -1566,10 +1577,8 @@ auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Ele
         reader.popFrontN(whitespaces.length);
 
     // Spaces not followed by a line break.
-    if(!c.among!(newLines))
-    {
-        output ~= whitespaces;
-        return output;
+    if(reader.empty || !reader.front.among!(newLines)) {
+        return whitespaces;
     }
 
     // There's a line break after the spaces.
@@ -1587,9 +1596,11 @@ auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Ele
 }
 @safe pure unittest {
     auto str = "";
-    assertThrown(str.popFlowScalarSpaces());
-    //str = " ";
-    //assertThrown(str.popFlowScalarSpaces());
+    assert(str.popFlowScalarSpaces() == "");
+    str = " ";
+    assert(str.popFlowScalarSpaces() == " ");
+    str = " \n";
+    assert(str.popFlowScalarSpaces() == " ");
     str = " a";
     assert(str.popFlowScalarSpaces() == " ");
     assert(str == "a");
@@ -1612,6 +1623,8 @@ auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRan
     dstring output;
     for(;;)
     {
+        if (reader.empty)
+            break;
         // Instead of checking indentation, we check for document separators.
         enforce(!reader.end(), new UnexpectedSequenceException("quoted scalar", "document separator"));
 
@@ -1635,15 +1648,23 @@ auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRan
     assert(str.popFlowScalarBreaks() == "");
 }
 bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
-    return reader.save().startsWith("---", "...")
-            && reader.save().drop(3).front.among!(allWhiteSpace);
+    if (reader.empty)
+        return true;
+    auto savedReader = reader.save();
+    if (savedReader.take(3).array.among!("---"d, "..."d)) {
+        static if (isArray!T)
+            savedReader.popFrontN(3);
+        if (savedReader.empty || savedReader.startsWith(allWhiteSpace))
+            return true;
+    }
+    return false;
 }
 @safe pure unittest {
     assert("---\r\n".end);
     assert("...\n".end);
     assert(!"...a".end);
-    //assert("---".end);
-    //assert("".end);
+    assert("---".end);
+    assert("".end);
 }
 /// Scan spaces in a plain scalar.
 auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
@@ -1704,6 +1725,7 @@ auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!
 /// Scan handle of a tag token.
 auto popTagHandle(T)(ref T reader, string name = "tag handle")
 {
+    enforce(!reader.empty, new UnexpectedTokenException(name, "'!"));
     dchar c = reader.front;
     enforce(c == '!', new UnexpectedTokenException(name, "'!'", c));
 
@@ -1727,7 +1749,9 @@ auto popTagHandle(T)(ref T reader, string name = "tag handle")
     //return chain(reader.take(1), reader.drop(1).until!(x => !(x.isAlphaNum || x.among!('-', '_')))).array;
 }
 @safe pure unittest {
-    auto str = "!!wordswords ";
+    auto str = "";
+    assertThrown(str.popTagHandle());
+    str = "!!wordswords ";
     assert(str.popTagHandle() == "!!");
     assert(str == "wordswords ");
 }
@@ -1744,15 +1768,27 @@ auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Un
         reader.popFront();
     }
     // OK if we scanned something, error otherwise.
-    enforce(output.length > 0, new UnexpectedTokenException(name, "URI", reader.front));
+    if (reader.empty)
+        enforce(output.length > 0, new UnexpectedTokenException(name, "URI"));
+    else
+        enforce(output.length > 0, new UnexpectedTokenException(name, "URI", reader.front));
     return output;
 }
 /*@safe pure*/ unittest {
-    auto str = "http://example.com";
+    auto str = "";
+    assertThrown(str.popTagURI());
+
+    str = "http://example.com";
     assert(str.popTagURI() == "http://example.com");
+    assert(str == "");
 
     str = "http://example.com/%20";
     assert(str.popTagURI() == "http://example.com/ ");
+    assert(str == "");
+
+    str = "http://example.com/ ";
+    assert(str.popTagURI() == "http://example.com/");
+    assert(str == " ");
 }
 /// Scan URI escape sequences.
 dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
