@@ -38,15 +38,16 @@ package:
 void run(F ...)(string testName, void function(F) testFunction,
                 string[] unittestExt, string[] skipExt = [])
 {
-    immutable string dataDir = "test/data";
+    immutable string dataDir = buildPath("test", "data");
     auto testFilenames = findTestFilenames(dataDir);
 
     Result[] results;
+    string[] filenames;
     if(unittestExt.length > 0)
     {
         outer: foreach(base, extensions; testFilenames)
         {
-            string[] filenames;
+            filenames = [];
             foreach(ext; unittestExt)
             {
                 if(!extensions.canFind(ext)){continue outer;}
@@ -57,12 +58,12 @@ void run(F ...)(string testName, void function(F) testFunction,
                 if(extensions.canFind(ext)){continue outer;}
             }
 
-            results ~= execute!F(testName, testFunction, filenames);
+            results ~= execute(testName, testFunction, filenames);
         }
     }
     else
     {
-        results ~= execute!F(testName, testFunction, cast(string[])[]);
+        results ~= execute(testName, testFunction, filenames);
     }
     display(results);
 }
@@ -202,7 +203,7 @@ body
  *
  * Returns: Information about the results of the unittest.
  */
-Result execute(F ...)(const string testName, void function(F) testFunction,
+Result execute(F...)(const string testName, void function(F) testFunction,
                       string[] filenames)
 {
     version(verboseTest)
