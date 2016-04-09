@@ -862,7 +862,7 @@ unittest
     auto constructor = new Constructor;
     constructor.addConstructorScalar!constructMyStructScalar("!mystruct");
     loader.constructor = constructor;
-    Node node = loader.load();
+    Node node = loader.loadAll().front;
 
     assert(node.as!MyStruct == MyStruct(1, 2, 3));
 }
@@ -874,7 +874,7 @@ unittest
     auto constructor = new Constructor;
     constructor.addConstructorSequence!constructMyStructSequence("!mystruct");
     loader.constructor = constructor;
-    Node node = loader.load();
+    Node node = loader.loadAll().front;
 
     assert(node.as!MyStruct == MyStruct(1, 2, 3));
 }
@@ -886,7 +886,7 @@ unittest
     auto constructor = new Constructor;
     constructor.addConstructorMapping!constructMyStructMapping("!mystruct");
     loader.constructor = constructor;
-    Node node = loader.load();
+    Node node = loader.loadAll().front;
 
     assert(node.as!MyStruct == MyStruct(1, 2, 3));
 }

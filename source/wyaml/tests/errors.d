@@ -68,20 +68,6 @@ void testLoaderErrorFilename(string errorFilename)
     assert(false, "testLoaderErrorSingle(" ~ errorFilename ~ ") Expected an exception");
 }
 
-/// Loader error unittest loading a single document from a file.
-///
-/// Params:  errorFilename = File name to read from.
-void testLoaderErrorSingle(string errorFilename)
-{
-    try { auto nodes = Loader(readText!(char[])(errorFilename)).load(); }
-    catch(Exception e)
-    {
-        version(verboseTest) { writeln(typeid(e).toString(), "\n", e); }
-        return;
-    }
-    assert(false, "Expected an exception");
-}
-
 
 unittest
 {
@@ -89,7 +75,6 @@ unittest
     run("testLoaderError",         &testLoaderError,         ["loader-error"]);
     run("testLoaderErrorString",   &testLoaderErrorString,   ["loader-error"]);
     run("testLoaderErrorFilename", &testLoaderErrorFilename, ["loader-error"]);
-    run("testLoaderErrorSingle",   &testLoaderErrorSingle,   ["single-loader-error"]);
 }
 
 } // version(unittest)

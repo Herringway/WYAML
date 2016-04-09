@@ -106,27 +106,6 @@ final class Composer
             return composeDocument();
         }
 
-        ///Get single YAML document, throwing if there is more than one document.
-        Node getSingleNode() @trusted
-        {
-            assert(!parser_.checkEvent(EventID.StreamEnd),
-                   "Trying to get a node from Composer when there is no node to "
-                   "get. use checkNode() to determine if there is a node.");
-
-            Node document = composeDocument();
-
-            //Ensure that the stream contains no more documents.
-            enforce(parser_.checkEvent(EventID.StreamEnd),
-                    new ComposerException("Expected single document in the stream, "
-                                          "but found another document.",
-                                          parser_.getEvent().startMark));
-
-            //Drop the STREAM-END event.
-            parser_.getEvent();
-
-            return document;
-        }
-
     private:
         ///Ensure that appenders for specified nesting levels exist.
         ///

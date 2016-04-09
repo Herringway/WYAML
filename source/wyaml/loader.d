@@ -7,7 +7,7 @@
 /// Class used to load YAML documents.
 module wyaml.loader;
 
-
+import std.array;
 import std.exception;
 import std.string;
 
@@ -172,36 +172,12 @@ struct Loader
 
         /** Load single YAML document.
          *
-         * If none or more than one YAML document is found, this throws a YAMLException.
-         *
-         * This can only be called once; this is enforced by contract.
-         *
          * Returns: Root node of the document.
          *
-         * Throws:  YAMLException if there wasn't exactly one document
-         *          or on a YAML parsing error.
+         * Throws:  YAMLException if there was a YAML parsing error.
          */
-        Node load() @safe
-        in
-        {
-            assert(!done_, "Loader: Trying to load YAML twice");
-        }
-        body
-        {
-            try
-            {
-                lazyInitConstructorResolver();
-                scope(exit) { done_ = true; }
-                auto composer = new Composer(parser_, resolver_, constructor_);
-                enforce(composer.checkNode(), new YAMLException("No YAML document to load"));
-                return composer.getSingleNode();
-            }
-            catch(YAMLException e)
-            {
-                e.msg = "Unable to load YAML from %s : %s"
-                                        .format(name_, e.msg);
-                throw e;
-            }
+        Node load() @safe {
+            return loadAll().front;
         }
 
         /** Load all YAML documents.
@@ -339,7 +315,7 @@ unittest
                         "green: '#00ff00'\n"
                         "blue:  '#0000ff'".dup;
 
-    auto colors = Loader(yaml_input).load();
+    auto colors = Loader(yaml_input).loadAll().front;
     assert(colors["red"] == "#ff0000");
     assert(colors["green"] == "#00ff00");
     assert(colors["blue"] == "#0000ff");

@@ -25,7 +25,7 @@ void testUnicodeInput(string unicodeFilename)
     auto data     = readText(unicodeFilename);
     auto expected = data.split().join(" ");
 
-    Node output = Loader(data).load();
+    Node output = Loader(data).loadAll().front;
     assert(output.as!string == expected);
 }
 
