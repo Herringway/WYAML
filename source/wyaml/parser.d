@@ -102,6 +102,9 @@ class ParserException : MarkedYAMLException
 {
     mixin MarkedExceptionCtors;
 }
+///Default tag handle shortcuts and replacements.
+private alias defaultTagDirectives_ =
+    AliasSeq!(TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:"));
 
 /// Generates events from tokens provided by a Scanner.
 ///
@@ -112,10 +115,6 @@ class ParserException : MarkedYAMLException
 final class Parser
 {
     private:
-        ///Default tag handle shortcuts and replacements.
-        alias defaultTagDirectives_ =
-            AliasSeq!(TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:"));
-
         ///Scanner providing YAML tokens.
         Scanner scanner_;
 
