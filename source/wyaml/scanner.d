@@ -21,7 +21,7 @@ import std.meta;
 import std.range;
 import std.string;
 import std.typecons;
-import std.traits : Unqual;
+import std.traits : Unqual, isArray;
 import std.utf;
 
 import wyaml.escapes;

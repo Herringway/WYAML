@@ -13,6 +13,7 @@ version(unittest)
 import wyaml.tests.common;
 import wyaml.reader;
 import std.algorithm;
+import std.file;
 
 
 // Try reading entire file through Reader, expecting an error (the file is invalid).
@@ -22,7 +23,7 @@ void testStreamError(string fileName)
 {
     try
     {
-        auto reader = new Reader(cast(string)std.file.read(fileName));
+        auto reader = new Reader(cast(string)read(fileName));
         while(!reader.empty) { reader.popFront(); }
         //assert(false, "Expected an exception: "~fileName);
     }
