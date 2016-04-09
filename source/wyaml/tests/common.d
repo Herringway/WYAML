@@ -75,7 +75,7 @@ void writeComparison(T)(T expected, T actual) {
         writeln(actual.debugString);
     }
 }
-T readText(T = char[])(string path) out(result) {
+T readText(T = string)(string path) out(result) {
     validate(result);
 } body {
     import std.range;

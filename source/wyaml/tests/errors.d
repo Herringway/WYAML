@@ -21,7 +21,7 @@ import wyaml.tests.common;
 void testLoaderError(string errorFilename)
 {
     try {
-        char[] buffer = readText!(char[])(errorFilename);
+        auto buffer = readText(errorFilename);
 
         Node[] nodes;
         nodes = Loader(buffer).loadAll().array;
@@ -43,7 +43,7 @@ void testLoaderErrorString(string errorFilename)
 
     try
     {
-        auto buffer = readText!(char[])(errorFilename);
+        auto buffer = readText(errorFilename);
         auto nodes = Loader(buffer).loadAll().array;
     }
     catch(Exception e)
@@ -59,7 +59,7 @@ void testLoaderErrorString(string errorFilename)
 /// Params:  errorFilename = File name to read from.
 void testLoaderErrorFilename(string errorFilename)
 {
-    try { auto nodes = Loader(readText!(char[])(errorFilename)).loadAll().array; }
+    try { auto nodes = Loader(readText(errorFilename)).loadAll().array; }
     catch(Exception e)
     {
         version(verboseTest) { writeln(typeid(e).toString(), "\n", e); }

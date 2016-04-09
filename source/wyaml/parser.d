@@ -527,12 +527,12 @@ final class Parser
         /// Handle escape sequences in a double quoted scalar.
         ///
         /// Moved here from scanner as it can't always be done in-place with slices.
-        string handleDoubleQuotedScalarEscapes(char[] tokenValue)
+        string handleDoubleQuotedScalarEscapes(string tokenValue)
         {
             string notInPlace;
             bool inEscape = false;
-            auto appender = appender!(char[])();
-            for(char[] oldValue = tokenValue; !oldValue.empty();)
+            auto appender = appender!(string)();
+            for(string oldValue = tokenValue; !oldValue.empty();)
             {
                 const dchar c = oldValue.front();
                 oldValue.popFront();
@@ -582,7 +582,7 @@ final class Parser
 
                     const hexLength = wyaml.escapes.escapeHexLength(c);
                     // Any hex digits are 1-byte so this works.
-                    char[] hex = oldValue[0 .. hexLength];
+                    string hex = oldValue[0 .. hexLength];
                     oldValue = oldValue[hexLength .. $];
                     assert(!hex.canFind!(d => !d.isHexDigit),
                             "Scanner must ensure the hex string is valid");

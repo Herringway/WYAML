@@ -22,7 +22,7 @@ import wyaml.tests.common;
 /// Params:  unicodeFilename = File name to read from.
 void testUnicodeInput(string unicodeFilename)
 {
-    auto data     = readText!(char[])(unicodeFilename);
+    auto data     = readText(unicodeFilename);
     auto expected = data.split().join(" ");
 
     Node output = Loader(data).load();

@@ -531,10 +531,10 @@ ubyte[] constructBinary(ref Node node)
 }
 unittest
 {
-    ubyte[] test = cast(ubyte[])"The Answer: 42";
+    immutable(ubyte)[] test = "The Answer: 42".representation;
     char[] buffer;
     buffer.length = 256;
-    string input = cast(string)Base64.encode(test, buffer);
+    string input = Base64.encode(test, buffer).idup;
     auto node = Node(input);
     auto value = constructBinary(node);
     assert(value == test);
@@ -857,7 +857,7 @@ MyStruct constructMyStructMapping(ref Node node)
 
 unittest
 {
-    char[] data = "!mystruct 1:2:3".dup;
+    string data = "!mystruct 1:2:3";
     auto loader = Loader(data);
     auto constructor = new Constructor;
     constructor.addConstructorScalar!constructMyStructScalar("!mystruct");
@@ -869,7 +869,7 @@ unittest
 
 unittest
 {
-    char[] data = "!mystruct [1, 2, 3]".dup;
+    string data = "!mystruct [1, 2, 3]";
     auto loader = Loader(data);
     auto constructor = new Constructor;
     constructor.addConstructorSequence!constructMyStructSequence("!mystruct");
@@ -881,7 +881,7 @@ unittest
 
 unittest
 {
-    char[] data = "!mystruct {x: 1, y: 2, z: 3}".dup;
+    string data = "!mystruct {x: 1, y: 2, z: 3}";
     auto loader = Loader(data);
     auto constructor = new Constructor;
     constructor.addConstructorMapping!constructMyStructMapping("!mystruct");

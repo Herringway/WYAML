@@ -51,7 +51,7 @@ void testTokens(string dataFilename, string tokensFilename)
         version(verboseTest) {writeln("tokens1: ", tokens1, "\ntokens2: ", tokens2);}
     }
 
-    auto loader = Loader(readText!(char[])(dataFilename));
+    auto loader = Loader(readText(dataFilename));
     foreach(token; loader.scan())
     {
         if(token.id != TokenID.StreamStart && token.id != TokenID.StreamEnd)
@@ -78,7 +78,7 @@ void testScanner(string dataFilename, string canonicalFilename)
         {
             version(verboseTest) {writeln(tokens);}
         }
-        auto loader = Loader(readText!(char[])(filename));
+        auto loader = Loader(readText(filename));
         foreach(ref token; loader.scan()){tokens ~= to!string(token.id);}
     }
 }

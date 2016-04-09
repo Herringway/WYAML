@@ -10,6 +10,7 @@ module wyaml.tests.resolver;
 version(unittest)
 {
 
+import std.array;
 import std.string;
 
 import wyaml.tests.common;
@@ -23,7 +24,7 @@ import wyaml.tests.common;
  */
 void testImplicitResolver(string dataFilename, string detectFilename)
 {
-    char[] correctTag;
+    string correctTag;
     Node node;
 
     scope(failure)
@@ -36,7 +37,7 @@ void testImplicitResolver(string dataFilename, string detectFilename)
     }
 
     correctTag = readText(detectFilename).strip();
-    node = Loader(readText!(char[])(dataFilename)).load();
+    node = Loader(readText(dataFilename)).loadAll().front;
     assert(node.isSequence);
     foreach(ref Node scalar; node)
     {

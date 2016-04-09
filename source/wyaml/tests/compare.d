@@ -20,8 +20,8 @@ import wyaml.token;
 ///          canonicalFilename = Another file to parse, in canonical YAML format.
 void testParser(string dataFilename, string canonicalFilename)
 {
-    auto dataEvents = Loader(readText!(char[])(dataFilename)).parse();
-    auto canonicalEvents = Loader(readText!(char[])(canonicalFilename)).parse();
+    auto dataEvents = Loader(readText(dataFilename)).parse();
+    auto canonicalEvents = Loader(readText(canonicalFilename)).parse();
 
     foreach(test, canon; lockstep(dataEvents, canonicalEvents, StoppingPolicy.requireSameLength))
     {
@@ -37,8 +37,8 @@ void testParser(string dataFilename, string canonicalFilename)
 ///          canonicalFilename = Another file to load, in canonical YAML format.
 void testLoader(string dataFilename, string canonicalFilename)
 {
-    auto data = Loader(readText!(char[])(dataFilename)).loadAll();
-    auto canonical = Loader(readText!(char[])(canonicalFilename)).loadAll();
+    auto data = Loader(readText(dataFilename)).loadAll();
+    auto canonical = Loader(readText(canonicalFilename)).loadAll();
 
     foreach(test, canon; lockstep(data, canonical, StoppingPolicy.requireSameLength))
     {

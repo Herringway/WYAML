@@ -22,7 +22,7 @@ void testStreamError(string fileName)
 {
     try
     {
-        auto reader = new Reader(cast(char[])std.file.read(fileName));
+        auto reader = new Reader(cast(string)std.file.read(fileName));
         while(!reader.empty) { reader.popFront(); }
         //assert(false, "Expected an exception: "~fileName);
     }

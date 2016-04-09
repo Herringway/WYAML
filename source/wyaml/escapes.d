@@ -20,11 +20,11 @@ immutable dchar[dchar] toEscapes;
 alias escapeSeqs = AliasSeq!('0', 'a', 'b', 't', '\t', 'n', 'v', 'f', 'r', 'e', ' ',
                              '\"', '\\', 'N', '_', 'L', 'P');
 /// All YAML escapes.
-immutable dchar[] escapes = [escapeSeqs];
+immutable dstring escapes = [escapeSeqs];
 
 alias escapeHexSeq = AliasSeq!('x', 'u', 'U');
 /// YAML hex codes specifying the length of the hex number.
-immutable dchar[] escapeHexCodeList = [escapeHexSeq];
+immutable dstring escapeHexCodeList = [escapeHexSeq];
 
 /// Covert a YAML escape to a dchar.
 ///

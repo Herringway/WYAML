@@ -837,7 +837,7 @@ final class Scanner
 
             // Index where tag handle ends and suffix starts in a tag directive value.
             uint tagHandleEnd = uint.max;
-            dchar[] value;
+            dstring value;
             if(name == "YAML")     { value = reader_.popYAMLDirectiveValue(); }
             else if(name == "TAG") { value = reader_.popTagDirectiveValue(tagHandleEnd); }
 
@@ -853,7 +853,7 @@ final class Scanner
             }
 
             reader_.skipDirectiveIgnoredLine();
-            return directiveToken(startMark, endMark, value.toUTF8.dup, directive, tagHandleEnd);
+            return directiveToken(startMark, endMark, value.toUTF8, directive, tagHandleEnd);
         }
 
 
@@ -874,17 +874,17 @@ final class Scanner
             const dchar i = reader_.front;
             reader_.popFront();
 
-            char[] value;
-            if(i == '*') { value = reader_.popAlphaNumeric("an alias").toUTF8.dup; }
-            else         { value = reader_.popAlphaNumeric("an anchor").toUTF8.dup; }
+            dstring value;
+            if(i == '*') { value = reader_.popAlphaNumeric("an alias"); }
+            else         { value = reader_.popAlphaNumeric("an anchor"); }
 
 
             enforce(reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", "alphanumeric, '-' or '_'", reader_.front));
             switch(id) {
                 case TokenID.Alias:
-                    return aliasToken(startMark, reader_.mark, value);
+                    return aliasToken(startMark, reader_.mark, value.toUTF8);
                 case TokenID.Anchor:
-                    return anchorToken(startMark, reader_.mark, value);
+                    return anchorToken(startMark, reader_.mark, value.toUTF8);
                 default:
                     assert(false, "Invalid token reached");
             }
@@ -895,7 +895,7 @@ final class Scanner
         {
             const startMark = reader_.mark;
             dchar c = reader_.save().drop(1).front;
-            dchar[] slice;
+            dstring slice;
             uint handleEnd;
 
             if(c == '<')
@@ -946,7 +946,7 @@ final class Scanner
 
             enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("tag", "' '", reader_.front));
 
-            return tagToken(startMark, reader_.mark, slice.toUTF8.dup, handleEnd);
+            return tagToken(startMark, reader_.mark, slice.toUTF8, handleEnd);
         }
 
         /// Scan a block scalar token with specified style.
@@ -965,8 +965,8 @@ final class Scanner
             // Determine the indentation level and go to the first non-empty line.
             uint indent = max(1, indent_ + 1);
 
-            dchar[] slice;
-            dchar[] newSlice;
+            dstring slice;
+            dstring newSlice;
             // Read the first indentation/line breaks before the scalar.
             size_t startLen = 0;
             if(increment == int.min)
@@ -1049,7 +1049,7 @@ final class Scanner
                 }
             }
 
-            return scalarToken(startMark, endMark, slice.toUTF8.dup, style);
+            return scalarToken(startMark, endMark, slice.toUTF8, style);
         }
 
 
@@ -1060,7 +1060,7 @@ final class Scanner
             const quote     = reader_.front;
             reader_.popFront();
 
-            dchar[] slice = reader_.popFlowScalarNonSpaces(quotes);
+            dstring slice = reader_.popFlowScalarNonSpaces(quotes);
 
             while(!reader_.empty && reader_.front != quote)
             {
@@ -1070,7 +1070,7 @@ final class Scanner
             enforce (!reader_.empty, new UnexpectedSequenceException("quoted flow scalar", "EOF"));
             reader_.popFront();
 
-            return scalarToken(startMark, reader_.mark, slice.toUTF8.dup, quotes);
+            return scalarToken(startMark, reader_.mark, slice.toUTF8, quotes);
         }
 
 
@@ -1087,8 +1087,8 @@ final class Scanner
             // document separators at the beginning of the line.
             // if(indent == 0) { indent = 1; }
 
-            dchar[] slice;
-            dchar[] newSlice;
+            dstring slice;
+            dstring newSlice;
             // Stop at a comment.
             while(!reader_.empty && reader_.front != '#')
             {
@@ -1111,7 +1111,7 @@ final class Scanner
                 }
             }
 
-            return scalarToken(startMark, endMark, slice.toUTF8.dup, ScalarStyle.Plain);
+            return scalarToken(startMark, endMark, slice.toUTF8, ScalarStyle.Plain);
         }
 }
 auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
@@ -1245,7 +1245,7 @@ auto popDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elemen
 /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
 auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    dchar[] output;
+    dstring output;
     reader.skipToNextNonSpace();
 
     output ~= reader.popYAMLDirectiveNumber();
@@ -1289,7 +1289,7 @@ auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(
 /// Returns: Length of tag handle (which is before tag prefix) in scanned data
 auto popTagDirectiveValue(T)(ref T reader, out uint handleLength) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    dchar[] output;
+    dstring output;
     reader.skipToNextNonSpace();
     output ~= reader.popTagDirectiveHandle();
     handleLength = cast(uint)(output.length);
@@ -1446,14 +1446,14 @@ void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqu
 
 @safe pure unittest { //ADD MORE
     auto str = "";
-    //assertThrown(str.skipBlockScalarIgnoredLine());
+    assertThrown(str.skipBlockScalarIgnoredLine());
     str = "\n";
     assertNotThrown(str.skipBlockScalarIgnoredLine());
 }
 /// Scan indentation in a block scalar, returning line breaks and max indent.
 auto popBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    dchar[] output;
+    dstring output;
     while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
     {
         if(reader.front != ' ')
@@ -1476,7 +1476,7 @@ auto popBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwar
 /// Scan line breaks at lower or specified indentation in a block scalar.
 auto popBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    dchar[] output;
+    dstring output;
 
     while(!reader.empty)
     {
@@ -1494,7 +1494,7 @@ auto popBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRange
 /// Scan nonspace characters in a flow scalar.
 auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    dchar[] output;
+    dstring output;
     for(;;) with(ScalarStyle)
     {
         dchar c = void;
@@ -1560,16 +1560,10 @@ auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFor
 /// Scan space characters in a flow scalar.
 auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    dchar[] output;
-    dchar[] whitespaces;
-    enforce(!reader.empty, new UnexpectedSequenceException("quoted scalar", "end of stream"));
-    while(reader.front.among!(whiteSpaces)) {
-        whitespaces ~= reader.front;
-        reader.popFront();
-    }
-
-    enforce(!reader.empty, new UnexpectedSequenceException("quoted scalar", "end of stream"));
-    const c = reader.front;
+    dstring output;
+    dstring whitespaces = reader.until!(x => !x.among!whiteSpaces).array;
+    static if (isArray!T)
+        reader.popFrontN(whitespaces.length);
 
     // Spaces not followed by a line break.
     if(!c.among!(newLines))
@@ -1610,12 +1604,12 @@ auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Ele
     assert(str == "a");
 }
 /// Scan line breaks in a flow scalar.
-dchar[] popFlowScalarBreaks(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dstring popFlowScalarBreaks(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
     bool waste;
     return reader.popFlowScalarBreaks(waste);
 }
 auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
-    dchar[] output;
+    dstring output;
     for(;;)
     {
         // Instead of checking indentation, we check for document separators.
@@ -1654,12 +1648,12 @@ bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar
 /// Scan spaces in a plain scalar.
 auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    dchar[] output;
+    dstring output;
     // The specification is really confusing about tabs in plain scalars.
     // We just forbid them completely. Do not use tabs in YAML!
 
     // Get as many plain spaces as there are.
-    dchar[] whitespaces;
+    dstring whitespaces;
     while(!reader.empty && reader.front == ' ') {
         whitespaces ~= reader.front;
         reader.popFront();
@@ -1740,7 +1734,7 @@ auto popTagHandle(T)(ref T reader, string name = "tag handle")
 /// Scan URI in a tag token.
 auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))  {
     // Note: we do not check if URI is well-formed.
-    dchar[] output;
+    dstring output;
     while(!reader.empty && (reader.front.isAlphaNum || reader.front.among!(miscValidURIChars))) {
         if(reader.front == '%')
             output ~= reader.popURIEscapes(name);
@@ -1761,9 +1755,9 @@ auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Un
     assert(str.popTagURI() == "http://example.com/ ");
 }
 /// Scan URI escape sequences.
-dchar[] popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
     import std.uri : decodeComponent;
-    dchar[] uriBuf;
+    dstring uriBuf;
     while(!reader.empty && reader.front == '%') {
         reader.popFront();
         uriBuf ~= '%';
@@ -1774,7 +1768,7 @@ dchar[] popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRa
             throw new UnexpectedTokenException(name, "URI escape sequence with two hexadecimal numbers", nextTwo.until!(x => x.isHexDigit).front);
         uriBuf ~= nextTwo;
     }
-    return decodeComponent(uriBuf).to!(dchar[]);
+    return decodeComponent(uriBuf).to!(dstring);
 }
 /*@safe pure*/ unittest {
     //it's a space!

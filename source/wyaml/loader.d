@@ -54,7 +54,7 @@ import wyaml.token;
  *
  * Load YAML from a string:
  * --------------------
- * char[] yaml_input = "red:   '#ff0000'\n"
+ * string yaml_input = "red:   '#ff0000'\n"
  *                     "green: '#00ff00'\n"
  *                     "blue:  '#0000ff'".dup;
  *
@@ -136,7 +136,7 @@ struct Loader
          *
          * Throws:  YAMLException if yamlData contains data illegal in YAML.
          */
-        this(char[] yamlData) @safe
+        this(string yamlData) @safe
         {
             try
             {
@@ -335,7 +335,7 @@ struct Loader
 
 unittest
 {
-    char[] yaml_input = "red:   '#ff0000'\n"
+    string yaml_input = "red:   '#ff0000'\n"
                         "green: '#00ff00'\n"
                         "blue:  '#0000ff'".dup;
 
@@ -347,5 +347,5 @@ unittest
 
 unittest
 {
-    assert(Loader(cast(char[])"42").load().as!int == 42);
+    assert(Loader("42").loadAll().front.as!int == 42);
 }
