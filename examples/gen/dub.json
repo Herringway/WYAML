@@ -1,0 +1,10 @@
+{
+    "name": "gen",
+    "targetType": "executable",
+    "sourceFiles": ["gen.d"],
+    "mainSourceFile": "gen.d",
+    "dependencies":
+    {
+        "wyaml": "*"
+    }
+}
