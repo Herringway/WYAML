@@ -1,0 +1,10 @@
+{
+    "name": "bench",
+    "targetType": "executable",
+    "sourceFiles": ["bench.d"],
+    "mainSourceFile": "bench.d",
+    "dependencies":
+    {
+        "wyaml": "*"
+    }
+}
