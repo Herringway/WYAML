@@ -77,6 +77,9 @@ class UnexpectedTokenException : YAMLException {
     this(string context, string expected, dchar got, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super("Expected %s in %s, got %s".format(expected, context, got), file, line);
     }
+    this(string context, string expected, in dchar[] got, string file = __FILE__, size_t line = __LINE__) @safe pure {
+        super("Expected %s in %s, got %s".format(expected, context, got), file, line);
+    }
     this(string context, string expected, string file = __FILE__, size_t line = __LINE__) @safe pure {
         super("Expected %s in %s, got end of range".format(expected, context), file, line);
     }
@@ -815,8 +818,7 @@ final class Scanner
             for(;;)
             {
                 reader_.skipToNextNonSpace();
-                if (reader_.empty) break;
-                if(reader_.front == '#') { reader_.popToNextBreak(); }
+                if(reader_.startsWith('#')) { reader_.popToNextBreak(); }
                 if(reader_.popLineBreak() != '\0')
                 {
                     if(flowLevel_ == 0) { allowSimpleKey_ = true; }
@@ -1093,7 +1095,7 @@ final class Scanner
             dstring slice;
             dstring newSlice;
             // Stop at a comment.
-            while(!reader_.empty && reader_.front != '#')
+            while(!reader_.startsWith('#'))
             {
                 // Scan the entire plain scalar.
                 auto l = reader_.popScalar(flowLevel_);
@@ -1347,8 +1349,8 @@ void skipDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual
     reader.skipToNextNonSpace();
     if (reader.empty)
         return;
-    if(reader.front == '#') { reader.popToNextBreak(); }
-    enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader.front));
+    if(reader.startsWith('#')) { reader.popToNextBreak(); }
+    enforce(reader.startsWith(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader.front));
     reader.popLineBreak();
 }
 @safe pure unittest { //ADD MORE
@@ -1447,7 +1449,7 @@ void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqu
 {
     reader.skipToNextNonSpace();
     enforce(!reader.empty, new UnexpectedTokenException("block scalar", "comment or line break"));
-    if(reader.front == '#') { reader.popToNextBreak(); }
+    if(reader.startsWith('#')) { reader.popToNextBreak(); }
 
     enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader.front));
 
@@ -1465,7 +1467,7 @@ void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqu
 auto popBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dstring output;
-    while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
+    while(reader.startsWith(newLinesPlusSpaces))
     {
         if(reader.front != ' ')
         {
@@ -1491,7 +1493,7 @@ auto popBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRange
 
     while(!reader.empty)
     {
-        while(!reader.empty && reader.column < indent && reader.front == ' ') { reader.popFront(); }
+        while(reader.startsWith(' ') && reader.column < indent) { reader.popFront(); }
         if(!reader.front.among!(newLines))  { break; }
         output ~= reader.popLineBreak();
     }
@@ -1508,54 +1510,58 @@ auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFor
     dstring output;
     for(;;) with(ScalarStyle)
     {
-        dchar c = void;
+        auto buf = reader.until!(x => x.among!(allWhiteSpacePlusQuotesAndSlashes)).array;
 
-        output ~= reader.until!(x => x.among!(allWhiteSpacePlusQuotesAndSlashes)).array;
-        if (reader.empty)
-            break;
-        c = reader.front;
-        if(quotes == SingleQuoted && c == '\'' && !reader.save().drop(1).empty && reader.save().drop(1).front == '\'')
+        static if (isArray!T)
+            reader.popFrontN(buf.length);
+
+        output ~= buf;
+        if(quotes == SingleQuoted && reader.startsWith('\'') && reader.save().drop(1).startsWith('\''))
         {
             reader.popFrontN(2);
             output ~= '\'';
         }
-        else if((quotes == DoubleQuoted && c == '\'') ||
-                (quotes == SingleQuoted && c.among!('"', '\\')))
+        else if((quotes == DoubleQuoted && reader.startsWith('\'')) ||
+                (quotes == SingleQuoted && reader.startsWith('"', '\\')))
         {
+            output ~= reader.front;
             reader.popFront();
-            output ~= c;
         }
-        else if(quotes == DoubleQuoted && c == '\\')
+        else if(quotes == DoubleQuoted && reader.startsWith('\\'))
         {
             reader.popFront();
-            c = reader.front;
-            if(c.among!(wyaml.escapes.escapeSeqs))
+            if(reader.startsWith(wyaml.escapes.escapeSeqs))
             {
+                output ~= ['\\', reader.front];
                 reader.popFront();
-                output ~= ['\\', c];
             }
-            else if(c.among!(wyaml.escapes.escapeHexSeq))
+            else if(reader.startsWith(wyaml.escapes.escapeHexSeq))
             {
-                const hexLength = wyaml.escapes.escapeHexLength(c);
+                const hexLength = wyaml.escapes.escapeHexLength(reader.front);
+                output ~= '\\';
+                output ~= reader.front;
                 reader.popFront();
 
                 auto v = reader.take(hexLength);
                 auto hex = v.save().array;
-                enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", "escape sequence of hexadecimal numbers", v.until!(x => x.isHexDigit).front));
+                enforce(hex.length == hexLength, new UnexpectedTokenException("double quoted scalar", "escape sequence of "~hexLength.text~" hexadecimal numbers"));
+                enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", "escape sequence of hexadecimal numbers", hex));
 
-                output ~= '\\';
-                output ~= c;
                 output ~= hex;
-                parse!int(hex, 16u);
+                static if (isArray!T)
+                    reader.popFrontN(hexLength);
             }
-            else if(c.among!(newLines))
+            else if(reader.startsWith(newLines))
             {
                 reader.popLineBreak();
                 output ~= reader.popFlowScalarBreaks();
             }
+            else if (reader.empty) {
+                throw new UnexpectedTokenException("double quoted scalar", "valid escape character");
+            }
             else
             {
-                throw new UnexpectedTokenException("double quoted scalar", "valid escape character", c);
+                throw new UnexpectedTokenException("double quoted scalar", "valid escape character", reader.front);
             }
         }
         else
@@ -1567,6 +1573,38 @@ auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFor
     auto str = "";
     assert(str.popFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == "");
     assert(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == "");
+    assert(str == "");
+
+    str = "'";
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == "");
+    assert(str == "'");
+    str = "'";
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == "'");
+    assert(str == "");
+
+    str = "aaa";
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == "aaa");
+    assert(str == "");
+    str = "aaa";
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == "aaa");
+    assert(str == "");
+
+    str = `\u4000`;
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == `\u4000`);
+    assert(str == "");
+    str = `\u4000`;
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == `\u4000`);
+    assert(str == "");
+
+    str = `\u400`;
+    assert(str.popFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == `\u400`);
+    assert(str == "");
+    str = `\u400`;
+    assertThrown(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted));
+    str = `\u40h0`;
+    assertThrown(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted));
+    str = `\u`;
+    assertThrown(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted));
 }
 /// Scan space characters in a flow scalar.
 auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
@@ -1577,7 +1615,7 @@ auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Ele
         reader.popFrontN(whitespaces.length);
 
     // Spaces not followed by a line break.
-    if(reader.empty || !reader.front.among!(newLines)) {
+    if(!reader.startsWith(newLines)) {
         return whitespaces;
     }
 
@@ -1632,7 +1670,7 @@ auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRan
         reader.until!(x => !x.among!whiteSpaces).walkLength;
 
         // Encountered a non-whitespace non-linebreak character, so we're done.
-        if (reader.empty || !reader.front.among!(newLines)) break;
+        if (!reader.startsWith(newLines)) break;
 
         const lineBreak = reader.popLineBreak();
         extraBreaks = true;
@@ -1674,42 +1712,31 @@ auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!
     // We just forbid them completely. Do not use tabs in YAML!
 
     // Get as many plain spaces as there are.
-    dstring whitespaces;
-    while(!reader.empty && reader.front == ' ') {
-        whitespaces ~= reader.front;
-        reader.popFront();
-    }
-    if (reader.empty)
-        return output;
-    dchar c = reader.front;
+    dstring whitespaces = reader.until!(x => x != ' ').array;
     // No newline after the spaces (if any)
-    if(!c.among!(newLines))
-    {
-        // We have spaces, but no newline.
-        if(whitespaces.length > 0) { output ~= whitespaces; }
-        return output;
-    }
+    if(!reader.startsWith(newLines))
+        return whitespaces;
 
     // Newline after the spaces (if any)
     const lineBreak = reader.popLineBreak();
     allowSimpleKey_ = true;
 
 
-    if(reader.end) { return output; }
+    if(reader.end)
+        return output;
 
     bool extraBreaks = false;
 
     if(lineBreak != '\n') { output ~= lineBreak; }
-    while(!reader.empty && reader.front.among!(newLinesPlusSpaces))
-    {
-        if(reader.front == ' ') { reader.popFront(); }
-        else
-        {
-            const lBreak = reader.popLineBreak();
+    while(reader.startsWith(newLinesPlusSpaces)) {
+        if(reader.startsWith(' ')) {
+            reader.popFront();
+        } else {
             extraBreaks  = true;
-            output ~= lBreak;
+            output ~= reader.popLineBreak();
 
-            if(reader.end) { return output; }
+            if(reader.end)
+                return output;
         }
     }
 
@@ -1794,7 +1821,7 @@ auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Un
 dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
     import std.uri : decodeComponent;
     dstring uriBuf;
-    while(!reader.empty && reader.front == '%') {
+    while(reader.startsWith('%')) {
         reader.popFront();
         uriBuf ~= '%';
         dstring nextTwo = reader.take(2).array;
@@ -1861,41 +1888,23 @@ dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRa
 ///   '\u2028'    :   '\u2028'
 ///   '\u2029     :   '\u2029'
 ///   no break    :   '\0'
-dchar popLineBreak(T)(ref T reader_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
-    // Fast path for ASCII line breaks.
-    if (reader_.empty)
-        return '\0';
-    const b = reader_.front;
-    if(b < 0x80)
-    {
-        if(b == '\n' || b == '\r')
-        {
-            if(reader_.save().startsWith("\r\n")) { reader_.popFrontN(2); }
-            else { reader_.popFront(); }
-            return '\n';
-        }
-        return '\0';
-    }
-
-    const c = reader_.front;
-    if(c == '\x85')
-    {
-        reader_.popFront();
+dchar popLineBreak(T)(ref T reader) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+    if(reader.startsWith("\r\n")) {
+        static if(isArray!T)
+            reader.popFront();
+        reader.popFront();
         return '\n';
     }
-    if(c == '\u2028' || c == '\u2029')
-    {
-        reader_.popFront();
-        return c;
+    switch (reader.startsWith('\r', '\n', '\x85', '\u2028', '\u2029')) {
+        case 1,2,3:
+            reader.popFront();
+            return '\n';
+        case 4,5:
+            scope(exit)
+                reader.popFront();
+            return reader.front;
+        default: return '\0';
     }
-    return '\0';
-    //switch(reader_.save().startsWith("\r\n", "\r", "\n", "\u0085", "\u2028"d, "\u2029"d)) {
-    //    default: return '\0';
-    //    case 1: reader_.popFrontN(2); return '\n';
-    //    case 2,3,4: reader_.popFront(); return '\n';
-    //    case 5: reader_.popFront(); return '\u2028';
-    //    case 6: reader_.popFront(); return '\u2029';
-    //}
 }
 @safe pure unittest {
     string str = "\r\n";
