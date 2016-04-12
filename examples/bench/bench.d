@@ -1,5 +1,5 @@
 
-module yaml_bench;
+module bench;
 //Benchmark that loads, and optionally extracts data from and/or emits a YAML file.
 
 import std.conv;
@@ -73,8 +73,8 @@ void main(string[] args)
     {
         import std.file;
         string fileInMemory;
+        StopWatch sw;
         if(!reload) { fileInMemory = std.file.readText!string(file); }
-        string fileWorkingCopy = fileInMemory.dup;
 
         // Instead of constructing a resolver/constructor with each Loader,
         // construct them once to remove noise when profiling.
@@ -86,20 +86,30 @@ void main(string[] args)
             // Loading the file rewrites the loaded buffer, so if we don't reload from
             // disk, we need to use a copy of the originally loaded file.
             if(reload) { fileInMemory = std.file.readText!string(file); }
-            else       { fileWorkingCopy = fileInMemory; }
-            string fileToLoad = reload ? fileInMemory : fileWorkingCopy;
-            auto loader        = Loader(fileToLoad);
+            sw.start();
+            auto loader        = Loader(fileInMemory);
             loader.resolver    = resolver;
             loader.constructor = constructor;
             auto nodes = loader.loadAll();
+            sw.stop();
+            writeln("Run ", runs, ": Loading completed after ", cast(Duration)sw.peek());
+            sw.reset();
             if(dump)
             {
+                sw.start();
                 OutBuffer buf;
                 dumper(buf).dump(nodes);
+                sw.stop();
+                writeln("Run ", runs, ": Dumping completed after ", cast(Duration)sw.peek());
+                sw.reset();
             }
             if(get) foreach(ref node; nodes)
             {
+                sw.start();
                 extract(node);
+                sw.stop();
+                writeln("Run ", runs, ": Extraction completed after ", cast(Duration)sw.peek());
+                sw.reset();
             }
         }
     }
