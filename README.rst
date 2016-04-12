@@ -2,8 +2,8 @@
 WYAML
 ==========
 
-.. image:: https://travis-ci.org/Herringway/WYAML.svg?branch=master
-.. image:: https://img.shields.io/coveralls/wyaml/wyaml.svg
+.. image:: https://travis-ci.org/Herringway/WYAML.svg?branch=master :target: https://travis-ci.org/Herringway/WYAML
+.. image:: https://coveralls.io/repos/github/Herringway/WYAML/badge.svg?branch=master :target: https://coveralls.io/github/Herringway/WYAML?branch=master
 
 ------------
 Introduction
