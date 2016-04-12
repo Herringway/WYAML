@@ -1,31 +1,17 @@
 ==========
-D:YAML 0.5
+WYAML
 ==========
 
-.. image:: https://travis-ci.org/kiith-sa/D-YAML.svg?branch=master
-.. image:: https://raw.githubusercontent.com/kiith-sa/D-YAML/master/code.dlang.org-shield.png
-   :target: http://code.dlang.org
-
-**Note**: D:YAML 0.5 brings some **breaking changes**. See the
-`changelog <https://github.com/kiith-sa/D-YAML/blob/master/CHANGES.rst>`_.
+.. image:: https://travis-ci.org/Herringway/WYAML.svg?branch=master
+.. image:: https://img.shields.io/coveralls/wyaml/wyaml.svg
 
 ------------
 Introduction
 ------------
 
-D:YAML is an open source YAML parser and emitter library for the D programming
-language.  It is
-(`almost <https://github.com/kiith-sa/D-YAML/wiki/Differences-between-D:YAML-and-the-YAML-specification>`_)
-compliant to the YAML 1.1 specification. D:YAML is based on
-`PyYAML <http://www.pyyaml.org>`_ created by Kirill Simonov. 
-
-D:YAML is designed to be easy to use while supporting the full feature set of
-YAML. To start using it in your project, see the
-`Getting Started <https://github.com/kiith-sa/D-YAML/wiki/Getting-Started>`_
-tutorial and the `documentation <http://defenestrate.eu/docs/dyaml/>`_.
-
-D:YAML is still a work in progress. Its API is not stable and there might be
-compatibility breaking changes.
+WYAML is an open-source range-based YAML parser and emitter. It is a fork of
+`D:YAML <https://github.com/kiith-sa/D-YAML>`. It is nearly YAML 1.1-compliant,
+with a few minor deviations from the spec.
 
 
 --------
