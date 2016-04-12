@@ -1128,23 +1128,22 @@ auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unq
             ++length;
             if (savedReader.empty)
                 break;
-            const cNext = savedReader.front;
-            c = cNext;
+            c = savedReader.front;
         }
     }
     else {
+        auto readerCopy = reader.save();
         for(;;)
         {
-            c = reader.save().drop(length).front;
-            if(c.among!(allWhiteSpace, ',', ':', '?', squareBrackets, curlyBraces))
+            if(readerCopy.front.among!(allWhiteSpace, ',', ':', '?', squareBrackets, curlyBraces))
             {
                 break;
             }
+            readerCopy.popFront();
             ++length;
         }
         // It's not clear what we should do with ':' in the flow context.
-        if(c == ':' && (reader.save().drop(length+1).empty ||
-               !reader.save().drop(length + 1).front.among!(allWhiteSpace, ',', squareBrackets, curlyBraces)))
+        if(readerCopy.front == ':' && (!readerCopy.drop(1).startsWith(allWhiteSpace, ',', squareBrackets, curlyBraces)))
         {
             throw new UnexpectedSequenceException("plain scalar", ":");
         }
@@ -1169,6 +1168,18 @@ auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unq
     test = ":";
     assert(test.popScalar(0) == "");
     assert(test == ":");
+
+    test = ": ";
+    assert(test.popScalar(0) == "");
+    assert(test == ": ");
+
+    test = "test: ";
+    assert(test.popScalar(0) == "test");
+    assert(test == ": ");
+
+    test = "yep,";
+    assert(test.popScalar(1) == "yep");
+    assert(test == ",");
 }
 /// Move to the next non-space character.
 void skipToNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
