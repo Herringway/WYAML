@@ -13,7 +13,6 @@ module wyaml.emitter;
 import std.algorithm;
 import std.array;
 import std.ascii;
-import std.container;
 import std.conv;
 import std.exception;
 import std.format;
@@ -88,7 +87,7 @@ struct Emitter(T)
         T stream_;
 
         ///Stack of states.
-        Array!(void delegate()) states_;
+        void delegate()[] states_;
         ///Current state.
         void delegate() state_;
 
@@ -98,7 +97,7 @@ struct Emitter(T)
         Event event_;
 
         ///Stack of previous indentation levels.
-        Array!int indents_;
+        int[] indents_;
         ///Current indentation level.
         int indent_ = -1;
 

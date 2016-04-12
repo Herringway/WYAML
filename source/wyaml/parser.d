@@ -13,7 +13,6 @@ module wyaml.parser;
 
 import std.algorithm;
 import std.array;
-import std.container;
 import std.conv;
 import std.exception;
 import std.meta;
@@ -127,9 +126,9 @@ final class Parser
         TagDirective[] tagDirectives_;
 
         ///Stack of states.
-        Array!(Event delegate()) states_;
+        Event delegate()[] states_;
         ///Stack of marks used to keep track of extents of e.g. YAML collections.
-        Array!Mark marks_;
+        Mark[] marks_;
 
         ///Current state.
         Event delegate() state_;
@@ -140,8 +139,6 @@ final class Parser
         {
             state_ = &parseStreamStart;
             scanner_ = scanner;
-            states_.reserve(32);
-            marks_.reserve(32);
         }
 
         /**
