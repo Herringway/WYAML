@@ -187,7 +187,7 @@ final class Scanner
         ///
         /// Returns: true if the next token is one of specified types, or if there are
         ///          any tokens left if no types specified, false otherwise.
-        bool checkToken(const TokenID[] ids ...) @safe
+        bool checkToken(const TokenID[] ids ...)
         {
             // Check if the next token is one of specified types.
             while(needMoreTokens()) { fetchToken(); }
@@ -209,7 +209,7 @@ final class Scanner
         /// Return the next token, but keep it in the queue.
         ///
         /// Must not be called if there are no tokens left.
-        ref const(Token) peekToken() @safe
+        ref const(Token) peekToken()
         {
             while(needMoreTokens) { fetchToken(); }
             if(!tokens_.empty)    { return tokens_.peek(); }
@@ -219,7 +219,7 @@ final class Scanner
         /// Return the next token, removing it from the queue.
         ///
         /// Must not be called if there are no tokens left.
-        Token getToken() @safe
+        Token getToken()
         {
             while(needMoreTokens){fetchToken();}
             if(!tokens_.empty)
@@ -243,7 +243,7 @@ final class Scanner
         }
 
         /// Fetch at token, adding it to tokens_.
-        void fetchToken() @safe
+        void fetchToken()
         {
             auto startMark = reader_.mark;
             try {
@@ -380,7 +380,7 @@ final class Scanner
         /// Decrease indentation, removing entries in indents_.
         ///
         /// Params:  column = Current column in the file/stream.
-        void unwindIndent(const int column) @trusted
+        void unwindIndent(const int column) @safe
         {
             if(flowLevel_ > 0)
             {
@@ -415,7 +415,7 @@ final class Scanner
         /// Params:  column = Current column in the file/stream.
         ///
         /// Returns: true if the indentation was increased, false otherwise.
-        bool addIndent(int column) @trusted
+        bool addIndent(int column) @safe
         {
             if(indent_ >= column){return false;}
             indents_ ~= indent_;
@@ -653,7 +653,7 @@ final class Scanner
         }
 
         /// Add block SCALAR token.
-        void fetchBlockScalar(ScalarStyle style)() @trusted
+        void fetchBlockScalar(ScalarStyle style)()
             if(style == ScalarStyle.Literal || style == ScalarStyle.Folded)
         {
             // Reset possible simple key on the current level.
@@ -820,7 +820,7 @@ final class Scanner
         }
 
         /// Scan directive token.
-        Token scanDirective() @trusted
+        Token scanDirective()
         {
             Mark startMark = reader_.mark;
             // Skip the '%'.
@@ -862,7 +862,7 @@ final class Scanner
         /// and
         ///   [ *alias , "value" ]
         /// Therefore we restrict aliases to ASCII alphanumeric characters.
-        Token scanAnchor(const TokenID id) @trusted
+        Token scanAnchor(const TokenID id) @safe
         {
             const startMark = reader_.mark;
             const dchar i = reader_.front;
@@ -885,7 +885,7 @@ final class Scanner
         }
 
         /// Scan a tag token.
-        Token scanTag() @trusted
+        Token scanTag()
         {
             const startMark = reader_.mark;
             dchar c = reader_.save().drop(1).front;
@@ -944,7 +944,7 @@ final class Scanner
         }
 
         /// Scan a block scalar token with specified style.
-        Token scanBlockScalar(const ScalarStyle style) @trusted
+        Token scanBlockScalar(const ScalarStyle style) @safe
         {
             const startMark = reader_.mark;
             // Scan the header.
@@ -1048,7 +1048,7 @@ final class Scanner
 
 
         /// Scan a quoted flow scalar token with specified quotes.
-        Token scanFlowScalar(const ScalarStyle quotes) @trusted
+        Token scanFlowScalar(const ScalarStyle quotes) @safe
         {
             const startMark = reader_.mark;
             const quote     = reader_.front;
@@ -1069,7 +1069,7 @@ final class Scanner
 
 
         /// Scan plain scalar token (no block, no quotes).
-        Token scanPlain() @trusted
+        Token scanPlain() @safe
         {
             // We keep track of the allowSimpleKey_ flag here.
             // Indentation rules are loosed for the flow context

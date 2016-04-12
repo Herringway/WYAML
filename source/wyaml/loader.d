@@ -136,7 +136,7 @@ struct Loader
          *
          * Throws:  YAMLException if yamlData contains data illegal in YAML.
          */
-        this(string yamlData) @safe
+        this(string yamlData)
         {
             try
             {
@@ -176,7 +176,7 @@ struct Loader
          *
          * Throws:  YAMLException if there was a YAML parsing error.
          */
-        Node load() @safe {
+        Node load() {
             return loadAll().front;
         }
 
@@ -192,7 +192,7 @@ struct Loader
          *
          * Throws:  YAMLException on a parsing error.
          */
-        Node[] loadAll() @trusted
+        auto loadAll()
         {
             Node[] nodes;
             foreach(ref node; this)
@@ -211,7 +211,7 @@ struct Loader
          *
          * Throws: YAMLException on a parsing error.
          */
-        int opApply(int delegate(ref Node) dg) @trusted
+        int opApply(int delegate(ref Node) dg)
         in
         {
             assert(!done_, "Loader: Trying to load YAML twice");
@@ -244,7 +244,7 @@ struct Loader
 
     package:
         // Scan and return all tokens. Used for debugging.
-        Token[] scan() @trusted
+        Token[] scan()
         {
             try
             {
@@ -265,7 +265,7 @@ struct Loader
         }
 
         // Scan all tokens, throwing them away. Used for benchmarking.
-        void scanBench() @safe
+        void scanBench()
         {
             try while(scanner_.checkToken())
             {

@@ -241,7 +241,7 @@ final class Parser
          */
 
         ///Parse stream start.
-        Event parseStreamStart() @safe
+        Event parseStreamStart()
         {
             const token = scanner_.getToken();
             state_ = &parseImplicitDocumentStart;
@@ -300,7 +300,7 @@ final class Parser
         }
 
         ///Parse document end (explicit or implicit).
-        Event parseDocumentEnd() @safe
+        Event parseDocumentEnd()
         {
             Mark startMark = scanner_.peekToken().startMark;
             const bool explicit = scanner_.checkToken(TokenID.DocumentEnd);
@@ -312,7 +312,7 @@ final class Parser
         }
 
         ///Parse document content.
-        Event parseDocumentContent() @safe
+        Event parseDocumentContent()
         {
             if(scanner_.checkToken(TokenID.Directive,   TokenID.DocumentStart,
                                    TokenID.DocumentEnd, TokenID.StreamEnd))
@@ -863,7 +863,7 @@ final class Parser
         }
 
         ///Parse end of a mapping in a flow sequence entry.
-        Event parseFlowSequenceEntryMappingEnd() @safe
+        Event parseFlowSequenceEntryMappingEnd()
         {
             state_ = &parseFlowSequenceEntry!(No.first);
             const token = scanner_.peekToken();
@@ -925,7 +925,7 @@ final class Parser
         }
 
         ///Parse an empty value in a flow mapping.
-        Event parseFlowMappingEmptyValue() @safe
+        Event parseFlowMappingEmptyValue()
         {
             state_ = &parseFlowMappingKey!(No.first);
             return processEmptyScalar(scanner_.peekToken().startMark);

@@ -96,7 +96,7 @@ final class Composer
         }
 
         ///Get a YAML document as a node (the root of the document).
-        Node getNode() @safe
+        Node getNode()
         {
             //Get the root node of the next document.
             assert(!parser_.checkEvent(EventID.StreamEnd),
@@ -112,7 +112,7 @@ final class Composer
         ///Params:  pairAppenderLevel = Current level in the pair appender stack.
         ///         nodeAppenderLevel = Current level the node appender stack.
         void ensureAppendersExist(const uint pairAppenderLevel, const uint nodeAppenderLevel)
-            @trusted
+            @safe
         {
             while(pairAppenders_.length <= pairAppenderLevel)
             {
@@ -125,7 +125,7 @@ final class Composer
         }
 
         ///Compose a YAML document and return its root node.
-        Node composeDocument() @trusted
+        Node composeDocument()
         {
             //Drop the DOCUMENT-START event.
             parser_.getEvent();
@@ -144,7 +144,7 @@ final class Composer
         ///
         /// Params: pairAppenderLevel = Current level of the pair appender stack.
         ///         nodeAppenderLevel = Current level of the node appender stack.
-        Node composeNode(const uint pairAppenderLevel, const uint nodeAppenderLevel) @system
+        Node composeNode(const uint pairAppenderLevel, const uint nodeAppenderLevel)
         {
             if(parser_.checkEvent(EventID.Alias))
             {

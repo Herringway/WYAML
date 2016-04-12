@@ -79,10 +79,10 @@ struct Event
     CollectionStyle collectionStyle = CollectionStyle.Invalid;
 
     ///Is this a null (uninitialized) event?
-    @property bool isNull() const pure @system nothrow {return id == EventID.Invalid;}
+    @property bool isNull() const pure @safe nothrow {return id == EventID.Invalid;}
 
     ///Get string representation of the token ID.
-    @property string idString() const @system {return to!string(id);}
+    @property string idString() const @safe {return to!string(id);}
 }
 
 /**
@@ -93,7 +93,7 @@ struct Event
  *          anchor   = Anchor, if this is an alias event.
  */
 Event event(EventID id)(const Mark start, const Mark end, const Anchor anchor = Anchor())
-    pure @trusted nothrow
+    pure @safe nothrow
 {
     Event result;
     result.startMark = start;
@@ -114,7 +114,7 @@ Event event(EventID id)(const Mark start, const Mark end, const Anchor anchor = 
  */
 Event collectionStartEvent(EventID id)
     (const Mark start, const Mark end, const Anchor anchor, const Tag tag,
-     const bool implicit, const CollectionStyle style) pure @trusted nothrow
+     const bool implicit, const CollectionStyle style) pure @safe nothrow
 {
     static assert(id == EventID.SequenceStart || id == EventID.SequenceEnd ||
                   id == EventID.MappingStart || id == EventID.MappingEnd);
@@ -137,7 +137,7 @@ Event collectionStartEvent(EventID id)
  *          encoding = Encoding of the stream.
  */
 Event streamStartEvent(const Mark start, const Mark end)
-    pure @trusted nothrow
+    pure @safe nothrow
 {
     Event result;
     result.startMark = start;
@@ -166,7 +166,7 @@ alias collectionStartEvent!(EventID.MappingStart)  mappingStartEvent;
  *          tagDirectives = Tag directives of the document.
  */
 Event documentStartEvent(const Mark start, const Mark end, const bool explicit, string YAMLVersion,
-                         TagDirective[] tagDirectives) pure @trusted nothrow
+                         TagDirective[] tagDirectives) pure @safe nothrow
 {
     Event result;
     result.value            = YAMLVersion;
@@ -185,7 +185,7 @@ Event documentStartEvent(const Mark start, const Mark end, const bool explicit, 
  *          end      = End position of the event in the file/stream.
  *          explicit = Is this an explicit document end?
  */
-Event documentEndEvent(const Mark start, const Mark end, const bool explicit) pure @trusted nothrow
+Event documentEndEvent(const Mark start, const Mark end, const bool explicit) pure @safe nothrow
 {
     Event result;
     result.startMark        = start;

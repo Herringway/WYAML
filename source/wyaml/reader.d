@@ -67,7 +67,7 @@ final class Reader
         ///
         /// Throws:  ReaderException on a UTF decoding error or if there are
         ///          nonprintable Unicode characters illegal in YAML.
-        this(in char[] buffer) @trusted pure //!nothrow
+        this(in char[] buffer) pure
         {
             auto endianResult = fixUTFByteOrder(cast(ubyte[])buffer);
             if(endianResult.bytesStripped > 0)
@@ -105,7 +105,7 @@ final class Reader
         }
 
         /// Move current position forward by one character.
-        void popFront() @trusted in {
+        void popFront() @safe in {
             assert(!empty);
         } body {
 

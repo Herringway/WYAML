@@ -217,7 +217,7 @@ final class Representer
          * --------------------
          */
         void addRepresenter(T)(Node function(ref Node, Representer) representer)
-            @trusted pure
+            @safe pure
         {
             assert((typeid(T) in representers_) is null,
                    "Representer function for data type " ~ T.stringof ~
@@ -267,7 +267,7 @@ final class Representer
          * --------------------
          */
         Node representScalar(string tag, string scalar,
-                             ScalarStyle style = ScalarStyle.Invalid) @trusted
+                             ScalarStyle style = ScalarStyle.Invalid)
         {
             if(style == ScalarStyle.Invalid){style = defaultScalarStyle_;}
             return Node.rawNode(Node.Value(scalar), Mark(), Tag(tag), style,
@@ -316,7 +316,7 @@ final class Representer
          * --------------------
          */
         Node representSequence(string tag, Node[] sequence,
-                               CollectionStyle style = CollectionStyle.Invalid) @trusted
+                               CollectionStyle style = CollectionStyle.Invalid)
         {
             Node[] value;
             value.length = sequence.length;
@@ -385,7 +385,7 @@ final class Representer
          * --------------------
          */
         Node representMapping(string tag, Node.Pair[] pairs,
-                              CollectionStyle style = CollectionStyle.Invalid) @trusted
+                              CollectionStyle style = CollectionStyle.Invalid)
         {
             Node.Pair[] value;
             value.length = pairs.length;
@@ -457,13 +457,13 @@ final class Representer
 
 
 ///Represent a _null _node as a _null YAML value.
-Node representNull(ref Node node, Representer representer) @safe
+Node representNull(ref Node node, Representer representer)
 {
     return representer.representScalar("tag:yaml.org,2002:null", "null");
 }
 
 ///Represent a string _node as a string scalar.
-Node representString(ref Node node, Representer representer) @safe
+Node representString(ref Node node, Representer representer)
 {
     string value = node.as!string;
     return value is null
@@ -482,7 +482,7 @@ Node representBytes(ref Node node, Representer representer) @system
 }
 
 ///Represent a bool _node as a bool scalar.
-Node representBool(ref Node node, Representer representer) @safe
+Node representBool(ref Node node, Representer representer)
 {
     return representer.representScalar("tag:yaml.org,2002:bool",
                                        node.as!bool ? "true" : "false");
@@ -517,7 +517,7 @@ Node representSysTime(ref Node node, Representer representer) @system
 }
 
 ///Represent a sequence _node as sequence/set.
-Node representNodes(ref Node node, Representer representer) @safe
+Node representNodes(ref Node node, Representer representer)
 {
     auto nodes = node.as!(Node[]);
     if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:set"))
@@ -614,14 +614,14 @@ version(unittest) {
         return representer.representScalar("!mystruct.tag", scalar);
     }
 
-    Node representMyStructSeq(ref Node node, Representer representer) @safe
+    Node representMyStructSeq(ref Node node, Representer representer)
     {
         auto value = node.as!MyStruct;
         auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
         return representer.representSequence("!mystruct.tag", nodes);
     }
 
-    Node representMyStructMap(ref Node node, Representer representer) @safe
+    Node representMyStructMap(ref Node node, Representer representer)
     {
         auto value = node.as!MyStruct;
         auto pairs = [Node.Pair("x", value.x),
@@ -652,7 +652,7 @@ version(unittest) {
         }
 
         ///Useful for Node.as!string .
-        override string toString() @trusted
+        override string toString() @safe
         {
             return format("MyClass(%s, %s, %s)", x, y, z);
         }

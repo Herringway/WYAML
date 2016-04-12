@@ -281,7 +281,7 @@ final class Constructor
          * Returns: Constructed node.
          */
         Node node(T, U)(const Mark start, const Mark end, const Tag tag,
-                        T value, U style) @trusted
+                        T value, U style)
             if((is(T : string) || is(T == Node[]) || is(T == Node.Pair[])) &&
                (is(U : CollectionStyle) || is(U : ScalarStyle)))
         {
