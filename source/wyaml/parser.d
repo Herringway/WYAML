@@ -550,7 +550,7 @@ final class Parser
                 scope(exit) { inEscape = false; }
 
                 // 'Normal' escape sequence.
-                if(wyaml.escapes.escapes.canFind(c))
+                if(c.among!escapeSeqs)
                 {
                     if(notInPlace is null)
                     {
@@ -572,7 +572,7 @@ final class Parser
                 }
 
                 // Unicode char written in hexadecimal in an escape sequence.
-                if(wyaml.escapes.escapeHexCodeList.canFind(c))
+                if(c.among!escapeHexSeq)
                 {
                     // Scanner has already checked that the hex string is valid.
 
