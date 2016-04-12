@@ -7,24 +7,43 @@
 
 module wyaml.escapes;
 
+private import std.array;
 private import std.meta;
+private import std.range;
+private import std.typecons;
 package:
 
 ///Translation table from YAML escapes to dchars.
 // immutable dchar[dchar] fromEscapes;
 ///Translation table from dchars to YAML escapes.
 immutable dchar[dchar] toEscapes;
-// ///Translation table from prefixes of escaped hexadecimal format characters to their lengths.
-// immutable uint[dchar]  escapeHexCodes;
 
-alias escapeSeqs = AliasSeq!('0', 'a', 'b', 't', '\t', 'n', 'v', 'f', 'r', 'e', ' ',
-                             '\"', '\\', 'N', '_', 'L', 'P');
+alias escapeSeqs  = AliasSeq!(cast(dchar)'0',   cast(dchar)'a',     cast(dchar)'b',     cast(dchar)'t',     cast(dchar)'\t',    cast(dchar)'n',     cast(dchar)'v',     cast(dchar)'f',     cast(dchar)'r',     cast(dchar)'e', cast(dchar)' ',     cast(dchar)'\"', cast(dchar)'\\', cast(dchar)'N', cast(dchar)'_', cast(dchar)'L', cast(dchar)'P');
+
+alias escapePairs = AliasSeq!(
+    Tuple!(dchar,dchar)('\0', '0'),
+    Tuple!(dchar,dchar)('\x07', 'a'),
+    Tuple!(dchar,dchar)('\x08', 'b'),
+    Tuple!(dchar,dchar)('\x09', 't'),
+    Tuple!(dchar,dchar)('\x0A', 'n'),
+    Tuple!(dchar,dchar)('\x0B', 'v'),
+    Tuple!(dchar,dchar)('\x0C', 'f'),
+    Tuple!(dchar,dchar)('\x0D', 'r'),
+    Tuple!(dchar,dchar)('\x1B', 'e'),
+    Tuple!(dchar,dchar)('"', '"'),
+    Tuple!(dchar,dchar)('\\', '\\'),
+    Tuple!(dchar,dchar)('\u0085', 'N'),
+    Tuple!(dchar,dchar)('\xA0', '_'),
+    Tuple!(dchar,dchar)('\u2028', 'L'),
+    Tuple!(dchar,dchar)('\u2029', 'P'));
+
+alias extraEscapes = AliasSeq!(
+    Tuple!(dchar,dchar)('\x09', '\t'),
+    Tuple!(dchar,dchar)(' ', ' '));
+
 /// All YAML escapes.
-immutable dstring escapes = [escapeSeqs];
-
 alias escapeHexSeq = AliasSeq!('x', 'u', 'U');
 /// YAML hex codes specifying the length of the hex number.
-immutable dstring escapeHexCodeList = [escapeHexSeq];
 
 /// Covert a YAML escape to a dchar.
 ///
@@ -34,27 +53,11 @@ dchar fromEscape(dchar escape) @safe pure nothrow @nogc
 {
     switch(escape)
     {
-        case '0':  return '\0';
-        case 'a':  return '\x07';
-        case 'b':  return '\x08';
-        case 't':  return '\x09';
-        case '\t': return '\x09';
-        case 'n':  return '\x0A';
-        case 'v':  return '\x0B';
-        case 'f':  return '\x0C';
-        case 'r':  return '\x0D';
-        case 'e':  return '\x1B';
-        case ' ':  return '\x20';
-        case '\"': return '\"';
-        case '\\': return '\\';
-        case 'N':  return '\x85'; //'\u0085';
-        case '_':  return '\xA0';
-        case 'L':  return '\u2028';
-        case 'P':  return '\u2029';
+        foreach (tup; AliasSeq!(escapePairs, extraEscapes))
+            case tup[1]: return tup[0];
         default:   assert(false, "No such YAML escape");
     }
 }
-
 /// Get the length of a hexadecimal number determined by its hex code.
 ///
 /// Need a function as associative arrays don't work with @nogc.
@@ -73,21 +76,5 @@ uint escapeHexLength(dchar hexCode) @safe pure nothrow @nogc
 
 static this()
 {
-    toEscapes =
-        ['\0':     '0',
-         '\x07':   'a',
-         '\x08':   'b',
-         '\x09':   't',
-         '\x0A':   'n',
-         '\x0B':   'v',
-         '\x0C':   'f',
-         '\x0D':   'r',
-         '\x1B':   'e',
-         '\"':     '\"',
-         '\\':     '\\',
-         '\u0085': 'N',
-         '\xA0':   '_',
-         '\u2028': 'L',
-         '\u2029': 'P'];
+    toEscapes = assocArray(only(escapePairs));
 }
-
