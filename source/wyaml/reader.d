@@ -22,8 +22,6 @@ import std.system;
 import std.typecons;
 import std.utf;
 
-import tinyendian;
-
 import wyaml.exception;
 
 
@@ -60,27 +58,12 @@ final class Reader
     public:
         /// Construct a Reader.
         ///
-        /// Params:  buffer = Buffer with YAML data. This may be e.g. the entire
-        ///                   contents of a file or a string. $(B will) be modified by
-        ///                   the Reader and other parts of D:YAML (D:YAML tries to
-        ///                   reuse the buffer to minimize memory allocations)
-        ///
-        /// Throws:  ReaderException on a UTF decoding error or if there are
-        ///          nonprintable Unicode characters illegal in YAML.
-        this(in char[] buffer) pure
-        {
-            auto endianResult = fixUTFByteOrder(buffer.representation.dup);
-            if(endianResult.bytesStripped > 0)
-            {
-                throw new ReaderException("Size of UTF-16 or UTF-32 input not aligned "
-                                          "to 2 or 4 bytes, respectively");
-            }
-
-            auto utf8Result = toUTF8(endianResult.array, endianResult.encoding);
-
-            buffer_ = utf8Result.idup;
-            //buffer_ = buffer;
-
+        /// Params:  buffer = Buffer with YAML data.
+        this(in char[] buffer) pure @safe nothrow {
+            buffer_ = buffer.idup;
+        }
+        this(string buffer) pure @safe nothrow @nogc {
+            buffer_ = buffer;
         }
         private this() @safe { }
         immutable(dchar) front() @safe out(result) {
@@ -131,85 +114,13 @@ final class Reader
         /// Get current column number.
         uint column() const { return column_; }
 }
-
 private:
-
-// Convert a UTF-8/16/32 buffer to UTF-8, in-place if possible.
-//
-// Params:
-//
-// input    = Buffer with UTF-8/16/32 data to decode. May be overwritten by the
-//            conversion, in which case the result will be a slice of this buffer.
-// encoding = Encoding of input.
-//
-// Returns:
-//
-// A struct with the following members:
-//
-// $(D string errorMessage)   In case of an error, the error message is stored here. If
-//                            there was no error, errorMessage is NULL. Always check
-//                            this first.
-// $(D char[] utf8)           input converted to UTF-8. May be a slice of input.
-// $(D size_t characterCount) Number of characters (code points) in input.
-deprecated char[] toUTF8(ubyte[] input, const UTFEncoding encoding) @safe pure
-{
-
-    char[] result;
-
-    // Encode input_ into UTF-8 if it's encoded as UTF-16 or UTF-32.
-    //
-    // Params:
-    //
-    // buffer = The input buffer to encode.
-    // result = A Result struct to put encoded result and any error messages to.
-    //
-    // On error, result.errorMessage will be set.
-    static void encode(C)(C[] input, ref char[] result) @safe pure
-    {
-        // We can do UTF-32->UTF-8 in place because all UTF-8 sequences are 4 or
-        // less bytes.
-        static if(is(C == dchar))
-        {
-            char[4] encodeBuf;
-            auto utf8 = cast(char[])input;
-            auto length = 0;
-            foreach(dchar c; input) {
-                const encodeResult = std.utf.encode(encodeBuf, c);
-                utf8[length .. length + encodeResult] = encodeBuf[0 .. encodeResult];
-                length += encodeResult;
-            }
-            result = utf8[0 .. length];
-        }
-        // Unfortunately we can't do UTF-16 in place so we just use std.conv.to
-        else
-        {
-            result = input.to!(char[]);
-        }
-    }
-
-    final switch(encoding)
-    {
-        case UTFEncoding.UTF_8:
-            encode(cast(char[])input, result);
-            break;
-        case UTFEncoding.UTF_16:
-            assert(input.length % 2 == 0, "UTF-16 buffer size must be even");
-            encode(cast(wchar[])input, result);
-            break;
-        case UTFEncoding.UTF_32:
-            assert(input.length % 4 == 0, "UTF-32 buffer size must be a multiple of 4");
-            encode(cast(dchar[])input, result);
-            break;
-    }
-
-    return result;
-}
 bool isPrintableChar(in dchar val) pure @safe nothrow @nogc {
     if (val < 0x20 && !val.among(0x09, 0x0A, 0x0D))
         return false;
     if (val < 0xA0 && val >= 0x80 && val != 0x85)
         return false;
-    if (val.among(0x7F, 0xFFFE, 0xFFFF))
+    if (val.among(0x7F, 0xFEFF, 0xFFFE, 0xFFFF))
         return false;
     return true;
 }

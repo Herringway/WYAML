@@ -82,17 +82,17 @@ T readText(T = string)(string path) out(result) {
     import std.range;
     auto buf = read(path);
     if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom16].representation)) {
-        return (cast(wchar[])buf).to!T;
+        return (cast(wchar[])buf).to!T[3..$];
     } else if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom16(true)].representation)) {
         foreach (ref character; (cast(wchar[])buf))
             character = character.swapEndian();
-        return (cast(wchar[])buf).to!T;
+        return (cast(wchar[])buf).to!T[3..$];
     } else if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom32].representation)) {
-        return (cast(dchar[])buf).to!T;
+        return (cast(dchar[])buf).to!T[3..$];
     } else if ((cast(ubyte[])buf).startsWith(cast(ubyte[])[bom32(true)].representation)) {
         foreach (ref character; (cast(dchar[])buf))
             character = character.swapEndian();
-        return (cast(dchar[])buf).to!T;
+        return (cast(dchar[])buf).to!T[3..$];
     }
     return (cast(char[])buf).to!T;
 }

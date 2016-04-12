@@ -56,7 +56,6 @@ static this()
     expected["utf16be"]                     = utf16be();
     expected["utf16le"]                     = utf16le();
     expected["utf8"]                        = utf8();
-    expected["utf8-implicit"]               = utf8implicit();
 }
 
 ///Construct a pair of nodes with specified values.
@@ -306,11 +305,6 @@ Node[] utf8()
     return [Node("UTF-8")];
 }
 
-Node[] utf8implicit()
-{
-    return [Node("implicit UTF-8")];
-}
-
 ///Testing custom YAML class type.
 class TestClass
 {
@@ -413,7 +407,7 @@ void testConstructor(string dataFilename, string codeDummy)
     {
         scope(failure)
             writeComparison(expected, node);
-        assert(node.equals!(No.useTag)(expected));
+        assert(node.equals!(No.useTag)(expected), dataFilename ~ " failed");
     }
 }
 

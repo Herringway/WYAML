@@ -3,7 +3,6 @@
     "description": "YAML parser and emitter",
     "authors": [ "Ferdinand Majerech", "Cameron \"Herringway\" Ross" ],
     "license": "Boost 1.0",
-    "dependencies": { "tinyendian" : { "version" : "~>0.1.0" } },
     "homepage": "https://github.com/Herringway/WYAML",
     "copyright": "Copyright © 2011-2014, Ferdinand Majerech, Modified work copyright © 2016 Cameron Ross",
     "configurations": [
