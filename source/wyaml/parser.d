@@ -416,7 +416,7 @@ final class Parser
             Mark startMark, endMark, tagMark;
             bool invalidMarks = true;
             // The index in the tag string where tag handle ends and tag suffix starts.
-            uint tagHandleEnd;
+            size_t tagHandleEnd;
 
             //Get anchor/tag if detected. Return false otherwise.
             bool get(const TokenID id, const Flag!"first" first, ref string target)
@@ -605,7 +605,7 @@ final class Parser
          *          startMark = Position of the node the tag belongs to.
          *          tagMark   = Position of the tag.
          */
-        string processTag(const string tag, const uint handleEnd,
+        string processTag(const string tag, const size_t handleEnd,
                           const Mark startMark, const Mark tagMark)
             const @trusted
         {

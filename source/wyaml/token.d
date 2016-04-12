@@ -85,7 +85,7 @@ struct Token
     DirectiveType directive;
     // 4B
     /// Used to split value into 2 substrings for tokens that need 2 values (tagToken)
-    uint valueDivider;
+    size_t valueDivider;
 
     /// Get string representation of the token ID.
     @property string idString() @safe pure const {return id.to!string;}
@@ -100,7 +100,7 @@ struct Token
 ///          value     = Value of the token.
 ///          directive = Directive type (YAML or TAG in YAML 1.1).
 Token directiveToken(const Mark start, const Mark end, string value,
-                     DirectiveType directive, const uint nameEnd)
+                     DirectiveType directive, const size_t nameEnd)
 {
     return Token(value, start, end, TokenID.Directive, ScalarStyle.init,
                  directive, nameEnd);
@@ -145,7 +145,7 @@ alias simpleToken!(TokenID.FlowEntry)          flowEntryToken;
 ///          valueDivider = A hack for TagToken to store 2 values in value; the first
 ///                         value goes up to valueDivider, the second after it.
 Token simpleValueToken(TokenID id)(const Mark start, const Mark end, string value,
-                                   const uint valueDivider = uint.max)
+                                   const size_t valueDivider = size_t.max)
 {
     return Token(value, start, end, id, ScalarStyle.Invalid,
                  DirectiveType.init, valueDivider);

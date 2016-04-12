@@ -448,7 +448,7 @@ final class Representer
         }
 
         //Represent a node, serializing with specified Serializer.
-        void represent(ref Serializer serializer, ref Node node) @trusted
+        void represent(T)(ref Serializer!T serializer, ref Node node)
         {
             auto data = representData(node);
             serializer.serialize(data);

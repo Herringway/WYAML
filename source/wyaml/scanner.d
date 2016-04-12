@@ -128,11 +128,11 @@ final class Scanner
         static struct SimpleKey
         {
             /// Index of the key token from start (first token scanned being 0).
-            uint tokenIndex;
+            size_t tokenIndex;
             /// Line the key starts at.
             uint line;
             /// Column the key starts at.
-            ushort column;
+            uint column;
             /// Is this required to be a simple key?
             bool required;
             /// Is this struct "null" (invalid)?.
@@ -150,7 +150,7 @@ final class Scanner
         /// Current indentation level.
         int indent_ = -1;
         /// Past indentation levels. Used as a stack.
-        Array!int indents_;
+        int[] indents_;
 
         /// Processed tokens not yet emitted. Used as a queue.
         Queue!Token tokens_;
@@ -346,12 +346,10 @@ final class Scanner
 
             // The next token might be a simple key, so save its number and position.
             removePossibleSimpleKey();
-            const tokenCount = tokensTaken_ + cast(uint)tokens_.length;
+            const tokenCount = tokensTaken_ + tokens_.length;
 
-            const line   = reader_.line;
-            const column = reader_.column;
-            const key    = SimpleKey(tokenCount, line,
-                                     cast(ushort)min(column, ushort.max), required);
+            const key    = SimpleKey(tokenCount, reader_.line,
+                                     min(reader_.column, uint.max), required);
 
             if(possibleSimpleKeys_.length <= flowLevel_)
             {
@@ -841,7 +839,7 @@ final class Scanner
             const name = reader_.popDirectiveName();
 
             // Index where tag handle ends and suffix starts in a tag directive value.
-            uint tagHandleEnd = uint.max;
+            size_t tagHandleEnd = size_t.max;
             dstring value;
             if(name == "YAML")     { value = reader_.popYAMLDirectiveValue(); }
             else if(name == "TAG") { value = reader_.popTagDirectiveValue(tagHandleEnd); }
@@ -901,7 +899,7 @@ final class Scanner
             const startMark = reader_.mark;
             dchar c = reader_.save().drop(1).front;
             dstring slice;
-            uint handleEnd;
+            size_t handleEnd;
 
             if(c == '<')
             {
@@ -937,13 +935,13 @@ final class Scanner
                 if(useHandle)
                 {
                     slice ~= reader_.popTagHandle("tag");
-                    handleEnd = cast(uint)slice.length;
+                    handleEnd = slice.length;
                 }
                 else
                 {
                     reader_.popFront();
                     slice ~= '!';
-                    handleEnd = cast(uint)slice.length;
+                    handleEnd = slice.length;
                 }
 
                 slice ~= reader_.popTagURI("tag");
@@ -968,7 +966,7 @@ final class Scanner
             reader_.skipBlockScalarIgnoredLine();
 
             // Determine the indentation level and go to the first non-empty line.
-            uint indent = max(1, indent_ + 1);
+            size_t indent = max(1, indent_ + 1);
 
             dstring slice;
             dstring newSlice;
@@ -976,7 +974,7 @@ final class Scanner
             size_t startLen = 0;
             if(increment == int.min)
             {
-                uint indentation;
+                size_t indentation;
                 newSlice ~= reader_.popBlockScalarIndentation(indentation);
                 indent  = max(indent, indentation);
             }
@@ -1294,12 +1292,12 @@ auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(
 /// Scan value of a tag directive.
 ///
 /// Returns: Length of tag handle (which is before tag prefix) in scanned data
-auto popTagDirectiveValue(T)(ref T reader, out uint handleLength) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popTagDirectiveValue(T)(ref T reader, out size_t handleLength) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dstring output;
     reader.skipToNextNonSpace();
     output ~= reader.popTagDirectiveHandle();
-    handleLength = cast(uint)(output.length);
+    handleLength = output.length;
     reader.skipToNextNonSpace();
     output ~= reader.popTagDirectivePrefix();
 
@@ -1307,7 +1305,7 @@ auto popTagDirectiveValue(T)(ref T reader, out uint handleLength) if (isForwardR
 }
 /*@safe pure*/ unittest { //ADD MORE
     auto str = "";
-    uint handleLength;
+    size_t handleLength;
     assertThrown(str.popTagDirectiveValue(handleLength));
     str = " !! !test ";
     assert(str.popTagDirectiveValue(handleLength) == "!!!test");
@@ -1464,7 +1462,7 @@ void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqu
     assertNotThrown(str.skipBlockScalarIgnoredLine());
 }
 /// Scan indentation in a block scalar, returning line breaks and max indent.
-auto popBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popBlockScalarIndentation(T)(ref T reader, out size_t maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dstring output;
     while(reader.startsWith(newLinesPlusSpaces))
@@ -1482,12 +1480,12 @@ auto popBlockScalarIndentation(T)(ref T reader, out uint maxIndent) if (isForwar
 }
 @safe pure unittest { //ADD MORE
     auto str = "";
-    uint maxIndent;
+    size_t maxIndent;
     assert(str.popBlockScalarIndentation(maxIndent) == "");
     assert(maxIndent == 0);
 }
 /// Scan line breaks at lower or specified indentation in a block scalar.
-auto popBlockScalarBreaks(T)(ref T reader, const uint indent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popBlockScalarBreaks(T)(ref T reader, const size_t indent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     dstring output;
 
