@@ -69,7 +69,7 @@ final class Reader
         ///          nonprintable Unicode characters illegal in YAML.
         this(in char[] buffer) pure
         {
-            auto endianResult = fixUTFByteOrder(cast(ubyte[])buffer);
+            auto endianResult = fixUTFByteOrder(buffer.representation.dup);
             if(endianResult.bytesStripped > 0)
             {
                 throw new ReaderException("Size of UTF-16 or UTF-32 input not aligned "
