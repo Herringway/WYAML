@@ -8,7 +8,7 @@ import std.math;
 import std.random;
 import std.stdio;
 import std.string;
-import dyaml.all;
+import wyaml;
 
 
 Node config;
@@ -34,38 +34,20 @@ static this()
     generators["set"]       = &genSet;
 }
 
-real randomNormalized(const string distribution = "linear")
-{
-    auto generator = Random(unpredictableSeed());
-    const r = uniform!"[]"(0.0L, 1.0L, generator);
+T distribute(T)(T input, in string distribution = "linear") {
     switch(distribution)
     {
         case "linear":
-            return r;
+            return input;
         case "quadratic":
-            return r * r;
+            return input^^2;
         case "cubic":
-            return r * r * r;
+            return input^^3;
         default:
             writeln("Unknown random distribution: ", distribution,
                     ", falling back to linear");
-            return randomNormalized("linear");
+            return input.distribute("linear");
     }
-}
-
-long randomLong(const long min, const long max, const string distribution = "linear")
-{
-    return min + cast(long)round((max - min) * randomNormalized(distribution));
-}
-
-real randomReal(const real min, const real max, const string distribution = "linear")
-{
-    return min + (max - min) * randomNormalized(distribution);
-}
-
-dchar randomChar(const dstring chars)
-{
-    return chars[randomLong(0, chars.length - 1)];
 }
 
 string randomType(string[] types)
@@ -84,15 +66,16 @@ Node genString(bool root = false)
 
     auto alphabet = config["string"]["alphabet"].as!dstring;
 
-    const chars = randomLong(range["min"].as!uint, range["max"].as!uint,
-                             range["dist"].as!string);
+    const chars = uniform(range["min"].as!size_t, range["max"].as!size_t).distribute(range["dist"].as!string);
 
     dchar[] result = new dchar[chars];
-    result[0] = randomChar(alphabet);
-    foreach(i; 1 .. chars)
-    {
-        result[i] = randomChar(alphabet);
-    }
+    foreach (ref c; result)
+        c = alphabet.randomSample(1).front;
+    //result[0] = randomChar(alphabet);
+    //foreach(i; 1 .. chars)
+    //{
+    //    result[i] = randomChar(alphabet);
+    //}
 
     return Node(result.to!string);
 }
@@ -101,8 +84,7 @@ Node genInt(bool root = false)
 {
     auto range = config["int"]["range"];
 
-    const result = randomLong(range["min"].as!int, range["max"].as!int,
-                              range["dist"].as!string);
+    const result = uniform(range["min"].as!int, range["max"].as!int).distribute(range["dist"].as!string);
 
     return Node(result);
 }
@@ -111,25 +93,23 @@ Node genFloat(bool root = false)
 {
     auto range = config["float"]["range"];
 
-    const result = randomReal(range["min"].as!real, range["max"].as!real,
-                              range["dist"].as!string);
+    const result = uniform(range["min"].as!real, range["max"].as!real).distribute(range["dist"].as!string);
 
     return Node(result);
 }
 
 Node genBool(bool root = false)
 {
-    return Node([true, false][randomLong(0, 1)]);
+    return Node(uniform(0, 1) ? true : false);
 }
 
 Node genTimestamp(bool root = false)
 {
     auto range = config["timestamp"]["range"];
 
-    auto hnsecs = randomLong(range["min"].as!ulong, range["max"].as!ulong,
-                             range["dist"].as!string);
+    auto hnsecs = uniform(range["min"].as!ulong, range["max"].as!ulong).distribute(range["dist"].as!string);
 
-    if(randomNormalized() <= config["timestamp"]["round-chance"].as!real)
+    if(uniform(0.0L, 1.0L) <= config["timestamp"]["round-chance"].as!real)
     {
         hnsecs -= hnsecs % 10000000;
     }
@@ -141,13 +121,12 @@ Node genBinary(bool root = false)
 {
     auto range = config["binary"]["range"];
 
-    const bytes = randomLong(range["min"].as!uint, range["max"].as!uint,
-                             range["dist"].as!string);
+    const bytes = uniform(range["min"].as!uint, range["max"].as!uint).distribute(range["dist"].as!string);
 
     ubyte[] result = new ubyte[bytes];
     foreach(i; 0 .. bytes)
     {
-        result[i] = cast(ubyte)randomLong(0, 255);
+        result[i] = uniform!ubyte();
     }
 
     return Node(result);
@@ -169,8 +148,7 @@ Node nodes(const bool root, Node range, const string tag, const bool set = false
     }
     else
     {
-        const elems = randomLong(range["min"].as!uint, range["max"].as!uint,
-                                 range["dist"].as!string);
+        const elems = uniform(range["min"].as!uint, range["max"].as!uint).distribute(range["dist"].as!string);
 
         nodes = new Node[elems];
         foreach(i; 0 .. elems)
@@ -211,16 +189,15 @@ Node pairs(bool root, bool complex, Node range, string tag)
     }
     else
     {
-        const pairs = randomLong(range["min"].as!uint, range["max"].as!uint,
-                                 range["dist"].as!string);
+        const pairs = uniform(range["min"].as!uint, range["max"].as!uint).distribute(range["dist"].as!string);
 
         keys = new Node[pairs];
         values = new Node[pairs];
-        outer: foreach(i; 0 .. pairs)
+        foreach(i; 0 .. pairs)
         {
             auto key = generateNode(randomType(typesScalarKey ~ (complex ? typesCollection : [])));
             // Maps can't contain duplicate keys
-            while(tag.endsWith("map") && keys[0 .. i].canFind(key)) 
+            while(tag.endsWith("map") && keys[0 .. i].canFind(key))
             {
                 key = generateNode(randomType(typesScalarKey ~ (complex ? typesCollection : [])));
             }
@@ -264,14 +241,15 @@ Node generateNode(const string type, bool root = false)
 
 Node[] generate(const string configFileName)
 {
-    config = Loader(configFileName).load();
+    import std.file : readText;
+    config = loader(readText(configFileName)).load();
 
     minNodesDocument = config["min-nodes-per-document"].as!long;
 
-    Node[] result;
-    foreach(i; 0 .. config["documents"].as!uint)
+    Node[] result = new Node[](config["documents"].as!uint);
+    foreach(ref doc; result)
     {
-        result ~= generateNode(config["root-type"].as!string, true);
+        doc = generateNode(config["root-type"].as!string, true);
         totalNodes = 0;
     }
 
@@ -297,11 +275,7 @@ void main(string[] args)
         //Generate and dump the nodes.
         Node[] generated = generate(configFile);
 
-        auto dumper     = Dumper(args[1]);
-        auto encoding   = config["encoding"];
-        dumper.encoding = encoding == "utf-16" ? Encoding.UTF_16:
-                          encoding == "utf-32" ? Encoding.UTF_32:
-                                                 Encoding.UTF_8;
+        auto dumper     = dumper(File(args[1], "w").lockingTextWriter);
 
         dumper.indent = config["indent"].as!uint;
         dumper.textWidth = config["text-width"].as!uint;
@@ -309,6 +283,6 @@ void main(string[] args)
     }
     catch(YAMLException e)
     {
-        writeln("ERROR: ", e.msg);
+        writeln("ERROR: ", e);
     }
 }

@@ -28,7 +28,7 @@
         "examples/representer",
         "examples/resolver",
         "examples/bench",
-        "examples/yaml_gen",
+        "examples/gen",
         "examples/yaml_stats",
     ]
 }
