@@ -1615,9 +1615,8 @@ auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Ele
         reader.popFrontN(whitespaces.length);
 
     // Spaces not followed by a line break.
-    if(!reader.startsWith(newLines)) {
+    if(!reader.startsWith(newLines))
         return whitespaces;
-    }
 
     // There's a line break after the spaces.
     const lineBreak = reader.popLineBreak();
