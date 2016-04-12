@@ -268,16 +268,16 @@ final class Scanner
                 // Order of the following checks is NOT significant.
                 switch(c)
                 {
-                    case '[':  return fetchFlowSequenceStart();
-                    case '{':  return fetchFlowMappingStart();
-                    case ']':  return fetchFlowSequenceEnd();
-                    case '}':  return fetchFlowMappingEnd();
-                    case ',':  return fetchFlowEntry();
-                    case '!':  return fetchTag();
-                    case '\'': return fetchSingle();
-                    case '\"': return fetchDouble();
-                    case '*':  return fetchAlias();
-                    case '&':  return fetchAnchor();
+                    case '[':  tokens_.push(fetchFlowSequenceStart()); return;
+                    case '{':  tokens_.push(fetchFlowMappingStart()); return;
+                    case ']':  tokens_.push(fetchFlowSequenceEnd()); return;
+                    case '}':  tokens_.push(fetchFlowMappingEnd()); return;
+                    case ',':  tokens_.push(fetchFlowEntry()); return;
+                    case '!':  tokens_.push(fetchTag()); return;
+                    case '\'': tokens_.push(fetchSingle()); return;
+                    case '\"': tokens_.push(fetchDouble()); return;
+                    case '*':  tokens_.push(fetchAlias()); return;
+                    case '&':  tokens_.push(fetchAnchor()); return;
                     case '?':  if(checkKey())        { return fetchKey();        } goto default;
                     case ':':  if(checkValue())      { return fetchValue();      } goto default;
                     case '-':  if(checkBlockEntry()) { return fetchBlockEntry(); } goto default;
@@ -430,41 +430,34 @@ final class Scanner
             tokens_.push(streamStartToken(reader_.mark, reader_.mark));
         }
 
+        void unwindAndReset() @safe {
+            // Set intendation to -1 .
+            unwindIndent(-1);
+            // Reset simple keys.
+            removePossibleSimpleKey();
+            allowSimpleKey_ = false;
+        }
         ///Add STREAM-END token.
         void fetchStreamEnd() @safe
         {
-            //Set intendation to -1 .
-            unwindIndent(-1);
-            removePossibleSimpleKey();
-            allowSimpleKey_ = false;
-            possibleSimpleKeys_.destroy;
+            unwindAndReset();
 
             tokens_.push(streamEndToken(reader_.mark, reader_.mark));
             done_ = true;
         }
 
         /// Add DIRECTIVE token.
-        void fetchDirective() @safe
+        void fetchDirective()
         {
-            // Set intendation to -1 .
-            unwindIndent(-1);
-            // Reset simple keys.
-            removePossibleSimpleKey();
-            allowSimpleKey_ = false;
-
-            auto directive = scanDirective();
-            tokens_.push(directive);
+            unwindAndReset();
+            tokens_.push(scanDirective());
         }
 
         /// Add DOCUMENT-START or DOCUMENT-END token.
-        void fetchDocumentIndicator(TokenID id)() @safe
+        void fetchDocumentIndicator(TokenID id)()
             if(id == TokenID.DocumentStart || id == TokenID.DocumentEnd)
         {
-            // Set indentation to -1 .
-            unwindIndent(-1);
-            // Reset simple keys. Note that there can't be a block collection after '---'.
-            removePossibleSimpleKey();
-            allowSimpleKey_ = false;
+            unwindAndReset();
 
             Mark startMark = reader_.mark;
             reader_.popFrontN(3);
@@ -476,7 +469,7 @@ final class Scanner
         alias fetchDocumentIndicator!(TokenID.DocumentEnd) fetchDocumentEnd;
 
         /// Add FLOW-SEQUENCE-START or FLOW-MAPPING-START token.
-        void fetchFlowCollectionStart(TokenID id)() @trusted
+        Token fetchFlowCollectionStart(TokenID id)()
         {
             // '[' and '{' may start a simple key.
             savePossibleSimpleKey();
@@ -486,7 +479,7 @@ final class Scanner
 
             Mark startMark = reader_.mark;
             reader_.popFront();
-            tokens_.push(simpleToken!id(startMark, reader_.mark));
+            return simpleToken!id(startMark, reader_.mark);
         }
 
         /// Aliases to add FLOW-SEQUENCE-START or FLOW-MAPPING-START token.
@@ -494,7 +487,7 @@ final class Scanner
         alias fetchFlowCollectionStart!(TokenID.FlowMappingStart) fetchFlowMappingStart;
 
         /// Add FLOW-SEQUENCE-START or FLOW-MAPPING-START token.
-        void fetchFlowCollectionEnd(TokenID id)() @safe
+        Token fetchFlowCollectionEnd(TokenID id)()
         {
             // Reset possible simple key on the current level.
             removePossibleSimpleKey();
@@ -504,7 +497,7 @@ final class Scanner
 
             Mark startMark = reader_.mark;
             reader_.popFront();
-            tokens_.push(simpleToken!id(startMark, reader_.mark));
+            return simpleToken!id(startMark, reader_.mark);
         }
 
         /// Aliases to add FLOW-SEQUENCE-START or FLOW-MAPPING-START token/
@@ -512,7 +505,7 @@ final class Scanner
         alias fetchFlowCollectionEnd!(TokenID.FlowMappingEnd) fetchFlowMappingEnd;
 
         /// Add FLOW-ENTRY token;
-        void fetchFlowEntry() @safe
+        Token fetchFlowEntry() @safe
         {
             // Reset possible simple key on the current level.
             removePossibleSimpleKey();
@@ -521,7 +514,7 @@ final class Scanner
 
             Mark startMark = reader_.mark;
             reader_.popFront();
-            tokens_.push(flowEntryToken(startMark, reader_.mark));
+            return flowEntryToken(startMark, reader_.mark);
         }
 
         /// Additional checks used in block context in fetchBlockEntry and fetchKey.
@@ -633,7 +626,7 @@ final class Scanner
         }
 
         /// Add ALIAS or ANCHOR token.
-        void fetchAnchor_(TokenID id)() @trusted
+        Token fetchAnchor_(TokenID id)() @safe
             if(id == TokenID.Alias || id == TokenID.Anchor)
         {
             // ALIAS/ANCHOR could be a simple key.
@@ -641,8 +634,7 @@ final class Scanner
             // No simple keys after ALIAS/ANCHOR.
             allowSimpleKey_ = false;
 
-            auto anchor = scanAnchor(id);
-            tokens_.push(anchor);
+            return scanAnchor(id);
         }
 
         /// Aliases to add ALIAS or ANCHOR token.
@@ -650,14 +642,14 @@ final class Scanner
         alias fetchAnchor_!(TokenID.Anchor) fetchAnchor;
 
         /// Add TAG token.
-        void fetchTag() @trusted
+        Token fetchTag()
         {
             //TAG could start a simple key.
             savePossibleSimpleKey();
             //No simple keys after TAG.
             allowSimpleKey_ = false;
 
-            tokens_.push(scanTag());
+            return scanTag();
         }
 
         /// Add block SCALAR token.
@@ -678,7 +670,7 @@ final class Scanner
         alias fetchBlockScalar!(ScalarStyle.Folded) fetchFolded;
 
         /// Add quoted flow SCALAR token.
-        void fetchFlowScalar(ScalarStyle quotes)() @safe
+        Token fetchFlowScalar(ScalarStyle quotes)() @safe
         {
             // A flow scalar could be a simple key.
             savePossibleSimpleKey();
@@ -686,8 +678,7 @@ final class Scanner
             allowSimpleKey_ = false;
 
             // Scan and add SCALAR.
-            auto scalar = scanFlowScalar(quotes);
-            tokens_.push(scalar);
+            return scanFlowScalar(quotes);
         }
 
         /// Aliases to add single or double quoted block scalar.
