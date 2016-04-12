@@ -9,7 +9,10 @@ module wyaml.loader;
 
 import std.array;
 import std.exception;
+import std.range;
 import std.string;
+import std.traits;
+import std.utf;
 
 import wyaml.composer;
 import wyaml.constructor;
@@ -22,7 +25,17 @@ import wyaml.resolver;
 import wyaml.scanner;
 import wyaml.token;
 
-
+auto loader(T)(T range) if(isInputRange!T && isSomeChar!(ElementType!T)) {
+    return Loader(range.array.toUTF8.idup);
+}
+unittest {
+    import std.stdio : File;
+    import std.algorithm : joiner;
+    assert(__traits(compiles,
+        loader("---\n...").loadAll()));
+    assert(__traits(compiles,
+        loader(File("a", "r").byLineCopy.joiner).loadAll()));
+}
 /** Loads YAML documents from files or streams.
  *
  * User specified Constructor and/or Resolver can be used to support new
