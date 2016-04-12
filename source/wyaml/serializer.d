@@ -29,11 +29,11 @@ import wyaml.token;
 package:
 
 ///Serializes represented YAML nodes, generating events which are then emitted by Emitter.
-struct Serializer
+struct Serializer(T)
 {
     private:
         ///Emitter to emit events produced.
-        Emitter* emitter_;
+        Emitter!T* emitter_;
         ///Resolver used to determine which tags are automaticaly resolvable.
         Resolver resolver_;
 
@@ -67,10 +67,10 @@ struct Serializer
          *          YAMLVersion   = YAML version string.
          *          tagDirectives = Tag directives to emit.
          */
-        this(ref Emitter emitter, Resolver resolver,
+        this(ref Emitter!T emitter, Resolver resolver,
              const Flag!"explicitStart" explicitStart,
              const Flag!"explicitEnd" explicitEnd, string YAMLVersion,
-             TagDirective[] tagDirectives) @trusted
+             TagDirective[] tagDirectives)
         {
             emitter_       = &emitter;
             resolver_      = resolver;
@@ -83,13 +83,13 @@ struct Serializer
         }
 
         ///Destroy the Serializer.
-        @safe ~this()
+        ~this()
         {
             emitter_.emit(streamEndEvent(Mark(), Mark()));
         }
 
         ///Serialize a node, emitting it in the process.
-        void serialize(ref Node node) @safe
+        void serialize(ref Node node)
         {
             emitter_.emit(documentStartEvent(Mark(), Mark(), explicitStart_,
                                              YAMLVersion_, tagDirectives_));
@@ -114,7 +114,7 @@ struct Serializer
          *
          * Returns: True if the node is anchorable, false otherwise.
          */
-        static bool anchorable(ref Node node) @safe
+        static bool anchorable(ref Node node)
         {
             if(node.isScalar)
             {
@@ -126,7 +126,7 @@ struct Serializer
         }
 
         ///Add an anchor to the node if it's anchorable and not anchored yet.
-        void anchorNode(ref Node node) @safe
+        void anchorNode(ref Node node)
         {
             if(!anchorable(node)){return;}
 
@@ -152,7 +152,7 @@ struct Serializer
         }
 
         ///Generate and return a new anchor.
-        Anchor generateAnchor() @trusted
+        Anchor generateAnchor()
         {
             ++lastAnchorID_;
             auto appender = appender!string();
@@ -161,7 +161,7 @@ struct Serializer
         }
 
         ///Serialize a node and all its subnodes.
-        void serializeNode(ref Node node) @trusted
+        void serializeNode(ref Node node)
         {
             //If the node has an anchor, emit an anchor (as aliasEvent) on the
             //first occurrence, save it in serializedNodes_, and emit an alias

@@ -84,7 +84,7 @@ void testEmitterOnData(string dataFilename, string canonicalFilename)
     auto loader = Loader(readText(dataFilename));
     auto events = cast(Event[])loader.parse();
     auto emitStream = new OutBuffer;
-    Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(events);
+    dumper(emitStream).emit(events);
 
     version(verboseTest)
     {
@@ -114,7 +114,7 @@ void testEmitterOnCanonical(string canonicalFilename)
     foreach(canonical; [false, true])
     {
         auto emitStream = new OutBuffer;
-        auto dumper = Dumper(outputRangeObject!(ubyte[])(emitStream));
+        auto dumper = dumper(emitStream);
         dumper.canonical = canonical;
         dumper.emit(events);
         version(verboseTest)
@@ -173,7 +173,7 @@ void testEmitterStyles(string dataFilename, string canonicalFilename)
                     styledEvents ~= event;
                 }
                 auto emitStream = new OutBuffer;
-                Dumper(outputRangeObject!(ubyte[])(emitStream)).emit(styledEvents);
+                dumper(emitStream).emit(styledEvents);
                 version(verboseTest)
                 {
                     writeln("OUTPUT (", filename, ", ", to!string(flowStyle), ", ",

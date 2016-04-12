@@ -54,7 +54,7 @@ void testRepresenterTypes(string codeFilename)
         auto representer = new Representer;
         representer.addRepresenter!TestClass(&representClass);
         representer.addRepresenter!TestStruct(&representStruct);
-        auto dumper = Dumper(outputRangeObject!(ubyte[])(emitStream));
+        auto dumper = dumper(emitStream);
         dumper.representer = representer;
         dumper.dump(expectedNodes);
 

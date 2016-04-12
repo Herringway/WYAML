@@ -677,7 +677,7 @@ unittest
                 &representMyStructSeq,
                 &representMyStructMap])
     {
-        auto dumper = Dumper(outputRangeObject!(ubyte[])(new OutBuffer()));
+        auto dumper = dumper(new OutBuffer());
         auto representer = new Representer;
         representer.addRepresenter!MyStruct(r);
         dumper.representer = representer;
@@ -688,7 +688,7 @@ unittest
 unittest
 {
     import std.outbuffer, std.range;
-    auto dumper = Dumper(outputRangeObject!(ubyte[])(new OutBuffer()));
+    auto dumper = dumper(new OutBuffer());
     auto representer = new Representer;
     representer.addRepresenter!MyClass(&representMyClass);
     dumper.representer = representer;

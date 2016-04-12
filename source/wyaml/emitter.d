@@ -75,7 +75,7 @@ alias specialCharSeq = AliasSeq!('#', ',', '[', ']', '{', '}', '&', '*', '!', '|
 alias invalidTagChars = AliasSeq!('-', ';', '/', '?', ':', '@', '&', '=', '+', '$', ',', '_', '.', '~', '*', '\'', '(', ')', '[', ']');
 
 //Emits YAML events into a file/stream.
-struct Emitter
+struct Emitter(T)
 {
     private:
         alias wyaml.tagdirective.TagDirective TagDirective;
@@ -85,7 +85,7 @@ struct Emitter
             [TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:")];
 
         ///Stream to write to.
-        OutputRange!(ubyte[]) stream_;
+        T stream_;
 
         ///Stack of states.
         Array!(void delegate()) states_;
@@ -170,8 +170,8 @@ struct Emitter
          *          indent    = Indentation width.
          *          lineBreak = Line break character/s.
          */
-        this(OutputRange!(ubyte[]) stream, const bool canonical, const int indent, const int width,
-             const LineBreak lineBreak) @trusted
+        this(T stream, const bool canonical, const int indent, const int width,
+             const LineBreak lineBreak)
         {
             states_.reserve(32);
             indents_.reserve(32);
@@ -187,7 +187,7 @@ struct Emitter
         }
 
         ///Emit an event. Throws EmitterException on error.
-        void emit(Event event) @trusted
+        void emit(Event event)
         {
             events_.push(event);
             while(!needMoreEvents())
@@ -200,7 +200,7 @@ struct Emitter
 
     private:
         ///Pop and return the newest state in states_.
-        void delegate() popState() @trusted
+        void delegate() popState()
         {
             enforce(states_.length > 0,
                     new YAMLException("Emitter: Need to pop a state but there are no states left"));
@@ -210,7 +210,7 @@ struct Emitter
         }
 
         ///Pop and return the newest indent in indents_.
-        int popIndent() @trusted
+        int popIndent()
         {
             enforce(indents_.length > 0,
                     new YAMLException("Emitter: Need to pop an indent level but there"
@@ -221,26 +221,13 @@ struct Emitter
         }
 
         ///Write a string to the file/stream.
-        void writeString(const string str) @system
+        void writeString(const string str)
         {
-            //final switch(encoding_)
-            //{
-            //    case Encoding.UTF_8:
-                    stream_.put(cast(ubyte[])str);
-            //        break;
-            //    case Encoding.UTF_16:
-            //        const buffer = to!wstring(str);
-            //        stream_.put(cast(ubyte[])buffer);
-            //        break;
-            //    case Encoding.UTF_32:
-            //        const buffer = to!dstring(str);
-            //        stream_.put(cast(ubyte[])buffer);
-            //        break;
-            //}
+            stream_.put(str.dup);
         }
 
         ///In some cases, we wait for a few next events before emitting.
-        bool needMoreEvents() @trusted nothrow
+        bool needMoreEvents()
         {
             if(events_.length == 0){return true;}
 
@@ -253,7 +240,7 @@ struct Emitter
         }
 
         ///Determines if we need specified number of more events.
-        bool needEvents(in uint count) @system nothrow
+        bool needEvents(in uint count)
         {
             int level = 0;
             foreach(event; events_)
@@ -272,7 +259,7 @@ struct Emitter
         }
 
         ///Increase indentation level.
-        void increaseIndent(const Flag!"flow" flow = No.flow, const bool indentless = false) @trusted
+        void increaseIndent(const Flag!"flow" flow = No.flow, const bool indentless = false)
         {
             indents_ ~= indent_;
             if(indent_ == -1)
@@ -286,7 +273,7 @@ struct Emitter
         }
 
         ///Determines if the type of current event is as specified. Throws if no event.
-        bool eventTypeIs(in EventID id) const pure @trusted
+        bool eventTypeIs(in EventID id) const
         {
             enforce(!event_.isNull,
                     new EmitterException("Expected an event, but no event is available."));
@@ -300,7 +287,7 @@ struct Emitter
         //Stream handlers.
 
         ///Handle start of a file/stream.
-        void expectStreamStart() @trusted
+        void expectStreamStart()
         {
             enforce(eventTypeIs(EventID.StreamStart),
                     new EmitterException("Expected StreamStart, but got " ~ event_.idString));
@@ -310,7 +297,7 @@ struct Emitter
         }
 
         ///Expect nothing, throwing if we still have something.
-        void expectNothing() const @trusted
+        void expectNothing() const
         {
             throw new EmitterException("Expected nothing, but got " ~ event_.idString);
         }
@@ -318,7 +305,7 @@ struct Emitter
         //Document handlers.
 
         ///Handle start of a document.
-        void expectDocumentStart(Flag!"first" first)() @trusted
+        void expectDocumentStart(Flag!"first" first)()
         {
             enforce(eventTypeIs(EventID.DocumentStart) || eventTypeIs(EventID.StreamEnd),
                     new EmitterException("Expected DocumentStart or StreamEnd, but got "
@@ -385,7 +372,7 @@ struct Emitter
         }
 
         ///Handle end of a document.
-        void expectDocumentEnd() @trusted
+        void expectDocumentEnd()
         {
             enforce(eventTypeIs(EventID.DocumentEnd),
                     new EmitterException("Expected DocumentEnd, but got " ~ event_.idString));
@@ -400,7 +387,7 @@ struct Emitter
         }
 
         ///Handle the root node of a document.
-        void expectRootNode() @trusted
+        void expectRootNode()
         {
             states_ ~= &expectDocumentEnd;
             expectNode(Context.Root);
@@ -421,7 +408,7 @@ struct Emitter
         }
 
         ///Handle a new node. Context specifies where in the document we are.
-        void expectNode(const Context context) @trusted
+        void expectNode(const Context context)
         {
             context_ = context;
 
@@ -465,7 +452,7 @@ struct Emitter
             }
         }
         ///Handle an alias.
-        void expectAlias() @trusted
+        void expectAlias()
         {
             enforce(!event_.anchor.isNull(), new EmitterException("Anchor is not specified for alias"));
             processAnchor("*");
@@ -473,7 +460,7 @@ struct Emitter
         }
 
         ///Handle a scalar.
-        void expectScalar() @trusted
+        void expectScalar()
         {
             increaseIndent(Yes.flow);
             processScalar();
@@ -484,7 +471,7 @@ struct Emitter
         //Flow sequence handlers.
 
         ///Handle a flow sequence.
-        void expectFlowSequence() @trusted
+        void expectFlowSequence()
         {
             writeIndicator("[", Yes.needWhitespace, Yes.whitespace);
             ++flowLevel_;
@@ -493,7 +480,7 @@ struct Emitter
         }
 
         ///Handle a flow sequence item.
-        void expectFlowSequenceItem(Flag!"first" first)() @trusted
+        void expectFlowSequenceItem(Flag!"first" first)()
         {
             if(event_.id == EventID.SequenceEnd)
             {
@@ -517,7 +504,7 @@ struct Emitter
         //Flow mapping handlers.
 
         ///Handle a flow mapping.
-        void expectFlowMapping() @trusted
+        void expectFlowMapping()
         {
             writeIndicator("{", Yes.needWhitespace, Yes.whitespace);
             ++flowLevel_;
@@ -526,7 +513,7 @@ struct Emitter
         }
 
         ///Handle a key in a flow mapping.
-        void expectFlowMappingKey(Flag!"first" first)() @trusted
+        void expectFlowMappingKey(Flag!"first" first)()
         {
             if(event_.id == EventID.MappingEnd)
             {
@@ -557,7 +544,7 @@ struct Emitter
         }
 
         ///Handle a simple value in a flow mapping.
-        void expectFlowMappingSimpleValue() @trusted
+        void expectFlowMappingSimpleValue()
         {
             writeIndicator(":", No.needWhitespace);
             states_ ~= &expectFlowMappingKey!(No.first);
@@ -565,7 +552,7 @@ struct Emitter
         }
 
         ///Handle a complex value in a flow mapping.
-        void expectFlowMappingValue() @trusted
+        void expectFlowMappingValue()
         {
             if(canonical_ || column_ > bestWidth_){writeIndent();}
             writeIndicator(":", Yes.needWhitespace);
@@ -576,7 +563,7 @@ struct Emitter
         //Block sequence handlers.
 
         ///Handle a block sequence.
-        void expectBlockSequence() @safe
+        void expectBlockSequence()
         {
             const indentless = (context_ == Context.MappingNoSimpleKey ||
                                 context_ == Context.MappingSimpleKey) && !indentation_;
@@ -585,7 +572,7 @@ struct Emitter
         }
 
         ///Handle a block sequence item.
-        void expectBlockSequenceItem(Flag!"first" first)() @trusted
+        void expectBlockSequenceItem(Flag!"first" first)()
         {
             static if(!first) if(event_.id == EventID.SequenceEnd)
             {
@@ -603,14 +590,14 @@ struct Emitter
         //Block mapping handlers.
 
         ///Handle a block mapping.
-        void expectBlockMapping() @safe
+        void expectBlockMapping()
         {
             increaseIndent(No.flow);
             state_ = &expectBlockMappingKey!(Yes.first);
         }
 
         ///Handle a key in a block mapping.
-        void expectBlockMappingKey(Flag!"first" first)() @trusted
+        void expectBlockMappingKey(Flag!"first" first)()
         {
             static if(!first) if(event_.id == EventID.MappingEnd)
             {
@@ -633,7 +620,7 @@ struct Emitter
         }
 
         ///Handle a simple value in a block mapping.
-        void expectBlockMappingSimpleValue() @trusted
+        void expectBlockMappingSimpleValue()
         {
             writeIndicator(":", No.needWhitespace);
             states_ ~= &expectBlockMappingKey!(No.first);
@@ -641,7 +628,7 @@ struct Emitter
         }
 
         ///Handle a complex value in a block mapping.
-        void expectBlockMappingValue() @trusted
+        void expectBlockMappingValue()
         {
             writeIndent();
             writeIndicator(":", Yes.needWhitespace, No.whitespace, Yes.indentation);
@@ -652,21 +639,21 @@ struct Emitter
         //Checkers.
 
         ///Check if an empty sequence is next.
-        bool checkEmptySequence() const @trusted pure nothrow
+        bool checkEmptySequence() const
         {
             return event_.id == EventID.SequenceStart && events_.length > 0
                    && events_.peek().id == EventID.SequenceEnd;
         }
 
         ///Check if an empty mapping is next.
-        bool checkEmptyMapping() const @trusted pure nothrow
+        bool checkEmptyMapping() const
         {
             return event_.id == EventID.MappingStart && events_.length > 0
                    && events_.peek().id == EventID.MappingEnd;
         }
 
         ///Check if an empty document is next.
-        bool checkEmptyDocument() const @trusted pure nothrow
+        bool checkEmptyDocument() const
         {
             if(event_.id != EventID.DocumentStart || events_.length == 0)
             {
@@ -680,7 +667,7 @@ struct Emitter
         }
 
         ///Check if a simple key is next.
-        bool checkSimpleKey() @trusted
+        bool checkSimpleKey()
         {
             uint length = 0;
             const id = event_.id;
@@ -719,7 +706,7 @@ struct Emitter
         }
 
         ///Process and write a scalar.
-        void processScalar() @trusted
+        void processScalar()
         {
             if(analysis_.flags & ScalarFlags.isNull){analysis_ = analyzeScalar(event_.value);}
             if(style_ == ScalarStyle.Invalid)
@@ -733,7 +720,7 @@ struct Emitter
             //{
             //    writeIndent();
             //}
-            auto writer = ScalarWriter(this, analysis_.scalar,
+            auto writer = ScalarWriter!T(this, analysis_.scalar,
                                        context_ != Context.MappingSimpleKey);
             with(writer) final switch(style_)
             {
@@ -749,7 +736,7 @@ struct Emitter
         }
 
         ///Process and write an anchor/alias.
-        void processAnchor(const string indicator) @trusted
+        void processAnchor(const string indicator)
         {
             if(event_.anchor.isNull())
             {
@@ -769,7 +756,7 @@ struct Emitter
         }
 
         ///Process and write a tag.
-        void processTag() @trusted
+        void processTag()
         {
             Tag tag = event_.tag;
 
@@ -804,7 +791,7 @@ struct Emitter
         }
 
         ///Determine style to write the current scalar in.
-        ScalarStyle chooseScalarStyle() @trusted
+        ScalarStyle chooseScalarStyle()
         {
             if(analysis_.flags & ScalarFlags.isNull){analysis_ = analyzeScalar(event_.value);}
 
@@ -847,7 +834,7 @@ struct Emitter
         }
 
         ///Prepare YAML version string for output.
-        static string prepareVersion(const string YAMLVersion) @trusted
+        static string prepareVersion(const string YAMLVersion)
         {
             enforce(YAMLVersion.split(".")[0] == "1",
                     new EmitterException("Unsupported YAML version: " ~ YAMLVersion));
@@ -855,7 +842,7 @@ struct Emitter
         }
 
         ///Encode an Unicode character for tag directive and write it to writer.
-        static void encodeChar(Writer)(ref Writer writer, in dchar c) @trusted
+        static void encodeChar(Writer)(ref Writer writer, in dchar c)
         {
             char[4] data;
             const bytes = encode(data, c);
@@ -867,7 +854,7 @@ struct Emitter
         }
 
         ///Prepare tag directive handle for output.
-        static string prepareTagHandle(const string handle) @trusted
+        static string prepareTagHandle(const string handle)
         {
             enforce(handle !is null && handle != "",
                     new EmitterException("Tag handle must not be empty"));
@@ -882,7 +869,7 @@ struct Emitter
         }
 
         ///Prepare tag directive prefix for output.
-        static string prepareTagPrefix(const string prefix) @trusted
+        static string prepareTagPrefix(const string prefix)
         {
             enforce(prefix !is null && prefix != "",
                     new EmitterException("Tag prefix must not be empty"));
@@ -912,7 +899,7 @@ struct Emitter
         }
 
         ///Prepare tag for output.
-        string prepareTag(in Tag tag) @trusted
+        string prepareTag(in Tag tag)
         {
             enforce(!tag.isNull(), new EmitterException("Tag must not be empty"));
 
@@ -959,7 +946,7 @@ struct Emitter
         }
 
         ///Prepare anchor for output.
-        static string prepareAnchor(const Anchor anchor) @trusted
+        static string prepareAnchor(const Anchor anchor)
         {
             enforce(!anchor.isNull() && anchor.get != "",
                     new EmitterException("Anchor must not be empty"));
@@ -973,7 +960,7 @@ struct Emitter
         }
 
         ///Analyze specifed scalar and return the analysis result.
-        static ScalarAnalysis analyzeScalar(string scalar) @safe
+        static ScalarAnalysis analyzeScalar(string scalar)
         {
             ScalarAnalysis analysis;
             analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.isNull);
@@ -1149,37 +1136,19 @@ struct Emitter
         //Writers.
 
         ///Start the YAML stream (write the unicode byte order mark).
-        void writeStreamStart() @system
+        void writeStreamStart()
         {
-            ubyte[] bom;
-            //Write BOM (always, even for UTF-8)
-            //final switch(encoding_)
-            //{
-            //    case Encoding.UTF_8:
-                    bom = [0xEF, 0xBB, 0xBF];
-            //        break;
-            //    case Encoding.UTF_16:
-            //        bom = std.system.endian == Endian.littleEndian
-            //              ? [0xFF, 0xFE]
-            //              : [0xFE, 0xFF];
-            //        break;
-            //    case Encoding.UTF_32:
-            //        bom = std.system.endian == Endian.littleEndian
-            //              ? [0xFF, 0xFE, 0x00, 0x00]
-            //              : [0x00, 0x00, 0xFE, 0xFF];
-            //        break;
-            //}
-            stream_.put(bom);
+            //TODO: add BOM for UTF-16, UTF-32 (0xFEFF)
         }
 
         ///End the YAML stream.
-        void writeStreamEnd() @system {}
+        void writeStreamEnd() {}
 
         ///Write an indicator (e.g. ":", "[", ">", etc.).
         void writeIndicator(const string indicator,
                             const Flag!"needWhitespace" needWhitespace,
                             const Flag!"whitespace" whitespace = No.whitespace,
-                            const Flag!"indentation" indentation = No.indentation) @system
+                            const Flag!"indentation" indentation = No.indentation)
         {
             const bool prefixSpace = !whitespace_ && needWhitespace;
             whitespace_  = whitespace;
@@ -1195,7 +1164,7 @@ struct Emitter
         }
 
         ///Write indentation.
-        void writeIndent() @system
+        void writeIndent()
         {
             const indent = indent_ == -1 ? 0 : indent_;
 
@@ -1221,7 +1190,7 @@ struct Emitter
         }
 
         ///Start new line.
-        void writeLineBreak(const string data = null) @system
+        void writeLineBreak(const string data = null)
         {
             whitespace_ = indentation_ = true;
             ++line_;
@@ -1230,7 +1199,7 @@ struct Emitter
         }
 
         ///Write a YAML version directive.
-        void writeVersionDirective(const string versionText) @system
+        void writeVersionDirective(const string versionText)
         {
             writeString("%YAML ");
             writeString(versionText);
@@ -1238,7 +1207,7 @@ struct Emitter
         }
 
         ///Write a tag directive.
-        void writeTagDirective(const string handle, const string prefix) @system
+        void writeTagDirective(const string handle, const string prefix)
         {
             writeString("%TAG ");
             writeString(handle);
@@ -1252,7 +1221,7 @@ struct Emitter
 private:
 
 ///RAII struct used to write out scalar values.
-struct ScalarWriter
+struct ScalarWriter(T)
 {
     invariant()
     {
@@ -1261,14 +1230,14 @@ struct ScalarWriter
     }
 
     private:
-        @disable int opCmp(ref Emitter);
-        @disable bool opEquals(ref Emitter);
+        @disable int opCmp(ref Emitter!T);
+        @disable bool opEquals(ref Emitter!T);
 
         ///Used as "null" UTF-32 character.
         static immutable dcharNone = dchar.max;
 
         ///Emitter used to emit the scalar.
-        Emitter* emitter_;
+        Emitter!T* emitter_;
 
         ///UTF-8 encoded text of the scalar to write.
         string text_;
@@ -1289,7 +1258,7 @@ struct ScalarWriter
 
     public:
         ///Construct a ScalarWriter using emitter to output text.
-        this(ref Emitter emitter, string text, const bool split = true) @trusted nothrow
+        this(ref Emitter!T emitter, string text, const bool split = true)
         {
             emitter_ = &emitter;
             text_ = text;
@@ -1297,7 +1266,7 @@ struct ScalarWriter
         }
 
         ///Write text as single quoted scalar.
-        void writeSingleQuoted() @system
+        void writeSingleQuoted()
         {
             emitter_.writeIndicator("\'", Yes.needWhitespace);
             spaces_ = breaks_ = false;
@@ -1347,7 +1316,7 @@ struct ScalarWriter
         }
 
         ///Write text as double quoted scalar.
-        void writeDoubleQuoted() @system
+        void writeDoubleQuoted()
         {
             resetTextPosition();
             emitter_.writeIndicator("\"", Yes.needWhitespace);
@@ -1409,7 +1378,7 @@ struct ScalarWriter
         }
 
         ///Write text as folded block scalar.
-        void writeFolded() @system
+        void writeFolded()
         {
             initBlock('>');
             bool leadingSpace = true;
@@ -1455,7 +1424,7 @@ struct ScalarWriter
         }
 
         ///Write text as literal block scalar.
-        void writeLiteral() @system
+        void writeLiteral()
         {
             initBlock('|');
             breaks_ = true;
@@ -1482,9 +1451,9 @@ struct ScalarWriter
         }
 
         ///Write text as plain scalar.
-        void writePlain() @system
+        void writePlain()
         {
-            if(emitter_.context_ == Emitter.Context.Root){emitter_.openEnded_ = true;}
+            if(emitter_.context_ == Emitter!T.Context.Root){emitter_.openEnded_ = true;}
             if(text_ == ""){return;}
             if(!emitter_.whitespace_)
             {
@@ -1529,7 +1498,7 @@ struct ScalarWriter
 
     private:
         ///Get next character and move end of the text range to it.
-        @property dchar nextChar() pure @safe
+        @property dchar nextChar()
         {
             ++endChar_;
             endByte_ = nextEndByte_;
@@ -1545,21 +1514,21 @@ struct ScalarWriter
         }
 
         ///Get character at start of the text range.
-        @property dchar charAtStart() const pure @safe
+        @property dchar charAtStart() const
         {
             size_t idx = startByte_;
             return decode(text_, idx);
         }
 
         ///Is the current line too wide?
-        @property bool tooWide() const pure @safe nothrow
+        @property bool tooWide() const
         {
             return startChar_ + 1 == endChar_ &&
                    emitter_.column_ > emitter_.bestWidth_;
         }
 
         ///Determine hints (indicators) for block scalar.
-        size_t determineBlockHints(char[] hints, uint bestIndent) const pure @trusted
+        size_t determineBlockHints(char[] hints, uint bestIndent) const
         {
             size_t hintsIdx = 0;
             if(text_.length == 0){return hintsIdx;}
@@ -1590,7 +1559,7 @@ struct ScalarWriter
         }
 
         ///Initialize for block scalar writing with specified indicator.
-        void initBlock(const char indicator) @system
+        void initBlock(const char indicator)
         {
             char[4] hints;
             hints[0] = indicator;
@@ -1604,7 +1573,7 @@ struct ScalarWriter
         }
 
         ///Write out the current text range.
-        void writeCurrentRange(const Flag!"UpdateColumn" updateColumn) @system
+        void writeCurrentRange(const Flag!"UpdateColumn" updateColumn)
         {
             emitter_.writeString(text_[startByte_ .. endByte_]);
             if(updateColumn){emitter_.column_ += endChar_ - startChar_;}
@@ -1612,7 +1581,7 @@ struct ScalarWriter
         }
 
         ///Write line breaks in the text range.
-        void writeLineBreaks() @system
+        void writeLineBreaks()
         {
             foreach(const dchar br; text_[startByte_ .. endByte_])
             {
@@ -1628,13 +1597,13 @@ struct ScalarWriter
         }
 
         ///Write line break if start of the text range is a newline.
-        void writeStartLineBreak() @system
+        void writeStartLineBreak()
         {
             if(charAtStart == '\n'){emitter_.writeLineBreak();}
         }
 
         ///Write indentation, optionally resetting whitespace/indentation flags.
-        void writeIndent(const Flag!"ResetSpace" resetSpace) @system
+        void writeIndent(const Flag!"ResetSpace" resetSpace)
         {
             emitter_.writeIndent();
             if(resetSpace)
@@ -1644,14 +1613,14 @@ struct ScalarWriter
         }
 
         ///Move start of text range to its end.
-        void updateRangeStart() pure @safe nothrow
+        void updateRangeStart()
         {
             startByte_ = endByte_;
             startChar_ = endChar_;
         }
 
         ///Update the line breaks_ flag, optionally updating the spaces_ flag.
-        void updateBreaks(in dchar c, const Flag!"UpdateSpaces" updateSpaces) pure @trusted
+        void updateBreaks(in dchar c, const Flag!"UpdateSpaces" updateSpaces)
         {
             if(c == dcharNone){return;}
             breaks_ = !!c.among(newLines);
@@ -1659,7 +1628,7 @@ struct ScalarWriter
         }
 
         ///Move to the beginning of text.
-        void resetTextPosition() pure @safe nothrow
+        void resetTextPosition()
         {
             startByte_ = endByte_ = nextEndByte_ = 0;
             startChar_ = endChar_ = -1;

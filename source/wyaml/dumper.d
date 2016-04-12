@@ -28,8 +28,8 @@ import wyaml.tagdirective;
 
 
 
-auto dumper(T)(T range) if(isOutputRange!(T, ubyte[])) {
-    return Dumper(outputRangeObject!(ubyte[])(range));
+auto dumper(T)(T range) if(isOutputRange!(T, char[])) {
+    return Dumper!T(range);
 }
 /**
  * Dumps YAML documents to files or streams.
@@ -80,7 +80,7 @@ auto dumper(T)(T range) if(isOutputRange!(T, ubyte[])) {
  * dumper.dump(node);
  * --------------------
  */
-struct Dumper
+private struct Dumper(T) if (isOutputRange!(T, char[]))
 {
     private:
         //Resolver to resolve tags.
@@ -89,7 +89,7 @@ struct Dumper
         Representer representer_;
 
         //Stream to write to.
-        OutputRange!(ubyte[]) stream_;
+        T stream_;
 
         //Write scalars in canonical form?
         bool canonical_;
@@ -117,7 +117,7 @@ struct Dumper
         @disable int opCmp(ref Dumper);
 
         ///Construct a Dumper writing to a _stream. This is useful to e.g. write to memory.
-        this(OutputRange!(ubyte[]) stream) @safe
+        this(T stream)
         {
             resolver_    = new Resolver();
             representer_ = new Representer();
@@ -125,33 +125,31 @@ struct Dumper
         }
 
         ///Set stream _name. Used in debugging messages.
-        @property void name(string name) pure @safe nothrow
+        @property void name(string name)
         {
             name_ = name;
         }
 
         ///Specify custom Resolver to use.
-        @property void resolver(Resolver resolver) @trusted
+        @property void resolver(Resolver resolver)
         {
-            resolver_.destroy();
             resolver_ = resolver;
         }
 
         ///Specify custom Representer to use.
-        @property void representer(Representer representer) @trusted
+        @property void representer(Representer representer)
         {
-            representer_.destroy();
             representer_ = representer;
         }
 
         ///Write scalars in _canonical form?
-        @property void canonical(bool canonical) pure @safe nothrow
+        @property void canonical(bool canonical)
         {
             canonical_ = canonical;
         }
 
         ///Set indentation width. 2 by default. Must not be zero.
-        @property void indent(uint indent) pure @safe nothrow
+        @property void indent(uint indent)
         in
         {
             assert(indent != 0, "Can't use zero YAML indent width");
@@ -162,31 +160,31 @@ struct Dumper
         }
 
         ///Set preferred text _width.
-        @property void textWidth(uint width) pure @safe nothrow
+        @property void textWidth(uint width)
         {
             textWidth_ = width;
         }
 
         ///Set line break to use. Unix by default.
-        @property void lineBreak(LineBreak lineBreak) pure @safe nothrow
+        @property void lineBreak(LineBreak lineBreak)
         {
             lineBreak_ = lineBreak;
         }
 
         ///Always explicitly write document start?
-        @property void explicitStart(bool explicit) pure @safe nothrow
+        @property void explicitStart(bool explicit)
         {
             explicitStart_ = explicit ? Yes.explicitStart : No.explicitStart;
         }
 
         ///Always explicitly write document end?
-        @property void explicitEnd(bool explicit) pure @safe nothrow
+        @property void explicitEnd(bool explicit)
         {
             explicitEnd_ = explicit ? Yes.explicitEnd : No.explicitEnd;
         }
 
         ///Specify YAML version string. "1.1" by default.
-        @property void YAMLVersion(string YAMLVersion) pure @safe nothrow
+        @property void YAMLVersion(string YAMLVersion)
         {
             YAMLVersion_ = YAMLVersion;
         }
@@ -221,7 +219,7 @@ struct Dumper
          * dumper.dump(Node("foo"));
          * --------------------
          */
-        @property void tagDirectives(string[string] tags) pure @trusted
+        @property void tagDirectives(string[string] tags)
         {
             TagDirective[] t;
             foreach(handle, prefix; tags)
@@ -247,12 +245,12 @@ struct Dumper
          * Throws:  YAMLException on error (e.g. invalid nodes,
          *          unable to write to file/stream).
          */
-        void dump(Node[] documents ...) @trusted
+        void dump(Node[] documents ...)
         {
             try
             {
-                auto emitter = Emitter(stream_, canonical_, indent_, textWidth_, lineBreak_);
-                auto serializer = Serializer(emitter, resolver_, explicitStart_,
+                auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
+                auto serializer = Serializer!T(emitter, resolver_, explicitStart_,
                                              explicitEnd_, YAMLVersion_, tags_);
                 foreach(ref document; documents)
                 {
@@ -274,11 +272,11 @@ struct Dumper
          *
          * Throws:  YAMLException if unable to emit.
          */
-        void emit(Event[] events) @system
+        void emit(Event[] events)
         {
             try
             {
-                auto emitter = Emitter(stream_, canonical_, indent_, textWidth_, lineBreak_);
+                auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
                 foreach(ref event; events)
                 {
                     emitter.emit(event);
@@ -295,21 +293,21 @@ version(unittest) import std.outbuffer;
 unittest
 {
     auto node = Node([1, 2, 3, 4, 5]);
-    Dumper(outputRangeObject!(ubyte[])(new OutBuffer())).dump(node);
+    dumper(new OutBuffer()).dump(node);
 }
 
 unittest
 {
     auto node1 = Node([1, 2, 3, 4, 5]);
     auto node2 = Node("This document contains only one string");
-    Dumper(outputRangeObject!(ubyte[])(new OutBuffer())).dump(node1, node2);
+    dumper(new OutBuffer()).dump(node1, node2);
 }
 
 unittest
 {
-    auto stream = outputRangeObject!(ubyte[])(new OutBuffer());
+    auto stream = new OutBuffer();
     auto node = Node([1, 2, 3, 4, 5]);
-    Dumper(stream).dump(node);
+    dumper(stream).dump(node);
 }
 
 unittest
@@ -317,7 +315,7 @@ unittest
     auto node = Node([1, 2, 3, 4, 5]);
     auto representer = new Representer();
     auto resolver = new Resolver();
-    auto dumper = Dumper(outputRangeObject!(ubyte[])(new OutBuffer()));
+    auto dumper = dumper(new OutBuffer());
     dumper.representer = representer;
     dumper.resolver = resolver;
     dumper.dump(node);
