@@ -6,24 +6,17 @@
 
 module wyaml.queue;
 
-
-/// Queue collection.
-import core.stdc.stdlib;
-import core.memory;
-
-import std.container;
-import std.range;
-import std.traits;
+import std.array;
 
 
 package:
 
 struct Queue(T) {
-    DList!T list;
+    T[] list;
     ref T pop() {
         scope(success)
-          list.removeFront();
-        return peek();
+          list.popFront();
+        return list.front;
     }
     ref T peek() {
         return list.front;
@@ -32,20 +25,20 @@ struct Queue(T) {
         return list.front;
     }
     void push(T val) {
-        list.insertBack(val);
+        list = list~val;
     }
     bool empty() {
         return list.empty;
     }
     size_t length() {
-        return list.opSlice().walkLength();
+        return list.length;
     }
     size_t length() const {
-        return ((cast()list).dup()).opSlice().walkLength();
+        return list.length;
     }
     int opApply(int delegate(ref T) nothrow dg) nothrow {
         int result;
-        foreach (item; list.opSlice()) {
+        foreach (item; list) {
             result = dg(item);
             if (result)
                 return result;
