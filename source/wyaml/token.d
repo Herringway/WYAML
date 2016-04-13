@@ -57,38 +57,32 @@ enum DirectiveType : ubyte
 
 /// Token produced by scanner.
 ///
-/// 32 bytes on 64-bit.
 struct Token
 {
     @disable int opCmp(ref Token);
 
-    // 16B
     /// Value of the token, if any.
     ///
     /// Values are char[] instead of string, as Parser may still change them in a few
     /// cases. Parser casts values to strings when producing Events.
     string value;
-    // 4B
     /// Start position of the token in file/stream.
     Mark startMark;
-    // 4B
     /// End position of the token in file/stream.
     Mark endMark;
-    // 1B
     /// Token type.
     TokenID id;
-    // 1B
     /// Style of scalar token, if this is a scalar token.
     ScalarStyle style;
-    // 1B
     /// Type of directive for directiveToken.
     DirectiveType directive;
-    // 4B
     /// Used to split value into 2 substrings for tokens that need 2 values (tagToken)
     size_t valueDivider;
 
     /// Get string representation of the token ID.
-    @property string idString() @safe pure const {return id.to!string;}
+    @property string idString() @safe pure const {
+        return id.to!string;
+    }
 }
 
 @safe pure nothrow @nogc:
