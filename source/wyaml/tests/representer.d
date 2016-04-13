@@ -6,79 +6,62 @@
 
 module wyaml.tests.representer;
 
+unittest {
+	import std.array;
+	import std.exception;
+	import std.meta;
+	import std.outbuffer;
+	import std.path;
+	import std.range;
+	import std.typecons;
 
-version(unittest)
-{
-
-import std.array;
-import std.exception;
-import std.outbuffer;
-import std.path;
-import std.range;
-import std.typecons;
-
-import wyaml.tests.common;
-import wyaml.tests.constructor;
+	import wyaml.tests.common;
+	import wyaml.tests.constructor;
 
 
-/// Representer unittest.
-///
-/// Params:  codeFilename = File name to determine test case from.
-///                         Nothing is read from this file, it only exists
-///                         to specify that we need a matching unittest.
-void testRepresenterTypes(string codeFilename)
-{
-    string baseName = codeFilename.baseName.stripExtension;
-    enforce((baseName in wyaml.tests.constructor.expected) !is null,
-            new Exception("Unimplemented representer test: " ~ baseName));
+	/// Representer unittest.
+	///
+	/// Params: testName = Name of the test being run.
+	void testRepresenterTypes(string testName) {
+		enforce((testName in wyaml.tests.constructor.expected) !is null,
+				new Exception("Unimplemented representer test: " ~ testName));
 
-    Node[] expectedNodes = expected[baseName];
-    //foreach(encoding; [Encoding.UTF_8, Encoding.UTF_16, Encoding.UTF_32])
-    //{
-        string output;
-        Node[] readNodes;
+		Node[] expectedNodes = expected[testName];
+		string output;
+		Node[] readNodes;
 
-        scope(failure)
-        {
-            version(verboseTest)
-            {
-                writeln("Expected nodes:");
-                foreach(ref n; expectedNodes){writeln(n.debugString, "\n---\n");}
-                writeln("Read nodes:");
-                foreach(ref n; readNodes){writeln(n.debugString, "\n---\n");}
-                writeln("OUTPUT:\n", output);
-            }
-        }
+		scope(failure) {
+			version(verboseTest) {
+				writeln("Expected nodes:");
+				foreach(ref n; expectedNodes){writeln(n.debugString, "\n---\n");}
+				writeln("Read nodes:");
+				foreach(ref n; readNodes){writeln(n.debugString, "\n---\n");}
+				writeln("OUTPUT:\n", output);
+			}
+		}
 
-        auto emitStream  = new OutBuffer;
-        auto representer = new Representer;
-        representer.addRepresenter!TestClass(&representClass);
-        representer.addRepresenter!TestStruct(&representStruct);
-        auto dumper = dumper(emitStream);
-        dumper.representer = representer;
-        dumper.dump(expectedNodes);
+		auto emitStream  = new OutBuffer;
+		auto representer = new Representer;
+		representer.addRepresenter!TestClass(&representClass);
+		representer.addRepresenter!TestStruct(&representStruct);
+		auto dumper = dumper(emitStream);
+		dumper.representer = representer;
+		dumper.dump(expectedNodes);
 
-        output = emitStream.toString;
-        auto constructor = new Constructor;
-        constructor.addConstructorMapping!constructClass("!tag1");
-        constructor.addConstructorScalar!constructStruct("!tag2");
+		output = emitStream.toString;
+		auto constructor = new Constructor;
+		constructor.addConstructorMapping!constructClass("!tag1");
+		constructor.addConstructorScalar!constructStruct("!tag2");
 
-        auto loader        = Loader(emitStream.toString().dup);
-        loader.name        = "TEST";
-        loader.constructor = constructor;
-        readNodes          = loader.loadAll().array;
+		auto loader        = Loader(emitStream.toString().dup);
+		loader.name        = "TEST";
+		loader.constructor = constructor;
+		readNodes          = loader.loadAll().array;
 
-        foreach(expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength))
-        {
-            assert(expected.equals!(No.useTag)(read));
-        }
-    //}
+		foreach(expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength))
+			assert(expected.equals!(No.useTag)(read));
+	}
+
+	alias testGroup = AliasSeq!( "aliases-cdumper-bug", "construct-binary", "construct-bool", "construct-custom", "construct-float", "construct-int", "construct-map", "construct-merge", "construct-null", "construct-omap", "construct-pairs", "construct-seq", "construct-set", "construct-str-ascii", "construct-str-utf8", "construct-str", "construct-timestamp", "construct-value", "duplicate-merge-key", "float-representer-2.3-bug", "invalid-single-quote-bug", "more-floats", "negative-float-bug", "single-dot-is-not-float-bug", "timestamp-bugs", "utf8");
+	run2!(testRepresenterTypes, [], testGroup)("Representer");
 }
-
-unittest
-{
-    writeln("D:YAML Representer unittest");
-    run("testRepresenterTypes", &testRepresenterTypes, ["code"]);
-}
-
-} // version(unittest)

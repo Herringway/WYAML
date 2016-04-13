@@ -6,51 +6,40 @@
 
 module wyaml.tests.resolver;
 
+unittest {
+	import std.array;
+	import std.meta;
+	import std.string;
 
-version(unittest)
-{
-
-import std.array;
-import std.string;
-
-import wyaml.tests.common;
+	import wyaml.tests.common;
 
 
-/**
- * Implicit tag resolution unittest.
- *
- * Params:  dataFilename   = File with unittest data.
- *          detectFilename = Dummy filename used to specify which data filenames to use.
- */
-void testImplicitResolver(string dataFilename, string detectFilename)
-{
-    string correctTag;
-    Node node;
+	/**
+	 * Implicit tag resolution unittest.
+	 *
+	 * Params:  data   = Unittest data.
+	 *          detect = Correct tag to look for.
+	 */
+	void testImplicitResolver(string data, string detect, string testName) {
+		string correctTag;
+		Node node;
 
-    scope(failure)
-    {
-        version(verboseTest)
-        {
-            writeln("Correct tag: ", correctTag);
-            writeln("Node: ", node.debugString);
-        }
-    }
+		scope(failure) {
+			version(verboseTest) {
+				writeln("Correct tag: ", correctTag);
+				writeln("Node: ", node.debugString);
+			}
+		}
 
-    correctTag = readText(detectFilename).strip();
-    node = Loader(readText(dataFilename)).loadAll().front;
-    assert(node.isSequence);
-    foreach(ref Node scalar; node)
-    {
-        assert(scalar.isScalar);
-        assert(scalar.tag == correctTag);
-    }
+		correctTag = detect.strip();
+		node = Loader(data).loadAll().front;
+		assert(node.isSequence);
+		foreach(ref Node scalar; node) {
+			assert(scalar.isScalar);
+			assert(scalar.tag == correctTag);
+		}
+	}
+
+	alias testGroup = AliasSeq!("bool", "float", "int", "merge", "null", "str", "timestamp", "value");
+	run2!(testImplicitResolver, ["data", "detect"], testGroup)("Resolver");
 }
-
-
-unittest
-{
-    writeln("D:YAML Resolver unittest");
-    run("testImplicitResolver", &testImplicitResolver, ["data", "detect"]);
-}
-
-} // version(unittest)

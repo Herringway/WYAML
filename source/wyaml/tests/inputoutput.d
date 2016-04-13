@@ -6,34 +6,22 @@
 
 module wyaml.tests.inputoutput;
 
+unittest {
+	import std.array;
+	import std.meta;
+	import std.utf;
 
-version(unittest)
-{
-
-import std.array;
-import std.meta;
-import std.utf;
-
-import wyaml.tests.common;
+	import wyaml.tests.common;
 
 
-/// Unicode input unittest. Tests various encodings.
-///
-/// Params:  unicodeFilename = File name to read from.
-void testUnicodeInput(string unicodeFilename)
-{
-    auto data     = readText(unicodeFilename);
-    auto expected = data.split().join(" ");
+	/// Unicode input unittest. Tests various encodings.
+	///
+	/// Params:  data = Data to read.
+	void testUnicodeInput(string data, string) {
+		auto expected = data.split().join(" ");
 
-    Node output = Loader(data).loadAll().front;
-    assert(output.as!string == expected);
+		Node output = Loader(data).loadAll().front;
+		assert(output.as!string == expected);
+	}
+	run2!(testUnicodeInput, ["unicode"], "latin")("I/O");
 }
-
-
-unittest
-{
-    writeln("D:YAML I/O unittest");
-    run("testUnicodeInput", &testUnicodeInput, ["unicode"]);
-}
-
-} // version(unittest)
