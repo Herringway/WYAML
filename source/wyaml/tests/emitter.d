@@ -75,7 +75,7 @@ unittest {
 			writeln("OUTPUT:\n", emitStream.toString);
 		}
 
-		auto loader2        = Loader(emitStream.toString().dup);
+		auto loader2        = Loader(emitStream.toString());
 		loader2.name        = "TEST";
 		loader2.constructor = new Constructor;
 		loader2.resolver    = new Resolver;
@@ -101,7 +101,7 @@ unittest {
 				writeln("OUTPUT (canonical=", canonical, "):\n",
 						emitStream.toString());
 			}
-			auto loader2        = Loader(emitStream.toString().dup);
+			auto loader2        = Loader(emitStream.toString());
 			loader2.name        = "TEST";
 			loader2.constructor = new Constructor;
 			loader2.resolver    = new Resolver;
@@ -147,7 +147,7 @@ unittest {
 							to!string(style), ")");
 					writeln(emitStream.toString);
 				}
-				auto loader2        = Loader(emitStream.toString().dup);
+				auto loader2        = Loader(emitStream.toString());
 				loader2.name        = "TEST";
 				loader2.constructor = new Constructor;
 				loader2.resolver    = new Resolver;

@@ -309,7 +309,7 @@ final class Composer
 
             core.memory.GC.disable();
             scope(exit){core.memory.GC.enable();}
-            auto flattened = pairAppender.data.dup;
+            auto flattened = pairAppender.data;
             pairAppender.clear();
 
             return flattened;

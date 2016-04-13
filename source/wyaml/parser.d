@@ -537,7 +537,7 @@ final class Parser
                 {
                     if(c != '\\')
                     {
-                        if(notInPlace is null) { appender.put(c.text.dup); }
+                        if(notInPlace is null) { appender.put(c.text); }
                         else                   { notInPlace ~= c; }
                         continue;
                     }
@@ -558,12 +558,12 @@ final class Parser
                         // many-byte unicode chars
                         if(c != 'L' && c != 'P')
                         {
-                            appender.put(wyaml.escapes.fromEscape(c).text.dup);
+                            appender.put(wyaml.escapes.fromEscape(c).text);
                             continue;
                         }
                         // Need to duplicate as we won't fit into
                         // token.value - which is what appender uses
-                        notInPlace = appender.data.dup;
+                        notInPlace = appender.data;
                         notInPlace ~= wyaml.escapes.fromEscape(c);
                         continue;
                     }
@@ -585,7 +585,7 @@ final class Parser
 
                     bool overflow;
                     const decoded = cast(dchar)parse!int(hex, 16u);
-                    if(notInPlace is null) { appender.put(decoded.text.dup); }
+                    if(notInPlace is null) { appender.put(decoded.text); }
                     else                   { notInPlace ~= decoded; }
                     continue;
                 }

@@ -222,7 +222,7 @@ struct Emitter(T)
         ///Write a string to the file/stream.
         void writeString(const string str)
         {
-            stream_.put(str.dup);
+            stream_.put(str);
         }
 
         ///In some cases, we wait for a few next events before emitting.

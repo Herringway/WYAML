@@ -53,7 +53,7 @@ unittest {
 		constructor.addConstructorMapping!constructClass("!tag1");
 		constructor.addConstructorScalar!constructStruct("!tag2");
 
-		auto loader        = Loader(emitStream.toString().dup);
+		auto loader        = Loader(emitStream.toString());
 		loader.name        = "TEST";
 		loader.constructor = constructor;
 		readNodes          = loader.loadAll().array;

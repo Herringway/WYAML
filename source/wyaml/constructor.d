@@ -765,9 +765,9 @@ unittest
         return pairs;
     }
 
-    auto DuplicatesShort   = set(8) ~ set(2);
+    auto duplicatesShort   = set(8) ~ set(2);
     auto noDuplicatesShort = set(8);
-    auto DuplicatesLong    = set(64) ~ set(4);
+    auto duplicatesLong    = set(64) ~ set(4);
     auto noDuplicatesLong  = set(64);
 
     bool eq(Node.Pair[] a, Node[] b)
@@ -783,10 +783,10 @@ unittest
         return true;
     }
 
-    auto nodeDuplicatesShort   = Node(DuplicatesShort.dup);
-    auto nodeNoDuplicatesShort = Node(noDuplicatesShort.dup);
-    auto nodeDuplicatesLong    = Node(DuplicatesLong.dup);
-    auto nodeNoDuplicatesLong  = Node(noDuplicatesLong.dup);
+    auto nodeDuplicatesShort   = Node(duplicatesShort);
+    auto nodeNoDuplicatesShort = Node(noDuplicatesShort);
+    auto nodeDuplicatesLong    = Node(duplicatesLong);
+    auto nodeNoDuplicatesLong  = Node(noDuplicatesLong);
 
     assert(null !is collectException(constructSet(nodeDuplicatesShort)));
     assert(null is  collectException(constructSet(nodeNoDuplicatesShort)));

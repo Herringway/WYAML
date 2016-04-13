@@ -39,8 +39,6 @@ class ReaderException : YAMLException
     }
 }
 
-/// Provides an API to read characters from a UTF-8 buffer and build slices into that
-/// buffer to avoid allocations (see SliceBuilder).
 final class Reader
 {
     private:
