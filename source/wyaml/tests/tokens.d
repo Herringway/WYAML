@@ -8,6 +8,7 @@ module wyaml.tests.tokens;
 
 unittest {
 	import std.array;
+	import std.conv : to;
 	import std.meta;
 
 	import wyaml.tests.common;

@@ -8,6 +8,7 @@ module wyaml.tests.representer;
 
 unittest {
 	import std.array;
+	import std.conv;
 	import std.exception;
 	import std.meta;
 	import std.outbuffer;
@@ -48,12 +49,12 @@ unittest {
 		dumper.representer = representer;
 		dumper.dump(expectedNodes);
 
-		output = emitStream.toString;
+		output = emitStream.text;
 		auto constructor = new Constructor;
 		constructor.addConstructorMapping!constructClass("!tag1");
 		constructor.addConstructorScalar!constructStruct("!tag2");
 
-		auto loader        = Loader(emitStream.toString());
+		auto loader        = Loader(emitStream.text);
 		loader.name        = "TEST";
 		loader.constructor = constructor;
 		readNodes          = loader.loadAll().array;

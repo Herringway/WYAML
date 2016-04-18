@@ -429,7 +429,7 @@ final class Representer
 
             enforce((type in representers_) !is null,
                     new RepresenterException("No representer function for type "
-                                             ~ type.toString() ~ " , cannot represent."));
+                                             ~ type.text ~ " , cannot represent."));
             Node result = representers_[type](data, this);
 
             //Override tag if specified.

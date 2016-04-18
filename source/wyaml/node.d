@@ -39,7 +39,7 @@ class NodeException : YAMLException
         this(string msg, Mark start, string file = __FILE__, int line = __LINE__)
             @safe
         {
-            super(msg ~ "\nNode at: " ~ start.toString(), file, line);
+            super(msg ~ "\nNode at: " ~ start.text, file, line);
         }
 }
 
@@ -55,7 +55,9 @@ package enum NodeID : ubyte
 struct YAMLNull
 {
     /// Used for string conversion.
-    string toString() const pure @safe nothrow {return "null";}
+    string toString() const pure @safe nothrow {
+        return "null";
+    }
 }
 
 // Merge YAML type, used to support "tag:yaml.org,2002:merge".
@@ -82,19 +84,15 @@ package final class YAMLContainer(T) if (!Node.allowed!T): YAMLObject
 
     public:
         // Get type of the stored value.
-        @property override TypeInfo type() const pure @safe nothrow {return typeid(T);}
+        @property override TypeInfo type() const pure @safe nothrow {
+            return typeid(T);
+        }
 
         // Get string representation of the container.
-        override string toString() @system
-        {
-            static if(!hasMember!(T, "toString"))
-            {
-                return super.toString();
-            }
-            else
-            {
-                return format("YAMLContainer(%s)", value_.toString());
-            }
+        void toString(scope void delegate(const(char)[]) sink) {
+            sink("YAMLContainer(");
+            sink(value_.text);
+            sink(")");
         }
 
     protected:
@@ -530,8 +528,8 @@ struct Node
                 {
                     return (cast(YAMLContainer!T)object).value_;
                 }
-                throw new NodeException("Node stores unexpected type: " ~ object.type.toString() ~
-                                ". Expected: " ~ typeid(T).toString, startMark_);
+                throw new NodeException("Node stores unexpected type: " ~ object.type.text ~
+                                ". Expected: " ~ typeid(T).text, startMark_);
             }
 
             // If we're getting from a mapping and we're not getting Node.Pair[],
@@ -543,8 +541,8 @@ struct Node
                 static if(!stringConversion)
                 {
                     if(isString){return to!T(value_.get!string);}
-                    throw new NodeException("Node stores unexpected type: " ~ type.toString() ~
-                                    ". Expected: " ~ typeid(T).toString, startMark_);
+                    throw new NodeException("Node stores unexpected type: " ~ type.text ~
+                                    ". Expected: " ~ typeid(T).text, startMark_);
                 }
                 else
                 {
@@ -571,12 +569,12 @@ struct Node
                 {
                     const temp = value_.get!(const long);
                     enforce(temp >= T.min && temp <= T.max,
-                            new NodeException("Integer value of type " ~ typeid(T).toString() ~
+                            new NodeException("Integer value of type " ~ typeid(T).text ~
                                       " out of range. Value: " ~ to!string(temp), startMark_));
                     return to!T(temp);
                 }
-                throw new NodeException("Node stores unexpected type: " ~ type.toString() ~
-                                ". Expected: " ~ typeid(T).toString(), startMark_);
+                throw new NodeException("Node stores unexpected type: " ~ type.text ~
+                                ". Expected: " ~ typeid(T).text, startMark_);
             }
             assert(false, "This code should never be reached");
         }
@@ -595,8 +593,8 @@ struct Node
                 {
                     return (cast(const YAMLContainer!(Unqual!T))object).value_;
                 }
-                throw new NodeException("Node has unexpected type: " ~ object.type.toString() ~
-                                ". Expected: " ~ typeid(T).toString, startMark_);
+                throw new NodeException("Node has unexpected type: " ~ object.type.text ~
+                                ". Expected: " ~ typeid(T).text, startMark_);
             }
 
             // If we're getting from a mapping and we're not getting Node.Pair[],
@@ -608,8 +606,8 @@ struct Node
                 static if(!stringConversion)
                 {
                     if(isString){return to!T(value_.get!(const string));}
-                    throw new NodeException("Node stores unexpected type: " ~ type.toString() ~
-                                    ". Expected: " ~ typeid(T).toString(), startMark_);
+                    throw new NodeException("Node stores unexpected type: " ~ type.text ~
+                                    ". Expected: " ~ typeid(T).text, startMark_);
                 }
                 else
                 {
@@ -637,12 +635,12 @@ struct Node
                 {
                     const temp = value_.get!(const long);
                     enforce(temp >= T.min && temp <= T.max,
-                            new NodeException("Integer value of type " ~ typeid(T).toString() ~
+                            new NodeException("Integer value of type " ~ typeid(T).text ~
                                       " out of range. Value: " ~ to!string(temp), startMark_));
                     return to!T(temp);
                 }
-                throw new NodeException("Node stores unexpected type: " ~ type.toString() ~
-                                ". Expected: " ~ typeid(T).toString, startMark_);
+                throw new NodeException("Node stores unexpected type: " ~ type.text ~
+                                ". Expected: " ~ typeid(T).text, startMark_);
             }
         }
 
@@ -1207,7 +1205,7 @@ struct Node
             {
                 return value_.get!(const YAMLObject).cmp(rhs.value_.get!(const YAMLObject));
             }
-            assert(false, "Unknown type of node for comparison : " ~ type.toString());
+            assert(false, "Unknown type of node for comparison : " ~ type.text);
         }
 
         // Get a string representation of the node tree. Used for debugging.
@@ -1245,7 +1243,7 @@ struct Node
             if(isScalar)
             {
                 return indent ~ "scalar(" ~
-                       (convertsTo!string ? get!string : type.toString()) ~ ")\n";
+                       (convertsTo!string ? get!string : type.text) ~ ")\n";
             }
             assert(false);
         }

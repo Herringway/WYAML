@@ -8,6 +8,7 @@ module wyaml.tests.errors;
 
 unittest {
 	import std.array;
+	import std.conv;
 	import std.meta;
 
 	import wyaml.tests.common;
@@ -22,7 +23,7 @@ unittest {
 			nodes = Loader(buffer).loadAll().array;
 		}
 		catch(Exception e) {
-			version(verboseTest) { writeln(typeid(e).toString(), "\n", e); }
+			version(verboseTest) { writeln(typeid(e).text, "\n", e); }
 			return;
 		}
 		assert(false, "Expected an exception");

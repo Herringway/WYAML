@@ -7,6 +7,7 @@ module wyaml.tests.constructor;
 
 
 version(unittest) {
+	import std.conv : to, text;
 	import std.datetime : DateTime, SysTime, SimpleTimeZone, dur, UTC;
 	import std.exception : enforce;
 	import std.meta : AliasSeq;
@@ -281,8 +282,14 @@ version(unittest) {
 			return 0;
 		}
 
-		override string toString() {
-			return format("TestClass(", x, ", ", y, ", ", z, ")");
+		void toString(scope void delegate(const(char)[]) sink) const {
+			sink("TestClass(");
+			sink(x.text);
+			sink(", ");
+			sink(y.text);
+			sink(", ");
+			sink(z.text);
+			sink(")");
 		}
 	}
 

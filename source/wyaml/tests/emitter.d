@@ -8,6 +8,7 @@ module wyaml.tests.emitter;
 
 unittest {
 	import std.algorithm : among;
+	import std.conv : text;
 	import std.outbuffer : OutBuffer;
 	import std.range : lockstep;
 	import std.typecons : tuple, AliasSeq;
@@ -72,10 +73,10 @@ unittest {
 		version(verboseTest) {
 			writeln(testName);
 			writeln("ORIGINAL:\n", data);
-			writeln("OUTPUT:\n", emitStream.toString);
+			writeln("OUTPUT:\n", emitStream.text);
 		}
 
-		auto loader2        = Loader(emitStream.toString());
+		auto loader2        = Loader(emitStream.text);
 		loader2.name        = "TEST";
 		loader2.constructor = new Constructor;
 		loader2.resolver    = new Resolver;
@@ -99,9 +100,9 @@ unittest {
 			dumper.emit(events);
 			version(verboseTest) {
 				writeln("OUTPUT (canonical=", canonical, "):\n",
-						emitStream.toString());
+						emitStream.text);
 			}
-			auto loader2        = Loader(emitStream.toString());
+			auto loader2        = Loader(emitStream.text);
 			loader2.name        = "TEST";
 			loader2.constructor = new Constructor;
 			loader2.resolver    = new Resolver;
@@ -143,11 +144,11 @@ unittest {
 				auto emitStream = new OutBuffer;
 				dumper(emitStream).emit(styledEvents);
 				version(verboseTest) {
-					writeln("OUTPUT (", testName, ", ", to!string(flowStyle), ", ",
-							to!string(style), ")");
-					writeln(emitStream.toString);
+					writeln("OUTPUT (", testName, ", ", flowStyle.text, ", ",
+							style.text, ")");
+					writeln(emitStream.text);
 				}
-				auto loader2        = Loader(emitStream.toString());
+				auto loader2        = Loader(emitStream.text);
 				loader2.name        = "TEST";
 				loader2.constructor = new Constructor;
 				loader2.resolver    = new Resolver;

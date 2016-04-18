@@ -306,7 +306,7 @@ final class Constructor
                 return Node.rawNode(delegateLocation!T[tag](node), start, tag,
                                     scalarStyle, collectionStyle);
             } catch(Exception e) {
-                throw new ConstructorException("Error constructing " ~ typeid(T).toString()
+                throw new ConstructorException("Error constructing " ~ typeid(T).text
                                 ~ ":\n" ~ e.msg, start, end);
             }
         }
