@@ -112,40 +112,36 @@ bool isPrintableChar(in dchar val) pure @safe nothrow @nogc {
 }
 // Unittests.
 
-void testPeekPrefixForward(R)()
-{
-    char[] data = "data".dup;
-    auto reader = new R(data);
-    assert(reader.save().startsWith("data"));
-    reader.popFrontN(2);
-}
 
-void testUTF(R)()
-{
-    dchar[] data = cast(dchar[])"data";
-    void utf_test(T)(T[] data)
-    {
-        char[] bytes = data.to!(char[]);
-        auto reader = new R(bytes);
-        assert(reader.startsWith("data"));
+unittest {
+    void testPeekPrefixForward(R)() {
+        char[] data = "data".dup;
+        auto reader = new R(data);
+        assert(reader.save().startsWith("data"));
+        reader.popFrontN(2);
     }
-    utf_test!char(to!(char[])(data));
-    utf_test!wchar(to!(wchar[])(data));
-    utf_test(data);
-}
 
-void test1Byte(R)()
-{
-    char[] data = [97];
+    void testUTF(R)() {
+        dchar[] data = cast(dchar[])"data";
+        void utf_test(T)(T[] data) {
+            char[] bytes = data.to!(char[]);
+            auto reader = new R(bytes);
+            assert(reader.startsWith("data"));
+        }
+        utf_test!char(to!(char[])(data));
+        utf_test!wchar(to!(wchar[])(data));
+        utf_test(data);
+    }
 
-    auto reader = new R(data);
-    assert(reader.front == 'a');
-    reader.popFront();
-    assert(reader.empty);
-}
+    void test1Byte(R)() {
+        char[] data = [97];
 
-unittest
-{
+        auto reader = new R(data);
+        assert(reader.front == 'a');
+        reader.popFront();
+        assert(reader.empty);
+    }
+
     testPeekPrefixForward!Reader();
     testUTF!Reader();
     test1Byte!Reader();
