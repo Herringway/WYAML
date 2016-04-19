@@ -61,6 +61,30 @@ alias squareBrackets = AliasSeq!('[', ']');
 alias parentheses = AliasSeq!('(', ')');
 alias miscValidURIChars = AliasSeq!('-', ';', '/', '?', ':', '&', '@', '=', '+', '$', ',', '_', '.', '!', '~', '*', '\'', parentheses, squareBrackets, '%');
 
+enum bool isYAMLStream(T) = isInputRange!T && is(Unqual!(ElementType!T) == dchar);
+enum bool isForwardYAMLStream(T) = isYAMLStream!T && isForwardRange!T;
+enum bool isMarkable(T) = isForwardYAMLStream!T && hasMember!(T, "mark");
+
+template worksWithYAMLStreams(alias func) {
+    struct SimpleInputRange {
+        dchar front;
+        bool empty() { return true; }
+        void popFront() { }
+    }
+    SimpleInputRange test;
+    enum worksWithYAMLStreams = __traits(compiles, func(test));
+}
+template worksWithForwardYAMLStreams(alias func) {
+    struct SimpleInputRange {
+        dchar front;
+        bool empty() { return true; }
+        void popFront() { }
+        SimpleInputRange save() { return this; }
+    }
+    SimpleInputRange test;
+    enum worksWithForwardYAMLStreams = __traits(compiles, func(test));
+}
+
 /// Marked exception thrown at scanner errors.
 ///
 /// See_Also: MarkedYAMLException
@@ -1100,7 +1124,8 @@ final class Scanner
             return scalarToken(startMark, endMark, slice.toUTF8, ScalarStyle.Plain);
         }
 }
-auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+//TODO: split into two funcs
+auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardYAMLStream!T) {
     dchar c = void;
     size_t length;
     // Moved the if() out of the loop for optimization.
@@ -1147,6 +1172,7 @@ auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unq
     return output;
 }
 @safe pure unittest {
+    static assert(worksWithForwardYAMLStreams!(x => {return popScalar(x, 0);}));
     auto test = "simpleword ";
     assert(test.popScalar(0) == "simpleword");
     assert(test == " ");
@@ -1174,13 +1200,14 @@ auto popScalar(T)(ref T reader, in int flowLevel) if (isForwardRange!T && is(Unq
     assert(test == ",");
 }
 /// Move to the next non-space character.
-void skipToNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void skipToNextNonSpace(T)(ref T reader) if (isYAMLStream!T)
 {
     auto length = reader.until!(x => x != ' ').walkLength;
     static if(isArray!T)
         reader.popFrontN(length);
 }
 @safe pure unittest {
+    static assert(worksWithYAMLStreams!skipToNextNonSpace);
     auto str = "";
     str.skipToNextNonSpace();
     assert(str == "");
@@ -1189,7 +1216,7 @@ void skipToNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elem
     assert(str == "c");
 }
 /// Scan a string of alphanumeric or "-_" characters.
-auto popAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isYAMLStream!T)
 {
     auto output = reader.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
     enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader));
@@ -1198,6 +1225,7 @@ auto popAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwar
     return output;
 }
 @safe pure unittest {
+    static assert(worksWithYAMLStreams!popAlphaNumeric);
     auto str = "";
     assertThrown(str.popAlphaNumeric());
     str = "1234";
@@ -1216,16 +1244,17 @@ auto popAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwar
     assertThrown(str.popAlphaNumeric());
 }
 /// Scan all characters until next line break.
-auto popToNextBreak(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popToNextBreak(T)(ref T reader) if (isYAMLStream!T)
 {
     return reader.until!(x => x.among!allBreaks).array;
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!popToNextBreak);
     auto str = "";
     assert(str.popToNextBreak() == "");
 }
 /// Scan name of a directive token.
-auto popDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popDirectiveName(T)(ref T reader) if (isYAMLStream!T)
 {
     // Scan directive name.
     auto output = reader.popAlphaNumeric("a directive");
@@ -1233,6 +1262,7 @@ auto popDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elemen
     return output;
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!popDirectiveName);
     auto str = "";
     assertThrown(str.popDirectiveName());
     str = "test ";
@@ -1240,7 +1270,7 @@ auto popDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elemen
     assert(str == " ");
 }
 /// Scan value of a YAML directive token. Returns major, minor version separated by '.'.
-auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popYAMLDirectiveValue(T)(ref T reader) if (isYAMLStream!T)
 {
     dstring output;
     reader.skipToNextNonSpace();
@@ -1259,6 +1289,7 @@ auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 }
 
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!popYAMLDirectiveValue);
     auto str = "";
     assertThrown(str.popYAMLDirectiveValue());
     str = "1.2 ";
@@ -1266,7 +1297,7 @@ auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
     assert(str == " ");
 }
 /// Scan a number from a YAML directive.
-auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popYAMLDirectiveNumber(T)(ref T reader) if (isYAMLStream!T)
 {
     enforce(!reader.empty, new UnexpectedTokenException("directive", "digit", reader));
     enforce(reader.front.isDigit, new UnexpectedTokenException("directive", "digit", reader));
@@ -1277,6 +1308,7 @@ auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(
 }
 
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!popYAMLDirectiveNumber);
     auto str = "";
     assertThrown(str.popYAMLDirectiveNumber());
     str = "1 ";
@@ -1286,7 +1318,7 @@ auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(
 /// Scan value of a tag directive.
 ///
 /// Returns: Length of tag handle (which is before tag prefix) in scanned data
-auto popTagDirectiveValue(T)(ref T reader, out size_t handleLength) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popTagDirectiveValue(T)(ref T reader, out size_t handleLength) if (isForwardYAMLStream!T)
 {
     dstring output;
     reader.skipToNextNonSpace();
@@ -1298,6 +1330,8 @@ auto popTagDirectiveValue(T)(ref T reader, out size_t handleLength) if (isForwar
     return output;
 }
 /*@safe pure*/ unittest { //ADD MORE
+    static assert(worksWithForwardYAMLStreams!(x => { size_t whatever; return popTagDirectiveValue(x, whatever); } ));
+
     auto str = "";
     size_t handleLength;
     assertThrown(str.popTagDirectiveValue(handleLength));
@@ -1308,13 +1342,14 @@ auto popTagDirectiveValue(T)(ref T reader, out size_t handleLength) if (isForwar
 }
 
 /// Scan handle of a tag directive.
-auto popTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popTagDirectiveHandle(T)(ref T reader) if (isForwardYAMLStream!T)
 {
     auto output = reader.popTagHandle("directive");
     enforce(reader.startsWith(' '), new UnexpectedTokenException("directive", "' '", reader));
     return output;
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithForwardYAMLStreams!popTagDirectiveHandle);
     auto str = "";
     assertThrown(str.popTagDirectiveHandle());
     str = "!! ";
@@ -1322,13 +1357,14 @@ auto popTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 }
 
 /// Scan prefix of a tag directive.
-auto popTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popTagDirectivePrefix(T)(ref T reader) if (isYAMLStream!T)
 {
     auto output = reader.popTagURI("directive");
     enforce(reader.startsWith(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader));
     return output;
 }
 /*@safe pure*/ unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!popTagDirectivePrefix);
     auto str = "";
     assertThrown(str.popTagDirectivePrefix());
     str = " ";
@@ -1336,7 +1372,7 @@ auto popTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 }
 
 /// Scan (and ignore) ignored line after a directive.
-void skipDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void skipDirectiveIgnoredLine(T)(ref T reader) if (isYAMLStream!T)
 {
     reader.skipToNextNonSpace();
     if (reader.empty)
@@ -1346,6 +1382,7 @@ void skipDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual
     reader.popLineBreak();
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!skipDirectiveIgnoredLine);
     auto str = "";
     assertNotThrown(str.skipDirectiveIgnoredLine());
     str = "\n";
@@ -1353,7 +1390,7 @@ void skipDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual
     assert(str == "");
 }
 /// Scan chomping and indentation indicators of a scalar token.
-Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isYAMLStream!T)
 {
     auto chomping = Chomping.Clip;
     int increment = int.min;
@@ -1375,6 +1412,7 @@ Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isForwardRan
 }
 
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!popBlockScalarIndicators);
     auto str = "";
     assert(str.popBlockScalarIndicators() == tuple(Chomping.Clip, int.min));
     str = " ";
@@ -1388,7 +1426,7 @@ Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isForwardRan
 ///
 /// c        = The character that may be a chomping indicator.
 /// chomping = Write the chomping value here, if detected.
-bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) if (isYAMLStream!T)
 {
     if(!c.among!(chompIndicators)) { return false; }
     chomping = c == '+' ? Chomping.Keep : Chomping.Strip;
@@ -1414,7 +1452,7 @@ bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) if (isForw
 ///             the next character in the Reader.
 /// increment = Write the increment value here, if detected.
 /// startMark = Mark for error messages.
-bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isYAMLStream!T)
 {
     if(!c.isDigit) { return false; }
     // Convert a digit to integer.
@@ -1434,7 +1472,7 @@ bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isForward
     assert(str.getIncrement(c, inc) == false);
 }
 /// Scan (and ignore) ignored line in a block scalar.
-void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+void skipBlockScalarIgnoredLine(T)(ref T reader) if (isYAMLStream!T)
 {
     reader.skipToNextNonSpace();
     enforce(!reader.empty, new UnexpectedTokenException("block scalar", "comment or line break", reader));
@@ -1447,13 +1485,14 @@ void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqu
 }
 
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!skipBlockScalarIgnoredLine);
     auto str = "";
     assertThrown(str.skipBlockScalarIgnoredLine());
     str = "\n";
     assertNotThrown(str.skipBlockScalarIgnoredLine());
 }
 /// Scan indentation in a block scalar, returning line breaks and max indent.
-auto popBlockScalarIndentation(T)(ref T reader, out size_t maxIndent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popBlockScalarIndentation(T)(ref T reader, out size_t maxIndent) if (isYAMLStream!T)
 {
     dstring output;
     while(reader.startsWith(newLinesPlusSpaces))
@@ -1470,13 +1509,14 @@ auto popBlockScalarIndentation(T)(ref T reader, out size_t maxIndent) if (isForw
     return output;
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!(x => { size_t whatever; return popBlockScalarIndentation(x, whatever); } ));
     auto str = "";
     size_t maxIndent;
     assert(str.popBlockScalarIndentation(maxIndent) == "");
     assert(maxIndent == 0);
 }
 /// Scan line breaks at lower or specified indentation in a block scalar.
-auto popBlockScalarBreaks(T)(ref T reader, const size_t indent) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popBlockScalarBreaks(T)(ref T reader, const size_t indent) if (isYAMLStream!T)
 {
     dstring output;
 
@@ -1490,11 +1530,12 @@ auto popBlockScalarBreaks(T)(ref T reader, const size_t indent) if (isForwardRan
     return output;
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithYAMLStreams!(x => popBlockScalarBreaks(x, 0)));
     auto str = "";
     assert(str.popBlockScalarBreaks(0) == "");
 }
 /// Scan nonspace characters in a flow scalar.
-auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isForwardYAMLStream!T)
 {
     dstring output;
     for(;;) with(ScalarStyle)
@@ -1556,6 +1597,7 @@ auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFor
     return output;
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithForwardYAMLStreams!(x => popFlowScalarNonSpaces(x, ScalarStyle.SingleQuoted)));
     auto str = "";
     assert(str.popFlowScalarNonSpaces(ScalarStyle.SingleQuoted) == "");
     assert(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted) == "");
@@ -1593,10 +1635,10 @@ auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFor
     assertThrown(str.popFlowScalarNonSpaces(ScalarStyle.DoubleQuoted));
 }
 /// Scan space characters in a flow scalar.
-auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popFlowScalarSpaces(T)(ref T reader) if (isYAMLStream!T)
 {
     dstring output;
-    dstring whitespaces = reader.until!(x => !x.among!whiteSpaces).array;
+    dstring whitespaces = reader.until!(x => !x.among!whiteSpaces).array.to!dstring;
     static if (isArray!T)
         reader.popFrontN(whitespaces.length);
 
@@ -1618,6 +1660,7 @@ auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Ele
     return output;
 }
 @safe pure unittest {
+    static assert(worksWithForwardYAMLStreams!popFlowScalarSpaces);
     auto str = "";
     assert(str.popFlowScalarSpaces() == "");
     str = " ";
@@ -1638,11 +1681,11 @@ auto popFlowScalarSpaces(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Ele
     assert(str == "a");
 }
 /// Scan line breaks in a flow scalar.
-dstring popFlowScalarBreaks(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dstring popFlowScalarBreaks(T)(ref T reader) if (isYAMLStream!T) {
     bool waste;
     return reader.popFlowScalarBreaks(waste);
 }
-auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardYAMLStream!T) {
     dstring output;
     for(;;)
     {
@@ -1657,20 +1700,20 @@ auto popFlowScalarBreaks(T)(ref T reader, out bool extraBreaks) if (isForwardRan
         // Encountered a non-whitespace non-linebreak character, so we're done.
         if (!reader.startsWith(newLines)) break;
 
-        const lineBreak = reader.popLineBreak();
         extraBreaks = true;
-        output ~= lineBreak;
+        output ~= reader.popLineBreak();
     }
     return output;
 }
 @safe pure unittest {
+    static assert(worksWithForwardYAMLStreams!(x => { bool whatever; return popFlowScalarBreaks(x, whatever); } ));
     auto str = "     ";
     assert(str.popFlowScalarBreaks() == "");
 
     str = " \n  ";
     assert(str.popFlowScalarBreaks() == "");
 }
-bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar)) {
+bool end(T)(T reader) if (isForwardYAMLStream!T) {
     if (reader.empty)
         return true;
     auto savedReader = reader.save();
@@ -1683,6 +1726,7 @@ bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar
     return false;
 }
 @safe pure unittest {
+    static assert(worksWithForwardYAMLStreams!end);
     assert("---\r\n".end);
     assert("...\n".end);
     assert(!"...a".end);
@@ -1690,14 +1734,14 @@ bool end(T)(T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar
     assert("".end);
 }
 /// Scan spaces in a plain scalar.
-auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))
+auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isForwardYAMLStream!T)
 {
     dstring output;
     // The specification is really confusing about tabs in plain scalars.
     // We just forbid them completely. Do not use tabs in YAML!
 
     // Get as many plain spaces as there are.
-    dstring whitespaces = reader.until!(x => x != ' ').array;
+    dstring whitespaces = reader.until!(x => x != ' ').array.to!dstring;
     // No newline after the spaces (if any)
     if(!reader.startsWith(newLines))
         return whitespaces;
@@ -1730,13 +1774,13 @@ auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!
     return output;
 }
 @safe pure unittest { //ADD MORE
+    static assert(worksWithForwardYAMLStreams!(x => { bool tf; return popPlainSpaces(x, tf);}));
     auto str = "";
     bool allowSimpleKey;
     assert(str.popPlainSpaces(allowSimpleKey) == "");
 }
 /// Scan handle of a tag token.
-auto popTagHandle(T)(ref T reader, string name = "tag handle")
-{
+auto popTagHandle(T)(ref T reader, string name = "tag handle") if (isForwardYAMLStream!T) {
     enforce(reader.startsWith('!'), new UnexpectedTokenException(name, "'!'", reader));
 
     uint length = 1;
@@ -1758,6 +1802,7 @@ auto popTagHandle(T)(ref T reader, string name = "tag handle")
     return output;
 }
 @safe pure unittest {
+    static assert(worksWithForwardYAMLStreams!popTagHandle);
     auto str = "";
     assertThrown(str.popTagHandle());
 
@@ -1772,7 +1817,7 @@ auto popTagHandle(T)(ref T reader, string name = "tag handle")
     assert(str == "wordswords ");
 }
 /// Scan URI in a tag token.
-auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar))  {
+auto popTagURI(T)(ref T reader, string name = "URI") if (isYAMLStream!T)  {
     // Note: we do not check if URI is well-formed.
     dstring output;
     while(!reader.empty && (reader.front.isAlphaNum || reader.front.among!(miscValidURIChars))) {
@@ -1788,6 +1833,7 @@ auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Un
     return output;
 }
 /*@safe pure*/ unittest {
+    static assert(worksWithYAMLStreams!popTagURI);
     auto str = "";
     assertThrown(str.popTagURI());
 
@@ -1804,13 +1850,13 @@ auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Un
     assert(str == " ");
 }
 /// Scan URI escape sequences.
-dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isYAMLStream!T) {
     import std.uri : decodeComponent;
     dstring uriBuf;
     while(reader.startsWith('%')) {
         reader.popFront();
         uriBuf ~= '%';
-        dstring nextTwo = reader.take(2).array;
+        auto nextTwo = reader.take(2).array;
         static if(isArray!T)
             reader.popFrontN(2);
         if(!nextTwo.all!isHexDigit)
@@ -1820,6 +1866,7 @@ dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRa
     return decodeComponent(uriBuf).to!(dstring);
 }
 /*@safe pure*/ unittest {
+    static assert(worksWithYAMLStreams!popURIEscapes);
     //it's a space!
     auto str = "%20";
     assert(str.popURIEscapes() == " ");
@@ -1874,7 +1921,7 @@ dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRa
 ///   '\u2028'    :   '\u2028'
 ///   '\u2029     :   '\u2029'
 ///   no break    :   '\0'
-dchar popLineBreak(T)(ref T reader) if (isInputRange!T && is(Unqual!(ElementType!T) == dchar)) {
+dchar popLineBreak(T)(ref T reader) if (isYAMLStream!T) {
     if(reader.startsWith("\r\n")) {
         static if(isArray!T)
             reader.popFront();
@@ -1893,6 +1940,7 @@ dchar popLineBreak(T)(ref T reader) if (isInputRange!T && is(Unqual!(ElementType
     }
 }
 @safe pure unittest {
+    static assert(worksWithYAMLStreams!popLineBreak);
     string str = "\r\n";
     assert(str.popLineBreak() == '\n');
     assert(str == "");
