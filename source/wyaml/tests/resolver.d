@@ -24,12 +24,8 @@ unittest {
 		string correctTag;
 		Node node;
 
-		scope(failure) {
-			version(verboseTest) {
-				writeln("Correct tag: ", correctTag);
-				writeln("Node: ", node.debugString);
-			}
-		}
+		scope(failure)
+			writeComparison!("Correct tag", "Node")(testName, correctTag, node);
 
 		correctTag = detect.strip();
 		node = Loader(data).loadAll().front;

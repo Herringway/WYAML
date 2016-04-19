@@ -69,13 +69,8 @@ unittest {
 		auto events = cast(Event[])loader.parse();
 		auto emitStream = new OutBuffer;
 		dumper(emitStream).emit(events);
-
-		version(verboseTest) {
-			writeln(testName);
-			writeln("ORIGINAL:\n", data);
-			writeln("OUTPUT:\n", emitStream.text);
-		}
-
+		scope(failure)
+			writeComparison!("Original", "Output")(testName, data, emitStream.text);
 		auto loader2        = Loader(emitStream.text);
 		loader2.name        = "TEST";
 		loader2.constructor = new Constructor;
@@ -89,7 +84,7 @@ unittest {
 	/// comparing events from parsing the emitted result with originally parsed events.
 	///
 	/// Params:  canonical = Canonical YAML data to parse.
-	void testEmitterOnCanonical(string canonicalData, string) {
+	void testEmitterOnCanonical(string canonicalData, string testName) {
 		//Must exist due to Anchor, Tags reference counts.
 		auto loader = Loader(canonicalData);
 		auto events = cast(Event[])loader.parse();
@@ -98,10 +93,8 @@ unittest {
 			auto dumper = dumper(emitStream);
 			dumper.canonical = canonical;
 			dumper.emit(events);
-			version(verboseTest) {
-				writeln("OUTPUT (canonical=", canonical, "):\n",
-						emitStream.text);
-			}
+			scope(failure)
+				writeComparison!("Canonical", "Output")(testName, canonical, emitStream.text);
 			auto loader2        = Loader(emitStream.text);
 			loader2.name        = "TEST";
 			loader2.constructor = new Constructor;
@@ -143,11 +136,8 @@ unittest {
 				}
 				auto emitStream = new OutBuffer;
 				dumper(emitStream).emit(styledEvents);
-				version(verboseTest) {
-					writeln("OUTPUT (", testName, ", ", flowStyle.text, ", ",
-							style.text, ")");
-					writeln(emitStream.text);
-				}
+				scope(failure)
+					writeComparison!("Original", "Output")(testName, flowStyle.text ~ style.text, emitStream.text);
 				auto loader2        = Loader(emitStream.text);
 				loader2.name        = "TEST";
 				loader2.constructor = new Constructor;

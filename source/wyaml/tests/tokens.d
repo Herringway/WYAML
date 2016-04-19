@@ -19,7 +19,7 @@ unittest {
 	 * Params:  data   = Data to scan.
 	 *          tokens = Data containing expected tokens.
 	 */
-	void testTokens(string data, string expected, string) {
+	void testTokens(string data, string expected, string testName) {
 		//representations of YAML tokens in tokens file.
 		auto replace = [TokenID.Directive          : "%"   ,
 						TokenID.DocumentStart      : "---" ,
@@ -42,18 +42,13 @@ unittest {
 
 		string[] tokens1;
 		auto tokens2 = expected.split();
-		scope(exit) {
-			version(verboseTest) {
-				writeln("tokens1: ", tokens1, "\ntokens2: ", tokens2);
-			}
-		}
+		scope(failure)
+			writeComparison!("Tokens1", "Tokens2")(testName, tokens1, tokens2);
 
 		auto loader = Loader(data);
-		foreach(token; loader.scan()) {
-			if(token.id != TokenID.StreamStart && token.id != TokenID.StreamEnd) {
+		foreach(token; loader.scan())
+			if(token.id != TokenID.StreamStart && token.id != TokenID.StreamEnd)
 				tokens1 ~= replace[token.id];
-			}
-		}
 
 		assert(tokens1 == tokens2);
 	}
@@ -66,12 +61,11 @@ unittest {
 	 * Params:  data      = Data to scan.
 	 *          canonical = Canonical YAML data to scan.
 	 */
-	void testScanner(string data, string canonical, string) {
+	void testScanner(string data, string canonical, string testName) {
 		foreach(yaml; [data, canonical]) {
 			string[] tokens;
-			scope(exit) {
-				version(verboseTest) {writeln(tokens);}
-			}
+			scope(failure)
+				writeComparison!("Token")(testName, tokens);
 			auto loader = Loader(yaml);
 			foreach(ref token; loader.scan()){tokens ~= to!string(token.id);}
 		}

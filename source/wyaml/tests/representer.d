@@ -31,15 +31,8 @@ unittest {
 		string output;
 		Node[] readNodes;
 
-		scope(failure) {
-			version(verboseTest) {
-				writeln("Expected nodes:");
-				foreach(ref n; expectedNodes){writeln(n.debugString, "\n---\n");}
-				writeln("Read nodes:");
-				foreach(ref n; readNodes){writeln(n.debugString, "\n---\n");}
-				writeln("OUTPUT:\n", output);
-			}
-		}
+		scope(failure)
+			writeComparison!("Expected nodes", "Read nodes", "Output")(testName, expectedNodes, readNodes, output);
 
 		auto emitStream  = new OutBuffer;
 		auto representer = new Representer;

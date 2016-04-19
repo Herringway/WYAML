@@ -9,7 +9,6 @@ module wyaml.tests.inputoutput;
 unittest {
 	import std.array;
 	import std.meta;
-	import std.utf;
 
 	import wyaml.tests.common;
 

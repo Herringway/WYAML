@@ -1,23 +1,24 @@
 //          Copyright Ferdinand Majerech 2011.
+//          Copyright Cameron Ross 2016.
 // Distributed under the Boost Software License, Version 1.0.
 //    (See accompanying file LICENSE_1_0.txt or copy at
 //          http://www.boost.org/LICENSE_1_0.txt)
 
 module wyaml.tests.common;
 
-public import std.stdio;
 public import wyaml;
 
+import std.conv;
 import std.meta;
 
 package:
 
 void run2(alias func, string[] testExts, T...)(string testTitle) {
+	import std.stdio : writeln, write;
 	writeln("=========================================");
 	writeln("WYAML ", testTitle, " test");
 	scope(exit) {
 		writeln("\nTests: ", T.length);
-		writeln("=========================================");
 	}
 	foreach (testName; T) {
 		try {
@@ -25,9 +26,7 @@ void run2(alias func, string[] testExts, T...)(string testTitle) {
 			write(".");
 		} catch (Exception e) {
 			write("Error");
-			version(verboseTest) {
-				writeln(e);
-			}
+			writeln(e);
 		}
 	}
 }
@@ -39,12 +38,29 @@ template buildTestArgs(string[] exts, string T) {
 	else
 		alias buildTestArgs = AliasSeq!();
 }
-void writeComparison(T)(T expected, T actual) {
-	version(verboseTest) {
-		writeln("Expected value:");
-		writeln(expected.debugString);
-		writeln("\n");
-		writeln("Actual value:");
-		writeln(actual.debugString);
-	}
+void writeComparison(string expectedLabel = "Expected value", string actualLabel = "Actual value", T, U)(string testName, T expected, U actual) {
+	import std.stdio : writeln;
+	writeItem!expectedLabel(expected);
+	writeln("\n");
+	writeItem!actualLabel(actual);
+}
+void writeComparison(string expectedLabel = "Expected value", T)(string testName, T expected) {
+	import std.stdio : writeln;
+	writeItem!expectedLabel(expected);
+}
+void writeComparison(string expectedLabel = "Expected value", string secondLabel = "Actual value", string thirdLabel = "Output", T, U, V)(string testName, T expected, U actual, V output) {
+	import std.stdio : writeln;
+	writeItem!expectedLabel(expected);
+	writeln("\n");
+	writeItem!secondLabel(actual);
+	writeln("\n");
+	writeItem!thirdLabel(output);
+}
+void writeItem(string label, T)(T item) {
+	import std.stdio : writeln;
+	writeln(label, ":");
+	static if(is(typeof(item.debugString)))
+		writeln(item.debugString);
+	else
+		writeln(item.text);
 }

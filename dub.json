@@ -15,12 +15,6 @@
             "name": "unittest",
             "targetType": "library",
             "stringImportPaths": ["test/data"]
-        },
-        {
-            "name": "verbose-test",
-            "targetType": "library",
-            "versions": ["verboseTest"],
-            "stringImportPaths": ["test/data"]
         }
     ],
     "subPackages": [

@@ -21,6 +21,8 @@ unittest {
 		auto canonicalEvents = Loader(canonical).parse();
 
 		foreach(test, canon; lockstep(dataEvents, canonicalEvents, StoppingPolicy.requireSameLength)) {
+			scope(failure)
+				writeComparison(testName, canon, test);
 			assert(test.id == canon.id, "testParser(" ~ testName ~ ") failed");
 		}
 	}
@@ -36,7 +38,7 @@ unittest {
 
 		foreach(test, canon; lockstep(dataLoaded, canonicalLoaded, StoppingPolicy.requireSameLength)) {
 			scope(failure)
-			writeComparison(canon, test);
+				writeComparison(testName, canon, test);
 			assert(test == canon, "testLoader(" ~ testName ~ ") failed");
 		}
 	}

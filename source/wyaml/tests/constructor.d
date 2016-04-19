@@ -358,7 +358,7 @@ unittest {
 		foreach(node, expected; lockstep(loader.loadAll(), exp, StoppingPolicy.requireSameLength))
 		{
 			scope(failure)
-				writeComparison(expected, node);
+				writeComparison(testName, expected, node);
 			assert(node.equals!(No.useTag)(expected), testName ~ " failed");
 		}
 	}
