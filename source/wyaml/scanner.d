@@ -8,12 +8,7 @@
 /// Code based on PyYAML: http://www.pyyaml.org
 module wyaml.scanner;
 
-
-import core.stdc.string;
-
 import std.algorithm;
-import std.array;
-import std.container;
 import std.conv;
 import std.ascii : isAlphaNum, isDigit, isHexDigit;
 import std.exception;

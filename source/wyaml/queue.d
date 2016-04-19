@@ -8,7 +8,6 @@ module wyaml.queue;
 
 import std.array;
 
-
 package:
 
 struct Queue(T) {

@@ -14,10 +14,7 @@
  */
 module wyaml.resolver;
 
-
-import std.conv;
 import std.regex;
-import std.stdio;
 import std.typecons;
 import std.utf;
 

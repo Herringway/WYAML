@@ -8,9 +8,6 @@
 /// Functionality that may sometimes be needed but allows unsafe or unstandard behavior, and should only be used in specific cases.
 module wyaml.hacks;
 
-
-import std.stdio;
-
 import wyaml.node;
 import wyaml.style;
 

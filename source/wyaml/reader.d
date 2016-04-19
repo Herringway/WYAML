@@ -7,19 +7,11 @@
 module wyaml.reader;
 
 import std.algorithm;
-import std.array;
 import std.conv;
-import std.exception;
 import std.range;
-import std.stdio;
-import std.string;
-import std.system;
-import std.typecons;
 import std.utf;
 
 import wyaml.exception;
-
-
 
 package:
 
