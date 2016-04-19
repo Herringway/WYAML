@@ -10,6 +10,7 @@
  */
 module wyaml.event;
 
+import std.algorithm;
 import std.array;
 import std.conv;
 import std.typecons;
@@ -24,8 +25,7 @@ import wyaml.style;
 
 package:
 ///Event types.
-enum EventID : ubyte
-{
+enum EventID : ubyte {
     Invalid = 0,     /// Invalid (uninitialized) event.
     StreamStart,     /// Stream start
     StreamEnd,       /// Stream end
@@ -38,8 +38,7 @@ enum EventID : ubyte
     MappingStart,    /// Mapping start
     MappingEnd       /// Mapping end
 }
-struct Event
-{
+struct Event {
     @disable int opCmp(ref Event);
 
     ///Value of the event, if any.
@@ -48,10 +47,8 @@ struct Event
     Mark startMark;
     ///End position of the event in file/stream.
     Mark endMark;
-    union
-    {
-        struct
-        {
+    union {
+        struct {
             ///Anchor of the event, if any.
             Anchor anchor;
             ///Tag of the event, if any.
@@ -92,9 +89,7 @@ struct Event
  *          end      = End position of the event in the file/stream.
  *          anchor   = Anchor, if this is an alias event.
  */
-Event event(EventID id)(const Mark start, const Mark end, const Anchor anchor = Anchor())
-    pure @safe nothrow
-{
+Event event(EventID id)(const Mark start, const Mark end, const Anchor anchor = Anchor()) {
     Event result;
     result.startMark = start;
     result.endMark   = end;
@@ -103,6 +98,9 @@ Event event(EventID id)(const Mark start, const Mark end, const Anchor anchor = 
     return result;
 }
 
+pure @safe nothrow unittest {
+    auto v = event!(EventID.SequenceStart)(Mark(), Mark(), Anchor());
+}
 /**
  * Construct a collection (mapping or sequence) start event.
  *
@@ -114,43 +112,26 @@ Event event(EventID id)(const Mark start, const Mark end, const Anchor anchor = 
  */
 Event collectionStartEvent(EventID id)
     (const Mark start, const Mark end, const Anchor anchor, const Tag tag,
-     const bool implicit, const CollectionStyle style) pure @safe nothrow
-{
-    static assert(id == EventID.SequenceStart || id == EventID.SequenceEnd ||
-                  id == EventID.MappingStart || id == EventID.MappingEnd);
-    Event result;
-    result.startMark       = start;
-    result.endMark         = end;
-    result.anchor          = anchor;
+     const bool implicit, const CollectionStyle style) in {
+        static assert(id.among(EventID.SequenceStart, EventID.SequenceEnd,
+                      EventID.MappingStart, EventID.MappingEnd));
+} body {
+    Event result = event!id(start, end, anchor);
     result.tag             = tag;
-    result.id              = id;
     result.implicit        = implicit;
     result.collectionStyle = style;
     return result;
 }
-
-/**
- * Construct a stream start event.
- *
- * Params:  start    = Start position of the event in the file/stream.
- *          end      = End position of the event in the file/stream.
- *          encoding = Encoding of the stream.
- */
-Event streamStartEvent(const Mark start, const Mark end)
-    pure @safe nothrow
-{
-    Event result;
-    result.startMark = start;
-    result.endMark   = end;
-    result.id        = EventID.StreamStart;
-    return result;
+pure @safe nothrow unittest {
+    auto v = collectionStartEvent!(EventID.SequenceStart)(Mark(), Mark(), Anchor(), Tag(), false, CollectionStyle.Invalid);
 }
 
 ///Aliases for simple events.
-alias event!(EventID.StreamEnd)   streamEndEvent;
-alias event!(EventID.Alias)       aliasEvent;
-alias event!(EventID.SequenceEnd) sequenceEndEvent;
-alias event!(EventID.MappingEnd)  mappingEndEvent;
+alias streamEndEvent = event!(EventID.StreamEnd);
+alias aliasEvent = event!(EventID.Alias);
+alias sequenceEndEvent = event!(EventID.SequenceEnd);
+alias mappingEndEvent = event!(EventID.MappingEnd);
+alias streamStartEvent = event!(EventID.StreamStart);
 
 ///Aliases for collection start events.
 alias collectionStartEvent!(EventID.SequenceStart) sequenceStartEvent;
@@ -166,18 +147,17 @@ alias collectionStartEvent!(EventID.MappingStart)  mappingStartEvent;
  *          tagDirectives = Tag directives of the document.
  */
 Event documentStartEvent(const Mark start, const Mark end, const bool explicit, string YAMLVersion,
-                         TagDirective[] tagDirectives) pure @safe nothrow
-{
-    Event result;
+                         TagDirective[] tagDirectives) pure @safe nothrow {
+    Event result = event!(EventID.DocumentStart)(start, end);
     result.value            = YAMLVersion;
-    result.startMark        = start;
-    result.endMark          = end;
-    result.id               = EventID.DocumentStart;
     result.explicitDocument = explicit;
     result.tagDirectives    = tagDirectives;
     return result;
 }
 
+pure @safe nothrow unittest {
+    auto v = documentStartEvent(Mark(), Mark(), false, "", []);
+}
 /**
  * Construct a document end event.
  *
@@ -185,16 +165,15 @@ Event documentStartEvent(const Mark start, const Mark end, const bool explicit, 
  *          end      = End position of the event in the file/stream.
  *          explicit = Is this an explicit document end?
  */
-Event documentEndEvent(const Mark start, const Mark end, const bool explicit) pure @safe nothrow
-{
-    Event result;
-    result.startMark        = start;
-    result.endMark          = end;
-    result.id               = EventID.DocumentEnd;
+Event documentEndEvent(const Mark start, const Mark end, const bool explicit) pure @safe nothrow {
+    Event result = event!(EventID.DocumentEnd)(start, end);
     result.explicitDocument = explicit;
     return result;
 }
 
+pure @safe nothrow unittest {
+    auto v = documentEndEvent(Mark(), Mark(), false);
+}
 /// Construct a scalar event.
 ///
 /// Params:  start    = Start position of the event in the file/stream.
@@ -206,17 +185,16 @@ Event documentEndEvent(const Mark start, const Mark end, const bool explicit) pu
 ///          style    = Scalar style.
 Event scalarEvent(const Mark start, const Mark end, const Anchor anchor, const Tag tag,
                   const Tuple!(bool, bool) implicit, const string value,
-                  const ScalarStyle style = ScalarStyle.Invalid) @safe pure nothrow @nogc
-{
-    Event result;
+                  const ScalarStyle style = ScalarStyle.Invalid) @safe pure nothrow @nogc {
+    Event result = event!(EventID.Scalar)(start, end, anchor);
     result.value       = value;
-    result.startMark   = start;
-    result.endMark     = end;
-    result.anchor      = anchor;
     result.tag         = tag;
-    result.id          = EventID.Scalar;
     result.scalarStyle = style;
     result.implicit    = implicit[0];
     result.implicit_2  = implicit[1];
     return result;
+}
+
+pure @safe nothrow unittest {
+    auto v = scalarEvent(Mark(), Mark(), Anchor(), Tag(), tuple(false, false), "");
 }
