@@ -85,7 +85,8 @@ final class Reader
                 ++line_;
                 column_ = 0;
             }
-            else if(c != '\uFEFF') { ++column_; }
+            else
+                ++column_;
 
         }
 
