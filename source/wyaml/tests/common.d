@@ -5,22 +5,10 @@
 
 module wyaml.tests.common;
 
-public import std.conv;
 public import std.stdio;
 public import wyaml;
 
-import core.exception;
-import std.algorithm;
-import std.array;
-import std.bitmanip;
-import std.conv;
-import std.file;
 import std.meta;
-import std.path;
-import std.string;
-import std.system;
-import std.typecons;
-import std.utf;
 
 package:
 
