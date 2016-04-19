@@ -69,14 +69,11 @@ class ScannerException : MarkedYAMLException
     mixin MarkedExceptionCtors;
 }
 class UnexpectedTokenException : YAMLException {
-    this(string context, string expected, dchar got, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super("Expected %s in %s, got %s".format(expected, context, got), file, line);
-    }
-    this(string context, string expected, in dchar[] got, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super("Expected %s in %s, got %s".format(expected, context, got), file, line);
-    }
-    this(string context, string expected, string file = __FILE__, size_t line = __LINE__) @safe pure {
-        super("Expected %s in %s, got end of range".format(expected, context), file, line);
+    this(T)(string context, string expected, T range, string file = __FILE__, size_t line = __LINE__) if (isYAMLStream!T) {
+        if (range.empty)
+            super("Expected %s in %s, got end of range".format(expected, context), file, line);
+        else
+            super("Expected %s in %s, got %s".format(expected, context, range.front), file, line);
     }
 }
 class UnexpectedSequenceException : YAMLException {
@@ -697,7 +694,7 @@ final class Scanner
         ///Check if the next token is DIRECTIVE:        ^ '%' ...
         bool checkDirective() @safe
         {
-            return reader_.front == '%' && reader_.column == 0;
+            return reader_.startsWith('%') && reader_.column == 0;
         }
 
         /// Check if the next token is DOCUMENT-START:   ^ '---' (' '|'\n')
@@ -723,7 +720,7 @@ final class Scanner
             readerCopy.popFront();
             if (readerCopy.empty)
                 return true;
-            if (!readerCopy.front.among!allWhiteSpace)
+            if (!readerCopy.startsWith(allWhiteSpace))
                 return false;
             return true;
         }
@@ -731,7 +728,7 @@ final class Scanner
         /// Check if the next token is BLOCK-ENTRY:      '-' (' '|'\n')
         bool checkBlockEntry() @safe
         {
-            return !!reader_.save().drop(1).front.among!(allWhiteSpace);
+            return !!reader_.save().drop(1).startsWith(allWhiteSpace);
         }
 
         /// Check if the next token is KEY(flow context):    '?'
@@ -739,7 +736,7 @@ final class Scanner
         /// or KEY(block context):   '?' (' '|'\n')
         bool checkKey() @safe
         {
-            return flowLevel_ > 0 || reader_.save().drop(1).front.among!(allWhiteSpace);
+            return flowLevel_ > 0 || reader_.save().drop(1).startsWith(allWhiteSpace);
         }
 
         /// Check if the next token is VALUE(flow context):  ':'
@@ -747,7 +744,7 @@ final class Scanner
         /// or VALUE(block context): ':' (' '|'\n')
         bool checkValue() @safe
         {
-            return flowLevel_ > 0 || reader_.save().drop(1).front.among!(allWhiteSpace);
+            return flowLevel_ > 0 || reader_.save().drop(1).startsWith(allWhiteSpace);
         }
 
         /// Check if the next token is a plain scalar.
@@ -868,7 +865,7 @@ final class Scanner
             else         { value = reader_.popAlphaNumeric("an anchor"); }
 
 
-            enforce(reader_.front.among!(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", "alphanumeric, '-' or '_'", reader_.front));
+            enforce(reader_.startsWith(allWhiteSpace, '?', ':', ',', ']', '}', '%', '@'), new UnexpectedTokenException(i == '*' ? "alias" : "anchor", "alphanumeric, '-' or '_'", reader_));
             switch(id) {
                 case TokenID.Alias:
                     return aliasToken(startMark, reader_.mark, value.toUTF8);
@@ -893,7 +890,7 @@ final class Scanner
 
                 handleEnd = 0;
                 slice ~= reader_.popTagURI("tag");
-                enforce(reader_.front == '>', new UnexpectedTokenException("tag", "'>'", reader_.front));
+                enforce(reader_.startsWith('>'), new UnexpectedTokenException("tag", "'>'", reader_));
                 reader_.popFront();
             }
             else if(c.among!(allWhiteSpace))
@@ -933,7 +930,7 @@ final class Scanner
                 slice ~= reader_.popTagURI("tag");
             }
 
-            enforce(reader_.front.among!(allWhiteSpace), new UnexpectedTokenException("tag", "' '", reader_.front));
+            enforce(reader_.startsWith(allWhiteSpace), new UnexpectedTokenException("tag", "' '", reader_));
 
             return tagToken(startMark, reader_.mark, slice.toUTF8, handleEnd);
         }
@@ -1195,7 +1192,7 @@ void skipToNextNonSpace(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elem
 auto popAlphaNumeric(T)(ref T reader, string name = "alphanumeric") if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto output = reader.until!(x => !(x.isAlphaNum || x.among!('-', '_'))).array;
-    enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader.empty ? '\x04' : reader.front));
+    enforce(!output.empty, new UnexpectedTokenException(name, "alphanumeric, '-', or '_'", reader));
     static if(isArray!T)
         reader.popFrontN(output.length);
     return output;
@@ -1232,7 +1229,7 @@ auto popDirectiveName(T)(ref T reader) if (isForwardRange!T && is(Unqual!(Elemen
 {
     // Scan directive name.
     auto output = reader.popAlphaNumeric("a directive");
-    enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "alphanumeric, '-' or '_'", reader.front));
+    enforce(reader.startsWith(allWhiteSpace), new UnexpectedTokenException("directive", "alphanumeric, '-' or '_'", reader));
     return output;
 }
 @safe pure unittest { //ADD MORE
@@ -1250,14 +1247,14 @@ auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 
     output ~= reader.popYAMLDirectiveNumber();
 
-    enforce(reader.front == '.', new UnexpectedTokenException("directive", "digit or '.'", reader.front));
+    enforce(reader.startsWith('.'), new UnexpectedTokenException("directive", "digit or '.'", reader));
     // Skip the '.'.
     reader.popFront();
 
     output ~= '.';
     output ~= reader.popYAMLDirectiveNumber();
 
-    enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "digit or '.'", reader.front));
+    enforce(reader.startsWith(allWhiteSpace), new UnexpectedTokenException("directive", "digit or '.'", reader));
     return output;
 }
 
@@ -1271,8 +1268,8 @@ auto popYAMLDirectiveValue(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 /// Scan a number from a YAML directive.
 auto popYAMLDirectiveNumber(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
-    enforce(!reader.empty, new UnexpectedTokenException("directive", "digit"));
-    enforce(reader.front.isDigit, new UnexpectedTokenException("directive", "digit", reader.front));
+    enforce(!reader.empty, new UnexpectedTokenException("directive", "digit", reader));
+    enforce(reader.front.isDigit, new UnexpectedTokenException("directive", "digit", reader));
     auto output = reader.until!(x => x.isDigit)(OpenRight.no).array;
     static if (isArray!T)
         reader.popFrontN(output.length);
@@ -1314,7 +1311,7 @@ auto popTagDirectiveValue(T)(ref T reader, out size_t handleLength) if (isForwar
 auto popTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto output = reader.popTagHandle("directive");
-    enforce(reader.front == ' ', new UnexpectedTokenException("directive", "' '", reader.front));
+    enforce(reader.startsWith(' '), new UnexpectedTokenException("directive", "' '", reader));
     return output;
 }
 @safe pure unittest { //ADD MORE
@@ -1328,7 +1325,7 @@ auto popTagDirectiveHandle(T)(ref T reader) if (isForwardRange!T && is(Unqual!(E
 auto popTagDirectivePrefix(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     auto output = reader.popTagURI("directive");
-    enforce(reader.front.among!(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader.front));
+    enforce(reader.startsWith(allWhiteSpace), new UnexpectedTokenException("directive", "' '", reader));
     return output;
 }
 /*@safe pure*/ unittest { //ADD MORE
@@ -1345,7 +1342,7 @@ void skipDirectiveIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual
     if (reader.empty)
         return;
     if(reader.startsWith('#')) { reader.popToNextBreak(); }
-    enforce(reader.startsWith(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader.front));
+    enforce(reader.startsWith(allBreaks), new UnexpectedTokenException("directive", "comment or a line break", reader));
     reader.popLineBreak();
 }
 @safe pure unittest { //ADD MORE
@@ -1368,14 +1365,11 @@ Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isForwardRan
     if(getChomping(reader, c, chomping))
     {
         getIncrement(reader, c, increment);
-    }
-    else
-    {
-        const gotIncrement = getIncrement(reader, c, increment);
-        if(gotIncrement) { getChomping(reader, c, chomping); }
+    } else if (getIncrement(reader, c, increment)) {
+        getChomping(reader, c, chomping);
     }
 
-    enforce(c.among!(allWhiteSpace), new UnexpectedTokenException("block scalar", "chomping or indentation indicator", c));
+    enforce(c.among!(allWhiteSpace), new UnexpectedTokenException("block scalar", "chomping or indentation indicator", reader));
 
     return tuple(chomping, increment);
 }
@@ -1426,7 +1420,7 @@ bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isForward
     // Convert a digit to integer.
     increment = c - '0';
     assert(increment < 10 && increment >= 0, "Digit has invalid value");
-    enforce(increment > 0, new UnexpectedTokenException("block scalar", "1-9", '0'));
+    enforce(increment > 0, new UnexpectedTokenException("block scalar", "1-9", reader));
 
     reader.popFront();
     c = reader.front;
@@ -1443,10 +1437,10 @@ bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isForward
 void skipBlockScalarIgnoredLine(T)(ref T reader) if (isForwardRange!T && is(Unqual!(ElementType!T) == dchar))
 {
     reader.skipToNextNonSpace();
-    enforce(!reader.empty, new UnexpectedTokenException("block scalar", "comment or line break"));
+    enforce(!reader.empty, new UnexpectedTokenException("block scalar", "comment or line break", reader));
     if(reader.startsWith('#')) { reader.popToNextBreak(); }
 
-    enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader.front));
+    enforce(reader.front.among!(allBreaks), new UnexpectedTokenException("block scalar", "comment or line break", reader));
 
     reader.popLineBreak();
     return;
@@ -1539,8 +1533,8 @@ auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFor
 
                 auto v = reader.take(hexLength);
                 auto hex = v.save().array;
-                enforce(hex.length == hexLength, new UnexpectedTokenException("double quoted scalar", "escape sequence of "~hexLength.text~" hexadecimal numbers"));
-                enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", "escape sequence of hexadecimal numbers", hex));
+                enforce(hex.length == hexLength, new UnexpectedTokenException("double quoted scalar", "escape sequence of "~hexLength.text~" hexadecimal numbers", reader));
+                enforce(v.all!isHexDigit, new UnexpectedTokenException("double quoted scalar", "escape sequence of hexadecimal numbers", v.find!(x => !x.isHexDigit)));
 
                 output ~= hex;
                 static if (isArray!T)
@@ -1551,12 +1545,9 @@ auto popFlowScalarNonSpaces(T)(ref T reader, const ScalarStyle quotes) if (isFor
                 reader.popLineBreak();
                 output ~= reader.popFlowScalarBreaks();
             }
-            else if (reader.empty) {
-                throw new UnexpectedTokenException("double quoted scalar", "valid escape character");
-            }
             else
             {
-                throw new UnexpectedTokenException("double quoted scalar", "valid escape character", reader.front);
+                throw new UnexpectedTokenException("double quoted scalar", "valid escape character", reader);
             }
         }
         else
@@ -1746,12 +1737,10 @@ auto popPlainSpaces(T)(ref T reader, ref bool allowSimpleKey_) if (isInputRange!
 /// Scan handle of a tag token.
 auto popTagHandle(T)(ref T reader, string name = "tag handle")
 {
-    enforce(!reader.empty, new UnexpectedTokenException(name, "'!"));
-    dchar c = reader.front;
-    enforce(c == '!', new UnexpectedTokenException(name, "'!'", c));
+    enforce(reader.startsWith('!'), new UnexpectedTokenException(name, "'!'", reader));
 
     uint length = 1;
-    c = reader.save().drop(length).front;
+    dchar c = reader.save().drop(length).front;
     if(c != ' ')
     {
         while(c.isAlphaNum || c.among!('-', '_'))
@@ -1759,7 +1748,7 @@ auto popTagHandle(T)(ref T reader, string name = "tag handle")
             ++length;
             c = reader.save().drop(length).front;
         }
-        enforce(c == '!', new UnexpectedTokenException(name, "'!'", c));
+        enforce(c == '!', new UnexpectedTokenException(name, "'!'", only(c)));
         ++length;
     }
 
@@ -1767,11 +1756,17 @@ auto popTagHandle(T)(ref T reader, string name = "tag handle")
     static if (isArray!T)
         reader.popFrontN(output.length);
     return output;
-    //return chain(reader.take(1), reader.drop(1).until!(x => !(x.isAlphaNum || x.among!('-', '_')))).array;
 }
 @safe pure unittest {
     auto str = "";
     assertThrown(str.popTagHandle());
+
+    str = "a";
+    assertThrown(str.popTagHandle());
+
+    str = "!a ";
+    assertThrown(str.popTagHandle());
+
     str = "!!wordswords ";
     assert(str.popTagHandle() == "!!");
     assert(str == "wordswords ");
@@ -1781,7 +1776,7 @@ auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Un
     // Note: we do not check if URI is well-formed.
     dstring output;
     while(!reader.empty && (reader.front.isAlphaNum || reader.front.among!(miscValidURIChars))) {
-        if(reader.front == '%')
+        if(reader.startsWith('%'))
             output ~= reader.popURIEscapes(name);
         if (reader.empty)
             break;
@@ -1789,10 +1784,7 @@ auto popTagURI(T)(ref T reader, string name = "URI") if (isInputRange!T && is(Un
         reader.popFront();
     }
     // OK if we scanned something, error otherwise.
-    if (reader.empty)
-        enforce(output.length > 0, new UnexpectedTokenException(name, "URI"));
-    else
-        enforce(output.length > 0, new UnexpectedTokenException(name, "URI", reader.front));
+    enforce(output.length > 0, new UnexpectedTokenException(name, "URI", reader));
     return output;
 }
 /*@safe pure*/ unittest {
@@ -1819,10 +1811,10 @@ dstring popURIEscapes(T)(ref T reader, string name = "URI escape") if (isInputRa
         reader.popFront();
         uriBuf ~= '%';
         dstring nextTwo = reader.take(2).array;
-        static if(isForwardRange!T)
+        static if(isArray!T)
             reader.popFrontN(2);
         if(!nextTwo.all!isHexDigit)
-            throw new UnexpectedTokenException(name, "URI escape sequence with two hexadecimal numbers", nextTwo.until!(x => x.isHexDigit).front);
+            throw new UnexpectedTokenException(name, "URI escape sequence with two hexadecimal numbers", nextTwo.until!(x => x.isHexDigit));
         uriBuf ~= nextTwo;
     }
     return decodeComponent(uriBuf).to!(dstring);
