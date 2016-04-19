@@ -174,37 +174,45 @@ final class Resolver
         // Add default implicit resolvers.
         void addImplicitResolvers() @safe
         {
-            addImplicitResolver("tag:yaml.org,2002:bool",
-                                ctRegex!(r"^(?:yes|Yes|YES|no|No|NO|true|True|TRUE"
-                                       "|false|False|FALSE|on|On|ON|off|Off|OFF)$"),
-                                "yYnNtTfFoO");
-            addImplicitResolver("tag:yaml.org,2002:float",
-                                ctRegex!(r"^(?:[-+]?([0-9][0-9_]*)\\.[0-9_]*"
+            enum boolRegex = r"^(?:yes|Yes|YES|no|No|NO|true|True|TRUE"
+                                       "|false|False|FALSE|on|On|ON|off|Off|OFF)$";
+            enum floatRegex = r"^(?:[-+]?([0-9][0-9_]*)\\.[0-9_]*"
                                       "(?:[eE][-+][0-9]+)?|[-+]?(?:[0-9][0-9_]"
                                       "*)?\\.[0-9_]+(?:[eE][-+][0-9]+)?|[-+]?"
                                       "[0-9][0-9_]*(?::[0-5]?[0-9])+\\.[0-9_]"
                                       "*|[-+]?\\.(?:inf|Inf|INF)|\\."
-                                      "(?:nan|NaN|NAN))$"),
-                                "-+0123456789.");
-            addImplicitResolver("tag:yaml.org,2002:int",
-                                ctRegex!(r"^(?:[-+]?0b[0-1_]+"
+                                      "(?:nan|NaN|NAN))$";
+            enum intRegex = r"^(?:[-+]?0b[0-1_]+"
                                        "|[-+]?0[0-7_]+"
                                        "|[-+]?(?:0|[1-9][0-9_]*)"
                                        "|[-+]?0x[0-9a-fA-F_]+"
-                                       "|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+)$"),
-                                "-+0123456789");
-            addImplicitResolver("tag:yaml.org,2002:merge", ctRegex!(r"^<<$"), "<");
-            addImplicitResolver("tag:yaml.org,2002:null",
-                                ctRegex!(r"^$|^(?:~|null|Null|NULL)$"), "~nN\0");
-            addImplicitResolver("tag:yaml.org,2002:timestamp",
-                                ctRegex!(r"^[0-9][0-9][0-9][0-9]-[0-9][0-9]-"
+                                       "|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+)$";
+            enum mergeRegex = r"^<<$";
+            enum nullRegex = r"^$|^(?:~|null|Null|NULL)$";
+            enum timestampRegex = r"^[0-9][0-9][0-9][0-9]-[0-9][0-9]-"
                                        "[0-9][0-9]|[0-9][0-9][0-9][0-9]-[0-9]"
                                        "[0-9]?-[0-9][0-9]?[Tt]|[ \t]+[0-9]"
                                        "[0-9]?:[0-9][0-9]:[0-9][0-9]"
                                        "(?:\\.[0-9]*)?(?:[ \t]*Z|[-+][0-9]"
-                                       "[0-9]?(?::[0-9][0-9])?)?$"),
-                                "0123456789");
-            addImplicitResolver("tag:yaml.org,2002:value", ctRegex!(r"^=$"), "=");
+                                       "[0-9]?(?::[0-9][0-9])?)?$";
+            enum valueRegex = r"^=$";
+            version(release) {
+                addImplicitResolver("tag:yaml.org,2002:bool", ctRegex!(boolRegex), "yYnNtTfFoO");
+                addImplicitResolver("tag:yaml.org,2002:float", ctRegex!(floatRegex), "-+0123456789.");
+                addImplicitResolver("tag:yaml.org,2002:int", ctRegex!(intRegex), "-+0123456789");
+                addImplicitResolver("tag:yaml.org,2002:merge", ctRegex!(mergeRegex), "<");
+                addImplicitResolver("tag:yaml.org,2002:null", ctRegex!(nullRegex), "~nN\0");
+                addImplicitResolver("tag:yaml.org,2002:timestamp", ctRegex!(timestampRegex), "0123456789");
+                addImplicitResolver("tag:yaml.org,2002:value", ctRegex!(valueRegex), "=");
+            } else {
+                addImplicitResolver("tag:yaml.org,2002:bool", regex(boolRegex), "yYnNtTfFoO");
+                addImplicitResolver("tag:yaml.org,2002:float", regex(floatRegex), "-+0123456789.");
+                addImplicitResolver("tag:yaml.org,2002:int", regex(intRegex), "-+0123456789");
+                addImplicitResolver("tag:yaml.org,2002:merge", regex(mergeRegex), "<");
+                addImplicitResolver("tag:yaml.org,2002:null", regex(nullRegex), "~nN\0");
+                addImplicitResolver("tag:yaml.org,2002:timestamp", regex(timestampRegex), "0123456789");
+                addImplicitResolver("tag:yaml.org,2002:value", regex(valueRegex), "=");
+            }
 
 
             //The following resolver is only for documentation purposes. It cannot work

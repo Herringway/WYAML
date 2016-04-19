@@ -543,10 +543,18 @@ unittest
 SysTime constructTimestamp(ref Node node)
 {
     string value = node.as!string;
-
-    auto YMDRegexp = ctRegex!("^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)");
-    auto HMSRegexp = ctRegex!("^[Tt \t]+([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(\\.[0-9]*)?");
-    auto TZRegexp  = ctRegex!("^[ \t]*Z|([-+][0-9][0-9]?)(:[0-9][0-9])?");
+    enum YMD = "^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)";
+    enum HMS = "^[Tt \t]+([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(\\.[0-9]*)?";
+    enum TZ = "^[ \t]*Z|([-+][0-9][0-9]?)(:[0-9][0-9])?";
+    version(release) {
+        auto YMDRegexp = ctRegex!(YMD);
+        auto HMSRegexp = ctRegex!(HMS);
+        auto TZRegexp  = ctRegex!(TZ);
+    } else {
+        auto YMDRegexp = regex(YMD);
+        auto HMSRegexp = regex(HMS);
+        auto TZRegexp  = regex(TZ);
+    }
 
     try
     {
