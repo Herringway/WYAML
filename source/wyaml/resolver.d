@@ -32,11 +32,11 @@ final class Resolver
 {
     private:
         // Default tag to use for scalars.
-        Tag defaultScalarTag_;
+        static immutable Tag defaultScalarTag_ = Tag("tag:yaml.org,2002:str");
         // Default tag to use for sequences.
-        Tag defaultSequenceTag_;
+        static immutable Tag defaultSequenceTag_ = Tag("tag:yaml.org,2002:seq");
         // Default tag to use for mappings.
-        Tag defaultMappingTag_;
+        static immutable Tag defaultMappingTag_ = Tag("tag:yaml.org,2002:map");
 
         /*
          * Arrays of scalar resolver tuples indexed by starting character of a scalar.
@@ -61,9 +61,6 @@ final class Resolver
         this(Flag!"useDefaultImplicitResolvers" defaultImplicitResolvers = Yes.useDefaultImplicitResolvers)
             @safe
         {
-            defaultScalarTag_   = Tag("tag:yaml.org,2002:str");
-            defaultSequenceTag_ = Tag("tag:yaml.org,2002:seq");
-            defaultMappingTag_  = Tag("tag:yaml.org,2002:map");
             if(defaultImplicitResolvers){addImplicitResolvers();}
         }
 
