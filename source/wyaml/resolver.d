@@ -135,27 +135,26 @@ final class Resolver
         {
             if(!tag.isNull() && tag.get() != "!"){return tag;}
 
-            if(kind == NodeID.Scalar)
-            {
-                if(!implicit){return defaultScalarTag_;}
+            final switch (kind) {
+                case NodeID.Scalar:
+                    if(!implicit){return defaultScalarTag_;}
 
-                //Get the first char of the value.
-                size_t dummy;
-                const dchar first = value.length == 0 ? '\0' : decode(value, dummy);
+                    //Get the first char of the value.
+                    size_t dummy;
+                    const dchar first = value.length == 0 ? '\0' : decode(value, dummy);
 
-                auto resolvers = (first in yamlImplicitResolvers_) is null ?
-                                 [] : yamlImplicitResolvers_[first];
+                    auto resolvers = (first in yamlImplicitResolvers_) is null ?
+                                     [] : yamlImplicitResolvers_[first];
 
-                //If regexp matches, return tag.
-                foreach(resolver; resolvers) if(!(match(value, resolver[1]).empty))
-                {
-                    return resolver[0];
-                }
-                return defaultScalarTag_;
+                    //If regexp matches, return tag.
+                    foreach(resolver; resolvers) if(!(match(value, resolver[1]).empty))
+                    {
+                        return resolver[0];
+                    }
+                    return defaultScalarTag_;
+                case NodeID.Sequence: return defaultSequenceTag_;
+                case NodeID.Mapping: return defaultMappingTag_;
             }
-            else if(kind == NodeID.Sequence){return defaultSequenceTag_;}
-            else if(kind == NodeID.Mapping) {return defaultMappingTag_;}
-            assert(false, "This line of code should never be reached");
         }
 
         ///Return default scalar tag.
