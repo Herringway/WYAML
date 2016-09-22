@@ -218,7 +218,7 @@ final class Resolver
         }
 }
 
-unittest
+@safe unittest
 {
     auto resolver = new Resolver();
 
