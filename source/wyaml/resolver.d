@@ -103,8 +103,8 @@ final class Resolver
          * }
          * --------------------
          */
-        void addImplicitResolver(string tag, Regex!char regexp, string first)
-            pure @safe
+        void addImplicitResolver(string tag, Regex!char regexp, dstring first)
+            pure @safe nothrow
         {
             foreach(const dchar c; first)
             {
