@@ -139,7 +139,7 @@ private struct Pair
 
     public:
         /// Construct a Pair from two values. Will be converted to Nodes if needed.
-        this(K, V)(K key, V value) @safe
+        this(K, V)(K key, V value)
         {
             static if(is(Unqual!K == Node)){this.key = key;}
             else                           {this.key = Node(key);}
@@ -249,7 +249,7 @@ struct Node
          *                  be in full form, e.g. "tag:yaml.org,2002:int", not
          *                  a shortcut, like "!!int".
          */
-        this(T)(T value, const string tag = null) @trusted
+        this(T)(T value, const string tag = null)
             if(!scalarCtorNothrow!T && (!isArray!T && !isAssociativeArray!T))
         {
             tag_ = Tag(tag);
@@ -266,7 +266,7 @@ struct Node
         }
         /// Ditto.
         // Overload for types where we can make this nothrow.
-        this(T)(T value, const string tag = null) @trusted pure nothrow
+        this(T)(T value, const string tag = null) pure nothrow
             if(scalarCtorNothrow!T)
         {
             tag_   = Tag(tag);
@@ -302,7 +302,7 @@ struct Node
          * auto set = Node([1, 2, 3, 4, 5], "tag:yaml.org,2002:set");
          * --------------------
          */
-        this(T)(T[] array, const string tag = null) @trusted
+        this(T)(T[] array, const string tag = null)
             if (!isSomeString!(T[]))
         {
             tag_ = Tag(tag);
@@ -352,7 +352,7 @@ struct Node
          * auto pairs = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:pairs");
          * --------------------
          */
-        this(K, V)(V[K] array, const string tag = null) @trusted
+        this(K, V)(V[K] array, const string tag = null)
         {
             tag_ = Tag(tag);
 
@@ -397,7 +397,7 @@ struct Node
          * auto pairs = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:pairs");
          * --------------------
          */
-        this(K, V)(K[] keys, V[] values, const string tag = null) @trusted
+        this(K, V)(K[] keys, V[] values, const string tag = null)
             if(!(isSomeString!(K[]) || isSomeString!(V[])))
         in
         {
@@ -589,7 +589,7 @@ struct Node
          *
          * Throws: NodeException if this is not a sequence nor a mapping.
          */
-        @property size_t length() const @trusted
+        @property size_t length() const
         {
             if(isSequence)    {return value_.get!(const Node[]).length;}
             else if(isMapping){return value_.get!(const Pair[]).length;}
@@ -616,7 +616,7 @@ struct Node
          *          non-integral index is used with a sequence or the node is
          *          not a collection.
          */
-        ref Node opIndex(T)(T index) @trusted
+        ref Node opIndex(T)(T index)
         {
             if(isSequence)
             {
@@ -671,11 +671,9 @@ struct Node
         }
 
         /// Assignment (shallow copy) by reference.
-        void opAssign(ref Node rhs) @trusted nothrow
+        void opAssign(ref Node rhs) @safe nothrow
         {
-            // Value opAssign doesn't really throw, so force it to nothrow.
-            alias Value delegate(Value) nothrow valueAssignNothrow;
-            (cast(valueAssignNothrow)&value_.opAssign!Value)(rhs.value_);
+            assumeWontThrow(() @trusted {value_ = rhs.value_;}());
             startMark_      = rhs.startMark_;
             tag_            = rhs.tag_;
             scalarStyle     = rhs.scalarStyle;
@@ -744,7 +742,7 @@ struct Node
          * Throws:  NodeException if the node is not a sequence or an
          *          element could not be converted to specified type.
          */
-        int opApply(T)(int delegate(ref T) dg) @trusted
+        int opApply(T)(int delegate(ref T) dg)
         {
             enforce(isSequence,
                     new NodeException("Trying to sequence-foreach over a " ~ nodeTypeString ~ " node",
@@ -775,7 +773,7 @@ struct Node
          * Throws:  NodeException if the node is not a mapping or an
          *          element could not be converted to specified type.
          */
-        int opApply(K, V)(int delegate(ref K, ref V) dg) @trusted
+        int opApply(K, V)(int delegate(ref K, ref V) dg)
         {
             enforce(isMapping,
                     new NodeException("Trying to mapping-foreach over a " ~ nodeTypeString ~ " node",
@@ -824,7 +822,7 @@ struct Node
          *
          * Params:  value = Value to _add to the sequence.
          */
-        void add(T)(T value) @trusted
+        void add(T)(T value)
         {
             enforce(isSequence(),
                     new NodeException("Trying to add an element to a " ~ nodeTypeString ~ " node", startMark_));
@@ -850,7 +848,7 @@ struct Node
          * Params:  key   = Key to _add.
          *          value = Value to _add.
          */
-        void add(K, V)(K key, V value) @trusted
+        void add(K, V)(K key, V value)
         {
             enforce(isMapping(),
                     new NodeException("Trying to add a key-value pair to a " ~
@@ -903,7 +901,7 @@ struct Node
          *
          * Throws:  NodeException if the node is not a collection.
          */
-        void remove(T)(T rhs) @trusted
+        void remove(T)(T rhs)
         {
             remove_!(T, No.key, "remove")(rhs);
         }
@@ -926,7 +924,7 @@ struct Node
          * Throws:  NodeException if the node is not a collection, index is out
          *          of range or if a non-integral index is used on a sequence node.
          */
-        void removeAt(T)(T index) @trusted
+        void removeAt(T)(T index)
         {
             remove_!(T, Yes.key, "removeAt")(index);
         }
@@ -957,7 +955,7 @@ struct Node
         // Returns: Constructed node.
         static Node rawNode(Value value, const Mark startMark, const Tag tag,
                             const ScalarStyle scalarStyle,
-                            const CollectionStyle collectionStyle) @trusted
+                            const CollectionStyle collectionStyle)
         {
             Node node;
             node.value_          = value;
@@ -970,7 +968,7 @@ struct Node
         }
 
         // Construct Node.Value from user defined type.
-        static Value userValue(T)(T value) @trusted nothrow
+        static Value userValue(T)(T value) nothrow
         {
             return Value(cast(YAMLObject)new YAMLContainer!T(value));
         }
@@ -1105,7 +1103,7 @@ struct Node
         // Params:  level = Level of the node in the tree.
         //
         // Returns: String representing the node tree.
-        @property string debugString(uint level = 0) @trusted
+        @property string debugString(uint level = 0)
         {
             string indent;
             foreach(i; 0 .. level){indent ~= " ";}
@@ -1141,9 +1139,9 @@ struct Node
         }
 
         // Get type of the node value (YAMLObject for user types).
-        @property TypeInfo type() const @trusted nothrow
+        @property TypeInfo type() const nothrow @safe
         {
-            alias TypeInfo delegate() const nothrow nothrowType;
+            alias nothrowType = TypeInfo delegate() const @safe nothrow;
             return (cast(nothrowType)&value_.type)();
         }
 
@@ -1249,7 +1247,7 @@ struct Node
         }
 
         // Get index of pair with key (or value, if key is false) matching index.
-        sizediff_t findPair(T, Flag!"key" key = Yes.key)(const ref T index) const @trusted
+        sizediff_t findPair(T, Flag!"key" key = Yes.key)(const ref T index) const
         {
             const pairs = value_.get!(const Pair[])();
             const(Node)* node;
@@ -1272,7 +1270,7 @@ struct Node
         }
 
         // Check if index is integral and in range.
-        void checkSequenceIndex(T)(T index) const @trusted
+        void checkSequenceIndex(T)(T index) const
         {
             assert(isSequence,
                    "checkSequenceIndex() called on a " ~ nodeTypeString ~ " node");
@@ -1290,7 +1288,7 @@ struct Node
         }
 
         // Const version of opIndex.
-        ref const(Node) indexConst(T)(T index) const @trusted
+        ref const(Node) indexConst(T)(T index) const
         {
             if(isSequence)
             {
@@ -1694,7 +1692,7 @@ package:
 //
 // Params:  pairs   = Appender managing the array of pairs to merge into.
 //          toMerge = Pair to merge.
-void merge(ref Appender!(Node.Pair[]) pairs, ref Node.Pair toMerge) @trusted
+void merge(ref Appender!(Node.Pair[]) pairs, ref Node.Pair toMerge)
 {
     foreach(ref pair; pairs.data)
     {
@@ -1710,7 +1708,7 @@ void merge(ref Appender!(Node.Pair[]) pairs, ref Node.Pair toMerge) @trusted
 //
 // Params:  pairs   = Appender managing the array of pairs to merge into.
 //          toMerge = Pairs to merge.
-void merge(ref Appender!(Node.Pair[]) pairs, Node.Pair[] toMerge) @trusted
+void merge(ref Appender!(Node.Pair[]) pairs, Node.Pair[] toMerge)
 {
     bool eq(ref Node.Pair a, ref Node.Pair b){return a.key == b.key;}
 
