@@ -696,7 +696,8 @@ struct Node
          *
          * To set element at a null index, use YAMLNull for index.
          *
-         * Params:  index = Index of the value to set.
+         * Params:  value = Value being set
+         *          index = Index of the value to set.
          *
          * Throws:  NodeException if the node is not a collection, index is out
          *          of range or if a non-integral index is used on a sequence node.
@@ -916,7 +917,7 @@ struct Node
          * key matches index.
          *
          * If the node is a mapping and no key matches index, nothing is removed
-         * and no exception is thrown. This ensures behavior siilar to D arrays
+         * and no exception is thrown. This ensures behavior similar to D arrays
          * and associative arrays.
          *
          * Params:  index = Index to remove at.
