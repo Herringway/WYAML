@@ -1156,22 +1156,22 @@ struct Node
 
     private:
         // Is the value a bool?
-        alias isType!bool isBool;
+        alias isBool = isType!bool;
 
         // Is the value a raw binary buffer?
-        alias isType!(ubyte[]) isBinary;
+        alias isBinary = isType!(ubyte[]);
 
         // Is the value an integer?
-        alias isType!long isInt;
+        alias isInt = isType!long;
 
         // Is the value a floating point number?
-        alias isType!real isFloat;
+        alias isFloat = isType!real;
 
         // Is the value a string?
-        alias isType!string isString;
+        alias isString = isType!string;
 
         // Is the value a timestamp?
-        alias isType!SysTime isTime;
+        alias isTime = isType!SysTime;
 
         // Does given node have the same type as this node?
         bool hasEqualType(const ref Node node) const @safe
@@ -1535,8 +1535,8 @@ unittest
 
 unittest
 {
-    alias Node.Value Value;
-    alias Node.Pair Pair;
+    alias Value = Node.Value;
+    alias Pair = Node.Pair;
 
     Node n1 = Node(Value(cast(long)11));
     Node n2 = Node(Value(cast(long)12));
@@ -1559,8 +1559,8 @@ unittest
 
 unittest
 {
-    alias Node.Value Value;
-    alias Node.Pair Pair;
+    alias Value = Node.Value;
+    alias Pair = Node.Pair;
 
     Node n1 = Node(cast(long)11);
     Node n2 = Node(cast(long)12);
