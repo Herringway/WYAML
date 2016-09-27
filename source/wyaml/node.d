@@ -250,31 +250,20 @@ struct Node
          *                  a shortcut, like "!!int".
          */
         this(T)(T value, const string tag = null)
-            if(!scalarCtorNothrow!T && (!isArray!T && !isAssociativeArray!T))
+            if((isSomeString!T || !isArray!T) && !isAssociativeArray!T && !is(Unqual!T == Node))
         {
             tag_ = Tag(tag);
 
             // No copyconstruction.
-            static assert(!is(Unqual!T == Node));
+            //static assert(!is(Unqual!T == Node));
 
-            enum unexpectedType = "Unexpected type in the non-nothrow YAML node constructor";
             static if(isSomeString!T)             { value_ = Value(value.to!string); }
+            else static if(isIntegral!T)           { value_ = Value(cast(long)value); }
+            else static if(isFloatingPoint!T) { value_ = Value(cast(real)value); }
             else static if(is(Unqual!T == Value)) { value_ = Value(value); }
-            else static if(Value.allowed!T)       { static assert(false, unexpectedType); }
+            else static if(Value.allowed!T)       { value_ = Value(value); }
             // User defined type.
             else                                  { value_ = userValue(value); }
-        }
-        /// Ditto.
-        // Overload for types where we can make this nothrow.
-        this(T)(T value, const string tag = null) pure nothrow
-            if(scalarCtorNothrow!T)
-        {
-            tag_   = Tag(tag);
-            // We can easily store ints, floats, strings.
-            static if(isIntegral!T)           { value_ = Value(cast(long)value); }
-            else static if(isFloatingPoint!T) { value_ = Value(cast(real)value); }
-            // User defined type or plain string.
-            else                              { value_ = Value(value); }
         }
 
         /** Construct a node from an _array.
