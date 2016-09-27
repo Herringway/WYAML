@@ -194,8 +194,8 @@ struct Node
 
     package:
         // YAML value type.
-        alias Algebraic!(YAMLNull, YAMLMerge, bool, long, real, ubyte[], SysTime, string,
-                         Node.Pair[], Node[], YAMLObject) Value;
+        alias Value = Algebraic!(YAMLNull, YAMLMerge, bool, long, real, ubyte[], SysTime, string,
+                         Node.Pair[], Node[], YAMLObject);
 
         // Can Value hold this type without wrapping it in a YAMLObject?
         template allowed(T)
@@ -1408,8 +1408,8 @@ unittest
 
 unittest
 {
-    alias Node.Value Value;
-    alias Node.Pair Pair;
+    alias Value = Node.Value;
+    alias Pair = Node.Pair;
 
     Node narray = Node([11, 12, 13, 14]);
     Node nmap   = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
@@ -1421,8 +1421,8 @@ unittest
 }
 unittest
 {
-    alias Node.Value Value;
-    alias Node.Pair Pair;
+    alias Value = Node.Value;
+    alias Pair = Node.Pair;
 
     Node narray = Node([11, 12, 13, 14]);
     Node nmap   = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
