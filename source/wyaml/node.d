@@ -14,7 +14,9 @@ import std.array;
 import std.conv;
 import std.datetime;
 import std.exception;
+import std.format;
 import std.math;
+import std.range;
 import std.traits;
 import std.typecons;
 import std.variant;
@@ -86,10 +88,8 @@ package final class YAMLContainer(T) if (!Node.allowed!T): YAMLObject
         }
 
         // Get string representation of the container.
-        void toString(scope void delegate(const(char)[]) sink) {
-            sink("YAMLContainer(");
-            sink(value_.text);
-            sink(")");
+        void toString(T)(T sink) const if (isOutputRange!(T, string)) {
+            formattedWrite(sink, "YAMLContainer(%s)", value_);
         }
 
     protected:
@@ -107,9 +107,26 @@ package final class YAMLContainer(T) if (!Node.allowed!T): YAMLObject
 
     private:
         // Construct a YAMLContainer holding specified value.
-        this(T value) @trusted {value_ = value;}
+        this(T value) {value_ = value;}
 }
-
+@safe unittest {
+    struct Test {
+        string toString() const {
+            return "test";
+        }
+        int opCmp(Test) const {
+            return 1;
+        }
+        bool opEquals(Test) const {
+            return false;
+        }
+        auto toHash() const {
+            return hashOf(0);
+        }
+    }
+    immutable t = new YAMLContainer!Test(Test());
+    assert(t.text == "YAMLContainer(test)");
+}
 
 // Key-value pair of YAML nodes, used in mappings.
 private struct Pair
