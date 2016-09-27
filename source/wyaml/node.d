@@ -673,7 +673,7 @@ struct Node
          *
          *
          * If the node is a mapping, return the value corresponding to the first
-         * key equal to index. containsKey() can be used to determine if a mapping
+         * key equal to index. The in operator can be used to determine if a mapping
          * has a specific key.
          *
          * To get element at a null index, use YAMLNull for index.
@@ -722,23 +722,16 @@ struct Node
          *
          * Throws:  NodeException if the node is not a collection.
          */
-        bool contains(T)(T rhs) const @safe
+        bool contains(T)(T rhs) const @trusted
         {
-            return contains_!(T, No.key, "contains")(rhs);
-        }
+            if (isSequence)
+                return value_.get!(Node[]).canFind(rhs);
 
+            if (isMapping)
+                return findPair!(T, No.key)(rhs) >= 0;
 
-        /** Determine if a mapping contains specified key.
-         *
-         * Params:  rhs = Key to look for. Use YAMLNull to check for a null key.
-         *
-         * Returns: true if rhs was found, false otherwise.
-         *
-         * Throws:  NodeException if the node is not a mapping.
-         */
-        bool containsKey(T)(T rhs) const @safe
-        {
-            return contains_!(T, Yes.key, "containsKey")(rhs);
+            throw new NodeException("Trying to use contains() on a " ~ nodeTypeString ~ " node",
+                            startMark_);
         }
 
         /// Assignment (shallow copy) by value.
@@ -1316,29 +1309,8 @@ struct Node
             else                             {return false;}
         }
 
-        // Implementation of contains() and containsKey().
-        bool contains_(T, Flag!"key" key, string func)(T rhs) const @trusted
-        {
-            static if(!key) if(isSequence)
-            {
-                foreach(ref node; value_.get!(const Node[]))
-                {
-                    if(node == rhs){return true;}
-                }
-                return false;
-            }
-
-            if(isMapping)
-            {
-                return findPair!(T, key)(rhs) >= 0;
-            }
-
-            throw new NodeException("Trying to use " ~ func ~ "() on a " ~ nodeTypeString ~ " node",
-                            startMark_);
-        }
-
         // Implementation of remove() and removeAt()
-        void remove_(T, Flag!"key" key, string func)(T rhs) @system
+        void remove_(T, Flag!"key" key, string func)(T rhs)
         {
             enforce(isSequence || isMapping,
                     new NodeException("Trying to " ~ func ~ "() from a " ~ nodeTypeString ~ " node",
@@ -1584,7 +1556,7 @@ unittest
            "Node.opAssign() doesn't produce an equivalent copy");
 }
 
-// Unittest for contains() and containsKey().
+// Unittest for contains() and in operator.
 unittest
 {
     auto seq = Node([1, 2, 3, 4, 5]);
@@ -1593,7 +1565,7 @@ unittest
     assert(!seq.contains("5"));
     assert(!seq.contains(6));
     assert(!seq.contains(float.nan));
-    assertThrown!NodeException(seq.containsKey(5));
+    assertThrown(5 !in seq);
 
     auto seq2 = Node(["1", "2"]);
     assert(seq2.contains("1"));
@@ -1604,36 +1576,36 @@ unittest
     assert(!map.contains("1"));
     assert(!map.contains(5));
     assert(!map.contains(float.nan));
-    assert(map.containsKey("1"));
-    assert(map.containsKey("4"));
-    assert(!map.containsKey(1));
-    assert(!map.containsKey("5"));
+    assert("1" in map);
+    assert("4" in map);
+    assert(1 !in map);
+    assert("5" !in map);
 
     assert(!seq.contains(YAMLNull()));
     assert(!map.contains(YAMLNull()));
-    assert(!map.containsKey(YAMLNull()));
+    assert(YAMLNull() !in map);
     seq.add(YAMLNull());
     map.add("Nothing", YAMLNull());
     assert(seq.contains(YAMLNull()));
     assert(map.contains(YAMLNull()));
-    assert(!map.containsKey(YAMLNull()));
+    assert(YAMLNull() !in map);
     map.add(YAMLNull(), "Nothing");
-    assert(map.containsKey(YAMLNull()));
+    assert(YAMLNull() in map);
 
     auto map2 = Node([1, 2, 3, 4], [1, 2, 3, 4]);
     assert(!map2.contains("1"));
     assert(map2.contains(1));
-    assert(!map2.containsKey("1"));
-    assert(map2.containsKey(1));
+    assert("1" !in map2);
+    assert(1 in map2);
 
     // scalar
     assertThrown!NodeException(Node(1).contains(4));
-    assertThrown!NodeException(Node(1).containsKey(4));
+    assertThrown(4 !in Node(1));
 
     auto mapNan = Node([1.0, 2, double.nan], [1, double.nan, 5]);
 
     assert(mapNan.contains(double.nan));
-    assert(mapNan.containsKey(double.nan));
+    assert(double.nan in mapNan);
 }
 
 unittest
