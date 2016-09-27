@@ -150,7 +150,7 @@ private struct Pair
         /// Equality test with another Pair.
         bool opEquals(const ref Pair rhs) const @safe
         {
-            return cmp!(Yes.useTag)(rhs) == 0;
+            return cmp(rhs) == 0;
         }
 
         /// Assignment (shallow copy) by value.
@@ -171,11 +171,11 @@ private struct Pair
         //
         // useTag determines whether or not we consider node tags
         // in the comparison.
-        int cmp(Flag!"useTag" useTag)(ref const(Pair) rhs) const @safe
+        int cmp(ref const(Pair) rhs) const @safe
         {
-            const keyCmp = key.cmp!useTag(rhs.key);
+            const keyCmp = key.cmp(rhs.key);
             return keyCmp != 0 ? keyCmp
-                                : value.cmp!useTag(rhs.value);
+                                : value.cmp(rhs.value);
         }
 
         @disable int opCmp(ref Pair);
@@ -934,7 +934,7 @@ struct Node
         /// Compare with another _node.
         int opCmp(ref const Node node) const @safe
         {
-            return cmp!(Yes.useTag)(node);
+            return cmp(node);
         }
 
         // Compute hash of the node.
@@ -1002,7 +1002,7 @@ struct Node
         // Used for ordering in mappings and for opEquals.
         //
         // useTag determines whether or not to consider tags in the comparison.
-        int cmp(Flag!"useTag" useTag)(const ref Node rhs) const @trusted
+        int cmp(const ref Node rhs) const @trusted
         {
             static int cmp(T1, T2)(T1 a, T2 b)
             {
@@ -1032,7 +1032,7 @@ struct Node
                 // Equal lengths, compare items.
                 foreach(i; 0 .. c1.length)
                 {
-                    const itemCmp = c1[i].cmp!useTag(c2[i]);
+                    const itemCmp = c1[i].cmp(c2[i]);
                     if(itemCmp != 0){return itemCmp;}
                 }
                 return 0;
