@@ -1211,7 +1211,7 @@ struct Node
             {
                 auto elems = node.value_.get!(E[]);
                 moveAll(elems[cast(size_t)index + 1 .. $], elems[cast(size_t)index .. $ - 1]);
-                elems.length = elems.length - 1;
+                elems.length--;
                 node.value_ = Value(elems);
             }
 
