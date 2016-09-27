@@ -491,7 +491,7 @@ struct Node
             // If we're getting from a mapping and we're not getting Node.Pair[],
             // we're getting the default value.
             if(isMapping)
-                return cast(T)indexConst("=");
+                return cast(T)this["="];
 
             static if(isSomeString!T) {
                 return toString!T;
@@ -1273,7 +1273,7 @@ struct Node
         }
 
         // Const version of opIndex.
-        ref const(Node) indexConst(T)(T index) const
+        ref const(Node) opIndex(T)(T index) const
         {
             if(isSequence)
             {
@@ -1348,11 +1348,17 @@ unittest
     }
 
     // Will be emitted as an unordered mapping (default for mappings)
-    auto map   = Node([1 : "a", 2 : "b"]);
+    immutable map   = Node([1 : "a", 2 : "b"]);
+    assert(map[1] == "a");
+    assert(map[2] == "b");
     // Will be emitted as an ordered map (overriden tag)
-    auto omap  = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:omap");
+    immutable omap  = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:omap");
+    assert(omap[1] == "a");
+    assert(omap[2] == "b");
     // Will be emitted as pairs (overriden tag)
-    auto pairs = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:pairs");
+    immutable pairs = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:pairs");
+    assert(pairs[1] == "a");
+    assert(pairs[2] == "b");
 }
 
 unittest
@@ -1365,11 +1371,17 @@ unittest
     }
 
     // Will be emitted as an unordered mapping (default for mappings)
-    auto map   = Node([1, 2], ["a", "b"]);
+    immutable map   = Node([1, 2], ["a", "b"]);
+    assert(map[1] == "a");
+    assert(map[2] == "b");
     // Will be emitted as an ordered map (overriden tag)
-    auto omap  = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:omap");
+    immutable omap  = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:omap");
+    assert(omap[1] == "a");
+    assert(omap[2] == "b");
     // Will be emitted as pairs (overriden tag)
-    auto pairs = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:pairs");
+    immutable pairs = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:pairs");
+    assert(pairs[1] == "a");
+    assert(pairs[2] == "b");
 }
 
 unittest
