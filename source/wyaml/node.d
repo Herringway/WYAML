@@ -254,9 +254,6 @@ struct Node
         {
             tag_ = Tag(tag);
 
-            // No copyconstruction.
-            //static assert(!is(Unqual!T == Node));
-
             static if(isSomeString!T)             { value_ = Value(value.to!string); }
             else static if(isIntegral!T)           { value_ = Value(cast(long)value); }
             else static if(isFloatingPoint!T) { value_ = Value(cast(real)value); }
