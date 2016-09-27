@@ -178,7 +178,7 @@ private struct Pair
                                 : value.cmp(rhs.value);
         }
 
-        @disable int opCmp(ref Pair);
+        @disable int opCmp(ref Pair) const;
 }
 
 /** YAML node.
@@ -402,8 +402,7 @@ struct Node
         in
         {
             assert(keys.length == values.length,
-                   "Lengths of keys and values arrays to construct "
-                   "a YAML node from don't match");
+                   "Lengths of keys and values arrays to construct a YAML node from don't match");
         }
         body
         {
@@ -635,8 +634,7 @@ struct Node
                     return cast(Node)value_.get!(Pair[])[idx].value;
                 }
 
-                string msg = "Mapping index not found" ~ (isSomeString!T ? ": " ~ to!string(index) : "");
-                throw new NodeException(msg, startMark_);
+                throw new NodeException("Mapping index not found" ~ (isSomeString!T ? ": " ~ to!string(index) : ""), startMark_);
             }
             throw new NodeException("Trying to index a " ~ nodeTypeString ~ " node", startMark_);
         }
@@ -1258,7 +1256,7 @@ struct Node
                 else          {node = &pair.value;}
 
 
-                bool typeMatch = (isFloatingPoint!T && (node.isInt || node.isFloat)) ||
+                immutable bool typeMatch = (isFloatingPoint!T && (node.isInt || node.isFloat)) ||
                                  (isIntegral!T && node.isInt) ||
                                  (isSomeString!T && node.isString) ||
                                  (node.isType!T);
