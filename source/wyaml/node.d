@@ -475,52 +475,14 @@ struct Node
             }
         }
 
-        T opCast(T)() const if(is(T == const)) {
+        T opCast(T)() const {
             if(isType!(Unqual!T))
-                return value_.get!T;
+                return cast(T)value_.get!T;
 
             /// Must go before others, as even string/int/etc could be stored in a YAMLObject.
             static if(!allowed!(Unqual!T)) if(isUserType) {
-                auto object = get!(const YAMLObject);
-                if(object.type is typeid(T))
-                    return (cast(const YAMLContainer!(Unqual!T))object).value_;
-                throw new NodeException("Node has unexpected type: " ~ object.type.text ~
-                                ". Expected: " ~ typeid(T).text, startMark_);
-            }
-
-            // If we're getting from a mapping and we're not getting Node.Pair[],
-            // we're getting the default value.
-            if(isMapping)
-                return cast(T)this["="];
-
-            static if(isSomeString!T) {
-                return toString!T;
-            } else {
-                static if(isFloatingPoint!T) {
-                    /// Can convert int to float.
-                    if(isInt())       {return to!T(value_.get!(const long));}
-                    else if(isFloat()){return to!T(value_.get!(const real));}
-                } else static if(isIntegral!T) if(isInt()) {
-                    const temp = value_.get!(const long);
-                    enforce(temp >= T.min && temp <= T.max,
-                            new NodeException("Integer value of type " ~ typeid(T).text ~
-                                      " out of range. Value: " ~ to!string(temp), startMark_));
-                    return temp.to!T;
-                }
-                throw new NodeException("Node stores unexpected type: " ~ type.text ~
-                                ". Expected: " ~ typeid(T).text, startMark_);
-            }
-        }
-        T opCast(T)() {
-            if(isType!(Unqual!T))
-                return value_.get!T;
-
-            /// Must go before others, as even string/int/etc could be stored in a YAMLObject.
-            static if(!allowed!(Unqual!T)) if(isUserType)
-            {
                 auto object = cast(YAMLObject)this;
-                if(object.type is typeid(T))
-                {
+                if(object.type is typeid(T)) {
                     return (cast(YAMLContainer!(Unqual!T))object).value_;
                 }
                 throw new NodeException("Node has unexpected type: " ~ object.type.text ~
