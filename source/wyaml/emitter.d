@@ -213,8 +213,7 @@ struct Emitter(T)
         int popIndent()
         {
             enforce(indents_.length > 0,
-                    new YAMLException("Emitter: Need to pop an indent level but there"
-                                      " are no indent levels left"));
+                    new YAMLException("Emitter: Need to pop an indent level but there are no indent levels left"));
             const result = indents_.back;
             indents_.length = indents_.length - 1;
             return result;
@@ -447,8 +446,7 @@ struct Emitter(T)
                      }
                      break;
                 default:
-                     throw new EmitterException("Expected Alias, Scalar, SequenceStart or "
-                                     "MappingStart, but got: " ~ event_.idString);
+                     throw new EmitterException("Expected Alias, Scalar, SequenceStart or MappingStart, but got: " ~ event_.idString);
             }
         }
         ///Handle an alias.

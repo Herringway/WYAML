@@ -301,8 +301,7 @@ final class Scanner
                     case '>':  if(flowLevel_ == 0)   { return fetchFolded();     } break;
                     default:   if(checkPlain())      { return fetchPlain();      }
                 }
-                throw new ScannerException("While scanning for the next token, found character "
-                                           "\'%s\', index %s that cannot start any token"
+                throw new ScannerException("While scanning for the next token, found character \'%s\', index %s that cannot start any token"
                                            .format(c, to!int(c)), reader_.mark);
             } catch (UnexpectedTokenException e) {
                 throw new UnexpectedTokenWithMarkException(e, startMark, reader_.mark);
@@ -355,8 +354,7 @@ final class Scanner
         {
             // Check if a simple key is required at the current position.
             const required = (flowLevel_ == 0 && indent_ == reader_.column);
-            assert(allowSimpleKey_ || !required, "A simple key is required only if it is "
-                   "the first token in the current line. Therefore it is always allowed.");
+            assert(allowSimpleKey_ || !required, "A simple key is required only if it is the first token in the current line. Therefore it is always allowed.");
 
             if(!allowSimpleKey_) { return; }
 

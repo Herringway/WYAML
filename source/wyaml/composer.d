@@ -100,8 +100,7 @@ final class Composer
         {
             //Get the root node of the next document.
             assert(!parser_.checkEvent(EventID.StreamEnd),
-                   "Trying to get a node from Composer when there is no node to "
-                   "get. use checkNode() to determine if there is a node.");
+                   "Trying to get a node from Composer when there is no node to get. use checkNode() to determine if there is a node.");
 
             return composeDocument();
         }
@@ -261,12 +260,7 @@ final class Composer
             void error(Node node)
             {
                 //this is Composer, but the code is related to Constructor.
-                throw new ConstructorException("While constructing a mapping, "
-                                               "expected a mapping or a list of "
-                                               "mappings for merging, but found: "
-                                               ~ node.type.text ~
-                                               " NOTE: line/column shows topmost parent "
-                                               "to which the content is being merged",
+                throw new ConstructorException("While constructing a mapping, expected a mapping or a list of mappings for merging, but found: " ~ node.type.text ~ " NOTE: line/column shows topmost parent to which the content is being merged",
                                                startMark, endMark);
             }
 

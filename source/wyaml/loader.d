@@ -324,9 +324,7 @@ struct Loader
 
 unittest
 {
-    string yaml_input = "red:   '#ff0000'\n"
-                        "green: '#00ff00'\n"
-                        "blue:  '#0000ff'";
+    string yaml_input = "red:   '#ff0000'\ngreen: '#00ff00'\nblue:  '#0000ff'";
 
     auto colors = Loader(yaml_input).loadAll().front;
     assert(colors["red"] == "#ff0000");
