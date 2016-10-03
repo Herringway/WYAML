@@ -147,7 +147,7 @@ alias collectionStartEvent!(EventID.MappingStart)  mappingStartEvent;
  *          tagDirectives = Tag directives of the document.
  */
 Event documentStartEvent(const Mark start, const Mark end, const bool explicit, string YAMLVersion,
-                         TagDirective[] tagDirectives) pure @safe nothrow {
+                         TagDirective[] tagDirectives) pure nothrow {
     Event result = event!(EventID.DocumentStart)(start, end);
     result.value            = YAMLVersion;
     result.explicitDocument = explicit;
@@ -155,7 +155,7 @@ Event documentStartEvent(const Mark start, const Mark end, const bool explicit, 
     return result;
 }
 
-pure @safe nothrow unittest {
+pure nothrow unittest {
     auto v = documentStartEvent(Mark(), Mark(), false, "", []);
 }
 /**

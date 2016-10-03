@@ -883,7 +883,7 @@ struct Node
         }
 
         // Compute hash of the node.
-        hash_t toHash() @safe nothrow const
+        hash_t toHash() nothrow const
         {
             const tagHash = tag_.isNull ? 0 : hashOf(tag_.get());
             // Variant toHash is not const at the moment, so we need to const-cast.
