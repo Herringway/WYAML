@@ -142,7 +142,7 @@ final class Representer
          * Node representMyStruct(ref Node node, Representer representer)
          * {
          *     //The node is guaranteed to be MyStruct as we add representer for MyStruct.
-         *     auto value = node.as!MyStruct;
+         *     auto value = node.to!MyStruct;
          *     //Using custom scalar format, x:y:z.
          *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
          *     //Representing as a scalar, with custom tag to specify this data type.
@@ -188,7 +188,7 @@ final class Representer
          *         return 0;
          *     }
          *
-         *     ///Useful for Node.as!string .
+         *     ///Useful for Node.to!string .
          *     override string toString()
          *     {
          *         return format("MyClass(%s, %s, %s)", x, y, z);
@@ -199,7 +199,7 @@ final class Representer
          * Node representMyClass(ref Node node, Representer representer)
          * {
          *     //The node is guaranteed to be MyClass as we add representer for MyClass.
-         *     auto value = node.as!MyClass;
+         *     auto value = node.to!MyClass;
          *     //Using custom scalar format, x:y:z.
          *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
          *     //Representing as a scalar, with custom tag to specify this data type.
@@ -260,7 +260,7 @@ final class Representer
          *
          * Node representMyStruct(ref Node node, Representer representer)
          * {
-         *     auto value = node.as!MyStruct;
+         *     auto value = node.to!MyStruct;
          *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
          *     return representer.representScalar("!mystruct.tag", scalar);
          * }
@@ -307,7 +307,7 @@ final class Representer
          *
          * Node representMyStruct(ref Node node, Representer representer)
          * {
-         *     auto value = node.as!MyStruct;
+         *     auto value = node.to!MyStruct;
          *     auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
          *     //use flow style
          *     return representer.representSequence("!mystruct.tag", nodes,
@@ -376,7 +376,7 @@ final class Representer
          *
          * Node representMyStruct(ref Node node, Representer representer)
          * {
-         *     auto value = node.as!MyStruct;
+         *     auto value = node.to!MyStruct;
          *     auto pairs = [Node.Pair("x", value.x),
          *                   Node.Pair("y", value.y),
          *                   Node.Pair("z", value.z)];
@@ -425,7 +425,7 @@ final class Representer
         Node representData(ref Node data) @system
         {
             //User types are wrapped in YAMLObject.
-            auto type = data.isUserType ? data.as!YAMLObject.type : data.type;
+            auto type = data.isUserType ? data.to!YAMLObject.type : data.type;
 
             enforce((type in representers_) !is null,
                     new RepresenterException("No representer function for type "
@@ -465,7 +465,7 @@ Node representNull(ref Node node, Representer representer)
 ///Represent a string _node as a string scalar.
 Node representString(ref Node node, Representer representer)
 {
-    string value = node.as!string;
+    string value = node.to!string;
     return value is null
            ? representNull(node, representer)
            : representer.representScalar("tag:yaml.org,2002:str", value);
@@ -474,7 +474,7 @@ Node representString(ref Node node, Representer representer)
 ///Represent a bytes _node as a binary scalar.
 Node representBytes(ref Node node, Representer representer) @system
 {
-    const ubyte[] value = node.as!(ubyte[]);
+    const ubyte[] value = node.to!(ubyte[]);
     if(value is null){return representNull(node, representer);}
     return representer.representScalar("tag:yaml.org,2002:binary",
                                        cast(string)Base64.encode(value),
@@ -485,20 +485,20 @@ Node representBytes(ref Node node, Representer representer) @system
 Node representBool(ref Node node, Representer representer)
 {
     return representer.representScalar("tag:yaml.org,2002:bool",
-                                       node.as!bool ? "true" : "false");
+                                       node.to!bool ? "true" : "false");
 }
 
 ///Represent a long _node as an integer scalar.
 Node representLong(ref Node node, Representer representer) @system
 {
     return representer.representScalar("tag:yaml.org,2002:int",
-                                       to!string(node.as!long));
+                                       to!string(node.to!long));
 }
 
 ///Represent a real _node as a floating point scalar.
 Node representReal(ref Node node, Representer representer) @system
 {
-    real f = node.as!real;
+    real f = cast(real)node;
     string value = isNaN(f)                  ? ".nan":
                    f == real.infinity        ? ".inf":
                    f == -1.0 * real.infinity ? "-.inf":
@@ -513,13 +513,13 @@ Node representReal(ref Node node, Representer representer) @system
 Node representSysTime(ref Node node, Representer representer) @system
 {
     return representer.representScalar("tag:yaml.org,2002:timestamp",
-                                       node.as!SysTime.toISOExtString());
+                                       node.to!SysTime.toISOExtString());
 }
 
 ///Represent a sequence _node as sequence/set.
 Node representNodes(ref Node node, Representer representer)
 {
-    auto nodes = node.as!(Node[]);
+    auto nodes = node.to!(Node[]);
     if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:set"))
     {
         ///YAML sets are mapping with null values.
@@ -541,7 +541,7 @@ Node representNodes(ref Node node, Representer representer)
 ///Represent a mapping _node as map/ordered map/pairs.
 Node representPairs(ref Node node, Representer representer) @system
 {
-    auto pairs = node.as!(Node.Pair[]);
+    auto pairs = node.to!(Node.Pair[]);
 
     bool hasDuplicates(Node.Pair[] pairs)
     {
@@ -607,7 +607,7 @@ version(unittest) {
     Node representMyStruct(ref Node node, Representer representer) @system
     {
         //The node is guaranteed to be MyStruct as we add representer for MyStruct.
-        auto value = node.as!MyStruct;
+        auto value = node.to!MyStruct;
         //Using custom scalar format, x:y:z.
         auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
         //Representing as a scalar, with custom tag to specify this data type.
@@ -616,14 +616,14 @@ version(unittest) {
 
     Node representMyStructSeq(ref Node node, Representer representer)
     {
-        auto value = node.as!MyStruct;
+        auto value = node.to!MyStruct;
         auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
         return representer.representSequence("!mystruct.tag", nodes);
     }
 
     Node representMyStructMap(ref Node node, Representer representer)
     {
-        auto value = node.as!MyStruct;
+        auto value = node.to!MyStruct;
         auto pairs = [Node.Pair("x", value.x),
                       Node.Pair("y", value.y),
                       Node.Pair("z", value.z)];
@@ -651,7 +651,7 @@ version(unittest) {
             return 0;
         }
 
-        ///Useful for Node.as!string .
+        ///Useful for Node.to!string .
         override string toString() @safe
         {
             return format("MyClass(%s, %s, %s)", x, y, z);
@@ -662,7 +662,7 @@ version(unittest) {
     Node representMyClass(ref Node node, Representer representer) @system
     {
         //The node is guaranteed to be MyClass as we add representer for MyClass.
-        auto value = node.as!MyClass;
+        auto value = cast(MyClass)node;
         //Using custom scalar format, x:y:z.
         auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
         //Representing as a scalar, with custom tag to specify this data type.

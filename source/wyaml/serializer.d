@@ -12,6 +12,7 @@ module wyaml.serializer;
 
 
 import std.array;
+import std.conv;
 import std.format;
 import std.typecons;
 
@@ -118,8 +119,8 @@ struct Serializer(T)
         {
             if(node.isScalar)
             {
-                return node.isType!string    ? node.as!string.length > 64 :
-                       node.isType!(ubyte[]) ? node.as!(ubyte[]).length > 64:
+                return node.isType!string    ? node.to!string.length > 64 :
+                       node.isType!(ubyte[]) ? node.to!(ubyte[]).length > 64:
                                                false;
             }
             return node.length > 2;
@@ -181,7 +182,7 @@ struct Serializer(T)
             if(node.isScalar)
             {
                 assert(node.isType!string, "Scalar node type must be string before serialized");
-                auto value = node.as!string;
+                auto value = node.to!string;
                 const detectedTag = resolver_.resolve(NodeID.Scalar, Tag(null), value, true);
                 const defaultTag = resolver_.resolve(NodeID.Scalar, Tag(null), value, false);
                 bool isDetected = node.tag_ == detectedTag;

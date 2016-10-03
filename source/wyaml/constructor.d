@@ -154,7 +154,7 @@ final class Constructor
          * {
          *     //Guaranteed to be string as we construct from scalar.
          *     //!mystruct x:y:z
-         *     auto parts = node.as!string().split(":");
+         *     auto parts = node.to!string().split(":");
          *     // If this throws, the D:YAML will handle it and throw a YAMLException.
          *     return MyStruct(to!int(parts[0]), to!int(parts[1]), to!int(parts[2]));
          * }
@@ -203,7 +203,7 @@ final class Constructor
          * {
          *     //node is guaranteed to be sequence.
          *     //!mystruct [x, y, z]
-         *     return MyStruct(node[0].as!int, node[1].as!int, node[2].as!int);
+         *     return MyStruct(node[0].to!int, node[1].to!int, node[2].to!int);
          * }
          *
          * void main()
@@ -250,7 +250,7 @@ final class Constructor
          * {
          *     //node is guaranteed to be mapping.
          *     //!mystruct {"x": x, "y": y, "z": z}
-         *     return MyStruct(node["x"].as!int, node["y"].as!int, node["z"].as!int);
+         *     return MyStruct(node["x"].to!int, node["y"].to!int, node["z"].to!int);
          * }
          *
          * void main()
@@ -363,7 +363,7 @@ bool constructBool(ref Node node) @safe
 {
     static yes = ["yes", "true", "on"];
     static no = ["no", "false", "off"];
-    string value = node.as!string().toLower();
+    string value = node.to!string().toLower();
     if(yes.canFind(value)){return true;}
     if(no.canFind(value)) {return false;}
     throw new Exception("Unable to parse boolean value: " ~ value);
@@ -372,7 +372,7 @@ bool constructBool(ref Node node) @safe
 /// Construct an integer (long) _node.
 long constructLong(ref Node node)
 {
-    string value = node.as!string().replace("_", "");
+    string value = node.to!string().replace("_", "");
     const char c = value[0];
     const long sign = c != '-' ? 1 : -1;
     if(c == '-' || c == '+')
@@ -441,7 +441,7 @@ unittest
 /// Construct a floating point (real) _node.
 real constructReal(ref Node node)
 {
-    string value = node.as!string().replace("_", "").toLower();
+    string value = node.to!string().replace("_", "").toLower();
     const char c = value[0];
     const real sign = c != '-' ? 1.0 : -1.0;
     if(c == '-' || c == '+')
@@ -512,7 +512,7 @@ unittest
 /// Construct a binary (base64) _node.
 ubyte[] constructBinary(ref Node node)
 {
-    string value = node.as!string;
+    string value = node.to!string;
     // For an unknown reason, this must be nested to work (compiler bug?).
     try
     {
@@ -541,7 +541,7 @@ unittest
 /// Construct a timestamp (SysTime) _node.
 SysTime constructTimestamp(ref Node node)
 {
-    string value = node.as!string;
+    string value = node.to!string;
     enum YMD = "^([0-9][0-9][0-9][0-9])-([0-9][0-9]?)-([0-9][0-9]?)";
     enum HMS = "^[Tt \t]+([0-9][0-9]?):([0-9][0-9]):([0-9][0-9])(\\.[0-9]*)?";
     enum TZ = "^[ \t]*Z|([-+][0-9][0-9]?)(:[0-9][0-9])?";
@@ -649,7 +649,7 @@ unittest
 /// Construct a string _node.
 string constructString(ref Node node)
 {
-    return node.as!string;
+    return node.to!string;
 }
 
 /// Convert a sequence of single-element mappings into a sequence of pairs.
@@ -664,7 +664,7 @@ Node.Pair[] getPairs(string type, Node[] nodes)
                               ", expected a mapping with single element"));
 
         pairs.assumeSafeAppend();
-        pairs ~= node.as!(Node.Pair[]);
+        pairs ~= node.to!(Node.Pair[]);
     }
 
     return pairs;
@@ -673,7 +673,7 @@ Node.Pair[] getPairs(string type, Node[] nodes)
 /// Construct an ordered map (ordered sequence of key:value pairs without duplicates) _node.
 Node.Pair[] constructOrderedMap(ref Node node)
 {
-    auto pairs = getPairs("ordered map", node.as!(Node[]));
+    auto pairs = getPairs("ordered map", node.to!(Node[]));
 
     //Detect duplicates.
     //TODO this should be replaced by something with deterministic memory allocation.
@@ -733,13 +733,13 @@ unittest
 /// Construct a pairs (ordered sequence of key: value pairs allowing duplicates) _node.
 Node.Pair[] constructPairs(ref Node node)
 {
-    return getPairs("pairs", node.as!(Node[]));
+    return getPairs("pairs", node.to!(Node[]));
 }
 
 /// Construct a set _node.
 Node[] constructSet(ref Node node)
 {
-    auto pairs = node.as!(Node.Pair[]);
+    auto pairs = node.to!(Node.Pair[]);
 
     // In future, the map here should be replaced with something with deterministic
     // memory allocation if possible.
@@ -803,13 +803,13 @@ unittest
 /// Construct a sequence (array) _node.
 Node[] constructSequence(ref Node node)
 {
-    return node.as!(Node[]);
+    return node.to!(Node[]);
 }
 
 /// Construct an unordered map (unordered set of key:value _pairs without duplicates) _node.
 Node.Pair[] constructMap(ref Node node)
 {
-    auto pairs = node.as!(Node.Pair[]);
+    auto pairs = node.to!(Node.Pair[]);
     //Detect duplicates.
     //TODO this should be replaced by something with deterministic memory allocation.
     auto keys = redBlackTree!Node();
@@ -845,20 +845,20 @@ struct MyStruct
 MyStruct constructMyStructScalar(ref Node node)
 {
     // Guaranteed to be string as we construct from scalar.
-    auto parts = node.as!string().split(":");
+    auto parts = node.to!string().split(":");
     return MyStruct(to!int(parts[0]), to!int(parts[1]), to!int(parts[2]));
 }
 
 MyStruct constructMyStructSequence(ref Node node)
 {
     // node is guaranteed to be sequence.
-    return MyStruct(node[0].as!int, node[1].as!int, node[2].as!int);
+    return MyStruct(node[0].to!int, node[1].to!int, node[2].to!int);
 }
 
 MyStruct constructMyStructMapping(ref Node node)
 {
     // node is guaranteed to be mapping.
-    return MyStruct(node["x"].as!int, node["y"].as!int, node["z"].as!int);
+    return MyStruct(node["x"].to!int, node["y"].to!int, node["z"].to!int);
 }
 
 unittest
@@ -870,7 +870,7 @@ unittest
     loader.constructor = constructor;
     Node node = loader.loadAll().front;
 
-    assert(node.as!MyStruct == MyStruct(1, 2, 3));
+    assert(node.to!MyStruct == MyStruct(1, 2, 3));
 }
 
 unittest
@@ -882,7 +882,7 @@ unittest
     loader.constructor = constructor;
     Node node = loader.loadAll().front;
 
-    assert(node.as!MyStruct == MyStruct(1, 2, 3));
+    assert(node.to!MyStruct == MyStruct(1, 2, 3));
 }
 
 unittest
@@ -894,5 +894,5 @@ unittest
     loader.constructor = constructor;
     Node node = loader.loadAll().front;
 
-    assert(node.as!MyStruct == MyStruct(1, 2, 3));
+    assert(node.to!MyStruct == MyStruct(1, 2, 3));
 }

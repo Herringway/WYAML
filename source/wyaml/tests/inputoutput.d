@@ -8,6 +8,7 @@ module wyaml.tests.inputoutput;
 
 unittest {
 	import std.array;
+	import std.conv;
 	import std.meta;
 
 	import wyaml.tests.common;
@@ -20,7 +21,7 @@ unittest {
 		auto expected = data.split().join(" ");
 
 		Node output = Loader(data).loadAll().front;
-		assert(output.as!string == expected);
+		assert(output.to!string == expected);
 	}
 	run2!(testUnicodeInput, ["unicode"], "latin")("I/O");
 }

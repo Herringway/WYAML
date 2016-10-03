@@ -307,11 +307,11 @@ version(unittest) {
 
 	///Constructor function for TestClass.
 	TestClass constructClass(ref Node node) {
-		return new TestClass(node["x"].as!int, node["y"].as!int, node["z"].as!int);
+		return new TestClass(node["x"].to!int, node["y"].to!int, node["z"].to!int);
 	}
 
 	Node representClass(ref Node node, Representer representer) {
-		auto value = node.as!TestClass;
+		auto value = cast(TestClass)node;
 		auto pairs = [Node.Pair("x", value.x),
 						Node.Pair("y", value.y),
 						Node.Pair("z", value.z)];
@@ -322,14 +322,14 @@ version(unittest) {
 
 	///Constructor function for TestStruct.
 	TestStruct constructStruct(ref Node node) {
-		return TestStruct(to!int(node.as!string));
+		return TestStruct(node.to!string.to!int);
 	}
 
 	///Representer function for TestStruct.
 	Node representStruct(ref Node node, Representer representer) {
 		string[] keys, values;
-		auto value = node.as!TestStruct;
-		return representer.representScalar("!tag2", to!string(value.value));
+		auto value = node.to!TestStruct;
+		return representer.representScalar("!tag2", value.value.to!string);
 	}
 }
 unittest {

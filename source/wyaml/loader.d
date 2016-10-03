@@ -332,7 +332,7 @@ unittest
     assert(colors["blue"] == "#0000ff");
 }
 
-unittest
-{
-    assert(Loader("42").loadAll().front.as!int == 42);
+unittest {
+    import std.conv : to;
+    assert(Loader("42").loadAll().front.to!int == 42);
 }
