@@ -602,7 +602,7 @@ struct Node
         bool contains(T)(T rhs) const @trusted
         {
             if (isSequence)
-                return value_.get!(Node[]).canFind(rhs);
+                return (cast(Node[])this).canFind(Node(rhs));
 
             if (isMapping)
                 return findPair!(T, No.key)(rhs) >= 0;
