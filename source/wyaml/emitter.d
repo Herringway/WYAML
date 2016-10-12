@@ -206,7 +206,7 @@ struct Emitter(T)
             enforce(states_.length > 0,
                     new YAMLException("Emitter: Need to pop a state but there are no states left"));
             const result = states_.back;
-            states_.length = states_.length - 1;
+            states_.popBack();
             return result;
         }
 
@@ -216,7 +216,7 @@ struct Emitter(T)
             enforce(indents_.length > 0,
                     new YAMLException("Emitter: Need to pop an indent level but there are no indent levels left"));
             const result = indents_.back;
-            indents_.length = indents_.length - 1;
+            indents_.popBack();
             return result;
         }
 
