@@ -356,7 +356,7 @@ YAMLMerge constructMerge(ref Node node) @safe pure nothrow @nogc
 }
 
 /// Construct a boolean _node.
-bool constructBool(ref Node node) @safe
+bool constructBool(ref Node node)
 {
     static yes = ["yes", "true", "on"];
     static no = ["no", "false", "off"];
