@@ -359,7 +359,7 @@ unittest {
 		{
 			scope(failure)
 				writeComparison(testName, expected, node);
-			assert(node.equals!(No.useTag)(expected), testName ~ " failed");
+			assert(node == expected, testName ~ " failed");
 		}
 	}
 	alias testSet = AliasSeq!("construct-binary", "construct-bool", "construct-custom", "construct-float", "construct-int", "construct-map", "construct-merge", "construct-null", "construct-omap", "construct-pairs", "construct-seq", "construct-set", "construct-str-ascii", "construct-str-utf8", "construct-str", "construct-timestamp", "construct-value", "duplicate-merge-key", "float-representer-2.3-bug", "invalid-single-quote-bug", "more-floats", "negative-float-bug", "single-dot-is-not-float-bug", "timestamp-bugs", "utf8");

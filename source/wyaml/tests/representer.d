@@ -53,7 +53,7 @@ unittest {
 		readNodes          = loader.loadAll().array;
 
 		foreach(expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength))
-			assert(expected.equals!(No.useTag)(read));
+			assert(expected == read);
 	}
 
 	alias testGroup = AliasSeq!( "aliases-cdumper-bug", "construct-binary", "construct-bool", "construct-custom", "construct-float", "construct-int", "construct-map", "construct-merge", "construct-null", "construct-omap", "construct-pairs", "construct-seq", "construct-set", "construct-str-ascii", "construct-str-utf8", "construct-str", "construct-timestamp", "construct-value", "duplicate-merge-key", "float-representer-2.3-bug", "invalid-single-quote-bug", "more-floats", "negative-float-bug", "single-dot-is-not-float-bug", "timestamp-bugs", "utf8");
