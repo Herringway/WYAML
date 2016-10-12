@@ -124,8 +124,6 @@ struct Loader
         Constructor constructor_;
         // Name of the input file or stream, used in error messages.
         string name_ = "<unknown>";
-        // Are we done loading?
-        bool done_ = false;
 
     public:
         @disable this();
@@ -224,14 +222,7 @@ struct Loader
          *
          * Throws: YAMLException on a parsing error.
          */
-        int opApply(int delegate(ref Node) dg)
-        in
-        {
-            assert(!done_, "Loader: Trying to load YAML twice");
-        }
-        body
-        {
-            scope(exit) { done_ = true; }
+        int opApply(int delegate(ref Node) dg) {
             try
             {
                 lazyInitConstructorResolver();
