@@ -312,7 +312,17 @@ struct Loader
             if(constructor_ is null) { constructor_ = new Constructor(); }
         }
 }
-
+unittest {
+    string nodocs = "";
+    string explicitdoc = "---\n...";
+    string twodocs = "---\n...\n---\n...";
+    auto nodocloader = Loader(nodocs).loadAll().array;
+    assert(nodocloader.length == 0);
+    auto explicitdocloader = Loader(explicitdoc).loadAll().array;
+    assert(explicitdocloader.length == 1);
+    auto twodocloader = Loader(twodocs).loadAll().array;
+    assert(twodocloader.length == 2);
+}
 unittest
 {
     string yaml_input = "red:   '#ff0000'\ngreen: '#00ff00'\nblue:  '#0000ff'";
