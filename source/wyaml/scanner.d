@@ -1422,6 +1422,7 @@ Tuple!(Chomping, int) popBlockScalarIndicators(T)(ref T reader) if (isYAMLStream
 ///
 /// Params:
 ///
+/// reader   = The YAML stream being read from.
 /// c        = The character that may be a chomping indicator.
 /// chomping = Write the chomping value here, if detected.
 bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) if (isYAMLStream!T)
@@ -1445,11 +1446,11 @@ bool getChomping(T)(ref T reader, ref dchar c, ref Chomping chomping) if (isYAML
 ///
 /// Params:
 ///
+/// reader    = The YAML stream being read from.
 /// c         = The character that may be an increment indicator.
 ///             If an increment indicator is detected, this will be updated to
 ///             the next character in the Reader.
 /// increment = Write the increment value here, if detected.
-/// startMark = Mark for error messages.
 bool getIncrement(T)(ref T reader, ref dchar c, ref int increment) if (isYAMLStream!T)
 {
     if(!c.isDigit) { return false; }

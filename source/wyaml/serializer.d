@@ -62,7 +62,6 @@ struct Serializer(T)
          *
          * Params:  emitter       = Emitter to emit events produced.
          *          resolver      = Resolver used to determine which tags are automaticaly resolvable.
-         *          encoding      = Character encoding to use.
          *          explicitStart = Do all document starts have to be specified explicitly?
          *          explicitEnd   = Do all document ends have to be specified explicitly?
          *          YAMLVersion   = YAML version string.

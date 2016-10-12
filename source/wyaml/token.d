@@ -93,6 +93,7 @@ struct Token
 ///          end       = End position of the token.
 ///          value     = Value of the token.
 ///          directive = Directive type (YAML or TAG in YAML 1.1).
+///          nameEnd   = Beginning index of second value
 Token directiveToken(const Mark start, const Mark end, string value,
                      DirectiveType directive, const size_t nameEnd)
 {
@@ -114,7 +115,6 @@ Token simpleToken(TokenID id)(const Mark start, const Mark end)
 ///
 /// Params:  start    = Start position of the token.
 ///          end      = End position of the token.
-///          encoding = Encoding of the stream.
 Token streamStartToken(const Mark start, const Mark end)
 {
     return Token(null, start, end, TokenID.StreamStart, ScalarStyle.Invalid);

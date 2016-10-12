@@ -125,9 +125,6 @@ final class Constructor
          * classes. Note that the class $(D opCmp()) should not alter the compared
          * values - it is not const for compatibility reasons.
          *
-         * Params:  tag  = Tag for the function to handle.
-         *          ctor = Constructor function.
-         *
          * Example:
          *
          * --------------------
