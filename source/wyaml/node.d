@@ -543,6 +543,7 @@ struct Node
             throw new NodeException("Trying to get length of a " ~ nodeTypeString ~ " node",
                             startMark_);
         }
+        alias opDollar = length;
 
         /** Get the element at specified index.
          *
