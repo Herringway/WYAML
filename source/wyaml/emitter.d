@@ -1502,13 +1502,6 @@ struct ScalarWriter(T)
             ++endChar_;
             endByte_ = nextEndByte_;
             if(endByte_ >= text_.length){return dcharNone;}
-            const c = text_[nextEndByte_];
-            //c is ascii, no need to decode.
-            if(c < 0x80)
-            {
-                ++nextEndByte_;
-                return c;
-            }
             return decode(text_, nextEndByte_);
         }
 
