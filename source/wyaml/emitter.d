@@ -749,7 +749,7 @@ struct Emitter(T)
             if(preparedAnchor_ !is null && preparedAnchor_ != "")
             {
                 writeIndicator(indicator, Yes.needWhitespace);
-                writeString(preparedAnchor_);
+                stream_.put(preparedAnchor_);
             }
             preparedAnchor_ = null;
         }
@@ -1157,9 +1157,9 @@ struct Emitter(T)
             if(prefixSpace)
             {
                 ++column_;
-                writeString(" ");
+                stream_.put(" ");
             }
-            writeString(indicator);
+            stream_.put(indicator);
         }
 
         ///Write indentation.
@@ -1181,10 +1181,10 @@ struct Emitter(T)
                 column_ = indent;
                 while(numSpaces >= spaces.length)
                 {
-                    writeString(spaces);
+                    stream_.put(spaces);
                     numSpaces -= spaces.length;
                 }
-                writeString(spaces[0 .. numSpaces]);
+                stream_.put(spaces[0 .. numSpaces]);
             }
         }
 
@@ -1194,31 +1194,30 @@ struct Emitter(T)
             whitespace_ = indentation_ = true;
             ++line_;
             column_ = 0;
-            writeString(data is null ? lineBreak(bestLineBreak_) : data);
+            stream_.put(data is null ? lineBreak(bestLineBreak_) : data);
         }
 
         ///Write a YAML version directive.
         void writeVersionDirective(const string versionText)
         {
-            writeString("%YAML ");
-            writeString(versionText);
+            stream_.put("%YAML ");
+            stream_.put(versionText);
             writeLineBreak();
         }
 
         ///Write a tag directive.
         void writeTagDirective(const string handle, const string prefix)
         {
-            writeString("%TAG ");
-            writeString(handle);
-            writeString(" ");
-            writeString(prefix);
+            stream_.put("%TAG ");
+            stream_.put(handle);
+            stream_.put(" ");
+            stream_.put(prefix);
             writeLineBreak();
         }
 }
 
 
 private:
-
 ///RAII struct used to write out scalar values.
 struct ScalarWriter(T)
 {
