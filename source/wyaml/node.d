@@ -36,7 +36,7 @@ class NodeException : YAMLException
         // Params:  msg   = Error message.
         //          start = Start position of the node.
         this(string msg, Mark start, string file = __FILE__, int line = __LINE__)
-            @safe
+            @safe pure
         {
             super(msg ~ "\nNode at: " ~ start.text, file, line);
         }
