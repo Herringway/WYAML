@@ -159,8 +159,9 @@ struct Emitter(T)
         ScalarStyle style_ = ScalarStyle.Invalid;
 
     public:
-        @disable int opCmp(ref Emitter);
-        @disable bool opEquals(ref Emitter);
+        @disable int opCmp(ref Emitter!T) const;
+        @disable bool opEquals(ref Emitter!T) const;
+        @disable size_t toHash() nothrow @safe;
 
         /**
          * Construct an emitter.
@@ -1228,8 +1229,9 @@ struct ScalarWriter(T)
     }
 
     private:
-        @disable int opCmp(ref Emitter!T);
-        @disable bool opEquals(ref Emitter!T);
+        @disable int opCmp(ref Emitter!T) const;
+        @disable bool opEquals(ref Emitter!T) const;
+        @disable size_t toHash() nothrow @safe;
 
         ///Used as "null" UTF-32 character.
         static immutable dcharNone = dchar.max;
