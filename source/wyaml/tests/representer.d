@@ -19,22 +19,20 @@ unittest {
 	import wyaml.tests.common;
 	import wyaml.tests.constructor;
 
-
 	/// Representer unittest.
 	///
 	/// Params: testName = Name of the test being run.
 	void testRepresenterTypes(string testName) {
-		enforce((testName in wyaml.tests.constructor.expected) !is null,
-				new Exception("Unimplemented representer test: " ~ testName));
+		enforce((testName in wyaml.tests.constructor.expected) !is null, new Exception("Unimplemented representer test: " ~ testName));
 
 		Node[] expectedNodes = expected[testName];
 		string output;
 		Node[] readNodes;
 
-		scope(failure)
+		scope (failure)
 			writeComparison!("Expected nodes", "Read nodes", "Output")(testName, expectedNodes, readNodes, output);
 
-		auto emitStream  = new OutBuffer;
+		auto emitStream = new OutBuffer;
 		auto representer = new Representer;
 		representer.addRepresenter!TestClass(&representClass);
 		representer.addRepresenter!TestStruct(&representStruct);
@@ -47,15 +45,17 @@ unittest {
 		constructor.addConstructorMapping!constructClass("!tag1");
 		constructor.addConstructorScalar!constructStruct("!tag2");
 
-		auto loader        = Loader(emitStream.text);
-		loader.name        = "TEST";
+		auto loader = Loader(emitStream.text);
+		loader.name = "TEST";
 		loader.constructor = constructor;
-		readNodes          = loader.loadAll().array;
+		readNodes = loader.loadAll().array;
 
-		foreach(expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength))
+		foreach (expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength))
 			assert(expected == read);
 	}
 
-	alias testGroup = AliasSeq!( "aliases-cdumper-bug", "construct-binary", "construct-bool", "construct-custom", "construct-float", "construct-int", "construct-map", "construct-merge", "construct-null", "construct-omap", "construct-pairs", "construct-seq", "construct-set", "construct-str-ascii", "construct-str-utf8", "construct-str", "construct-timestamp", "construct-value", "duplicate-merge-key", "float-representer-2.3-bug", "invalid-single-quote-bug", "more-floats", "negative-float-bug", "single-dot-is-not-float-bug", "timestamp-bugs", "utf8");
+	alias testGroup = AliasSeq!("aliases-cdumper-bug", "construct-binary", "construct-bool", "construct-custom", "construct-float", "construct-int", "construct-map", "construct-merge",
+		"construct-null", "construct-omap", "construct-pairs", "construct-seq", "construct-set", "construct-str-ascii", "construct-str-utf8", "construct-str", "construct-timestamp",
+		"construct-value", "duplicate-merge-key", "float-representer-2.3-bug", "invalid-single-quote-bug", "more-floats", "negative-float-bug", "single-dot-is-not-float-bug", "timestamp-bugs", "utf8");
 	run2!(testRepresenterTypes, [], testGroup)("Representer");
 }

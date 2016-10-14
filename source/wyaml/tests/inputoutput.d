@@ -7,12 +7,10 @@
 module wyaml.tests.inputoutput;
 
 unittest {
-	import std.array;
-	import std.conv;
-	import std.meta;
+	import std.array : split, front, join;
+	import std.conv : to;
 
 	import wyaml.tests.common;
-
 
 	/// Unicode input unittest. Tests various encodings.
 	///
@@ -23,5 +21,6 @@ unittest {
 		Node output = Loader(data).loadAll().front;
 		assert(output.to!string == expected);
 	}
+
 	run2!(testUnicodeInput, ["unicode"], "latin")("I/O");
 }

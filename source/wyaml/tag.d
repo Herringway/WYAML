@@ -8,4 +8,5 @@
 module wyaml.tag;
 
 private import std.typecons;
+
 alias Tag = Nullable!(string, "");

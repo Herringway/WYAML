@@ -7,22 +7,19 @@
 ///YAML node formatting styles.
 module wyaml.style;
 
-
 ///Scalar styles.
-enum ScalarStyle : ubyte
-{
-    Invalid = 0,  /// Invalid (uninitialized) style
-    Literal,      /// `|` (Literal block style)
-    Folded,       /// `>` (Folded block style)
-    Plain,        /// Plain scalar
-    SingleQuoted, /// Single quoted scalar
-    DoubleQuoted  /// Double quoted scalar
+enum ScalarStyle : ubyte {
+	Invalid = 0, /// Invalid (uninitialized) style
+	Literal, /// `|` (Literal block style)
+	Folded, /// `>` (Folded block style)
+	Plain, /// Plain scalar
+	SingleQuoted, /// Single quoted scalar
+	DoubleQuoted /// Double quoted scalar
 }
 
 ///Collection styles.
-enum CollectionStyle : ubyte
-{
-    Invalid = 0, /// Invalid (uninitialized) style
-    Block,       /// Block style.
-    Flow         /// Flow style.
+enum CollectionStyle : ubyte {
+	Invalid = 0, /// Invalid (uninitialized) style
+	Block, /// Block style.
+	Flow /// Flow style.
 }

@@ -11,7 +11,6 @@
  */
 module wyaml.dumper;
 
-
 import std.range;
 import std.typecons;
 
@@ -26,10 +25,8 @@ import wyaml.resolver;
 import wyaml.serializer;
 import wyaml.tagdirective;
 
-
-
-auto dumper(T)(T range) if(isOutputRange!(T, char[])) {
-    return Dumper!T(range);
+auto dumper(T)(T range) if (isOutputRange!(T, char[])) {
+	return Dumper!T(range);
 }
 /**
  * Dumps YAML documents to files or streams.
@@ -80,242 +77,211 @@ auto dumper(T)(T range) if(isOutputRange!(T, char[])) {
  * dumper.dump(node);
  * --------------------
  */
-private struct Dumper(T) if (isOutputRange!(T, char[]))
-{
-    private:
-        //Resolver to resolve tags.
-        Resolver resolver_;
-        //Representer to represent data types.
-        Representer representer_;
+private struct Dumper(T) if (isOutputRange!(T, char[])) {
+	//Resolver to resolve tags.
+	private Resolver resolver_;
+	//Representer to represent data types.
+	private Representer representer_;
 
-        //Stream to write to.
-        T stream_;
+	//Stream to write to.
+	private T stream_;
 
-        //Write scalars in canonical form?
-        bool canonical_;
-        //Indentation width.
-        int indent_ = 2;
-        //Preferred text width.
-        uint textWidth_ = 80;
-        //Line break to use.
-        LineBreak lineBreak_ = LineBreak.Unix;
-        //YAML version string.
-        string YAMLVersion_ = "1.1";
-        //Tag directives to use.
-        TagDirective[] tags_ = null;
-        //Always write document start?
-        Flag!"explicitStart" explicitStart_ = No.explicitStart;
-        //Always write document end?
-        Flag!"explicitEnd" explicitEnd_ = No.explicitEnd;
+	//Write scalars in canonical form?
+	private bool canonical_;
+	//Indentation width.
+	private int indent_ = 2;
+	//Preferred text width.
+	private uint textWidth_ = 80;
+	//Line break to use.
+	private LineBreak lineBreak_ = LineBreak.Unix;
+	//YAML version string.
+	private string yamlVersion_ = "1.1";
+	//Tag directives to use.
+	private TagDirective[] tags_ = null;
+	//Always write document start?
+	private Flag!"explicitStart" explicitStart_ = No.explicitStart;
+	//Always write document end?
+	private Flag!"explicitEnd" explicitEnd_ = No.explicitEnd;
 
-        //Name of the output file or stream, used in error messages.
-        string name_ = "<unknown>";
+	//Name of the output file or stream, used in error messages.
+	private string name_ = "<unknown>";
 
-    public:
-        @disable this();
-        @disable bool opEquals(ref Dumper);
-        @disable int opCmp(ref Dumper);
+	@disable this();
+	@disable int opCmp(ref Emitter!T) const;
+	@disable bool opEquals(ref Emitter!T) const;
+	@disable size_t toHash() nothrow @safe;
 
-        ///Construct a Dumper writing to a _stream. This is useful to e.g. write to memory.
-        this(T stream)
-        {
-            resolver_    = new Resolver();
-            representer_ = new Representer();
-            stream_ = stream;
-        }
+	///Construct a Dumper writing to a _stream. This is useful to e.g. write to memory.
+	public this(T stream) {
+		resolver_ = new Resolver();
+		representer_ = new Representer();
+		stream_ = stream;
+	}
 
-        ///Set stream _name. Used in debugging messages.
-        @property void name(string name)
-        {
-            name_ = name;
-        }
+	///Set stream _name. Used in debugging messages.
+	public void name(string name) {
+		name_ = name;
+	}
 
-        ///Specify custom Resolver to use.
-        @property void resolver(Resolver resolver)
-        {
-            resolver_ = resolver;
-        }
+	///Specify custom Resolver to use.
+	public void resolver(Resolver resolver) {
+		resolver_ = resolver;
+	}
 
-        ///Specify custom Representer to use.
-        @property void representer(Representer representer)
-        {
-            representer_ = representer;
-        }
+	///Specify custom Representer to use.
+	public void representer(Representer representer) {
+		representer_ = representer;
+	}
 
-        ///Write scalars in _canonical form?
-        @property void canonical(bool canonical)
-        {
-            canonical_ = canonical;
-        }
+	///Write scalars in _canonical form?
+	public void canonical(bool canonical) {
+		canonical_ = canonical;
+	}
 
-        ///Set indentation width. 2 by default. Must not be zero.
-        @property void indent(uint indent)
-        in
-        {
-            assert(indent != 0, "Can't use zero YAML indent width");
-        }
-        body
-        {
-            indent_ = indent;
-        }
+	///Set indentation width. 2 by default. Must not be zero.
+	public void indent(uint indent)
+	in {
+		assert(indent != 0, "Can't use zero YAML indent width");
+	}
+	body {
+		indent_ = indent;
+	}
 
-        ///Set preferred text _width.
-        @property void textWidth(uint width)
-        {
-            textWidth_ = width;
-        }
+	///Set preferred text _width.
+	public void textWidth(uint width) {
+		textWidth_ = width;
+	}
 
-        ///Set line break to use. Unix by default.
-        @property void lineBreak(LineBreak lineBreak)
-        {
-            lineBreak_ = lineBreak;
-        }
+	///Set line break to use. Unix by default.
+	public void lineBreak(LineBreak lineBreak) {
+		lineBreak_ = lineBreak;
+	}
 
-        ///Always explicitly write document start?
-        @property void explicitStart(bool explicit)
-        {
-            explicitStart_ = explicit ? Yes.explicitStart : No.explicitStart;
-        }
+	///Always explicitly write document start?
+	public void explicitStart(bool explicit) {
+		explicitStart_ = explicit ? Yes.explicitStart : No.explicitStart;
+	}
 
-        ///Always explicitly write document end?
-        @property void explicitEnd(bool explicit)
-        {
-            explicitEnd_ = explicit ? Yes.explicitEnd : No.explicitEnd;
-        }
+	///Always explicitly write document end?
+	public void explicitEnd(bool explicit) {
+		explicitEnd_ = explicit ? Yes.explicitEnd : No.explicitEnd;
+	}
 
-        ///Specify YAML version string. "1.1" by default.
-        @property void YAMLVersion(string YAMLVersion)
-        {
-            YAMLVersion_ = YAMLVersion;
-        }
+	///Specify YAML version string. "1.1" by default.
+	public void yamlVersion(string ver) {
+		yamlVersion_ = ver;
+	}
 
-        /**
-         * Specify tag directives.
-         *
-         * A tag directive specifies a shorthand notation for specifying _tags.
-         * Each tag directive associates a handle with a prefix. This allows for
-         * compact tag notation.
-         *
-         * Each handle specified MUST start and end with a '!' character
-         * (a single character "!" handle is allowed as well).
-         *
-         * Only alphanumeric characters, '-', and '__' may be used in handles.
-         *
-         * Each prefix MUST not be empty.
-         *
-         * The "!!" handle is used for default YAML _tags with prefix
-         * "tag:yaml.org,2002:". This can be overridden.
-         *
-         * Params:  tags = Tag directives (keys are handles, values are prefixes).
-         *
-         * Example:
-         * --------------------
-         * Dumper dumper = Dumper("file.yaml");
-         * string[string] directives;
-         * directives["!short!"] = "tag:long.org,2011:";
-         * //This will emit tags starting with "tag:long.org,2011"
-         * //with a "!short!" prefix instead.
-         * dumper.tagDirectives(directives);
-         * dumper.dump(Node("foo"));
-         * --------------------
-         */
-        @property void tagDirectives(string[string] tags)
-        {
-            TagDirective[] t;
-            foreach(handle, prefix; tags)
-            {
-                assert(handle.length >= 1 && handle[0] == '!' && handle[$ - 1] == '!',
-                       "A tag handle is empty or does not start and end with a '!' character : " ~ handle);
-                assert(prefix.length >= 1, "A tag prefix is empty");
-                t ~= TagDirective(handle, prefix);
-            }
-            tags_ = t;
-        }
+	/**
+	     * Specify tag directives.
+	     *
+	     * A tag directive specifies a shorthand notation for specifying _tags.
+	     * Each tag directive associates a handle with a prefix. This allows for
+	     * compact tag notation.
+	     *
+	     * Each handle specified MUST start and end with a '!' character
+	     * (a single character "!" handle is allowed as well).
+	     *
+	     * Only alphanumeric characters, '-', and '__' may be used in handles.
+	     *
+	     * Each prefix MUST not be empty.
+	     *
+	     * The "!!" handle is used for default YAML _tags with prefix
+	     * "tag:yaml.org,2002:". This can be overridden.
+	     *
+	     * Params:  tags = Tag directives (keys are handles, values are prefixes).
+	     *
+	     * Example:
+	     * --------------------
+	     * Dumper dumper = Dumper("file.yaml");
+	     * string[string] directives;
+	     * directives["!short!"] = "tag:long.org,2011:";
+	     * //This will emit tags starting with "tag:long.org,2011"
+	     * //with a "!short!" prefix instead.
+	     * dumper.tagDirectives(directives);
+	     * dumper.dump(Node("foo"));
+	     * --------------------
+	     */
+	public void tagDirectives(string[string] tags) {
+		TagDirective[] t;
+		foreach (handle, prefix; tags) {
+			assert(handle.length >= 1 && handle[0] == '!' && handle[$ - 1] == '!', "A tag handle is empty or does not start and end with a '!' character : " ~ handle);
+			assert(prefix.length >= 1, "A tag prefix is empty");
+			t ~= TagDirective(handle, prefix);
+		}
+		tags_ = t;
+	}
 
-        /**
-         * Dump one or more YAML _documents to the file/stream.
-         *
-         * Note that while you can call dump() multiple times on the same
-         * dumper, you will end up writing multiple YAML "files" to the same
-         * file/stream.
-         *
-         * Params:  documents = Documents to _dump (root nodes of the _documents).
-         *
-         * Throws:  YAMLException on error (e.g. invalid nodes,
-         *          unable to write to file/stream).
-         */
-        void dump(Node[] documents ...)
-        {
-            try
-            {
-                auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
-                auto serializer = Serializer!T(emitter, resolver_, explicitStart_,
-                                             explicitEnd_, YAMLVersion_, tags_);
-                foreach(ref document; documents)
-                {
-                    representer_.represent(serializer, document);
-                }
-            }
-            catch(YAMLException e)
-            {
-                throw new YAMLException("Unable to dump YAML to stream "
-                                        ~ name_ ~ " : " ~ e.msg);
-            }
-        }
+	/**
+	     * Dump one or more YAML _documents to the file/stream.
+	     *
+	     * Note that while you can call dump() multiple times on the same
+	     * dumper, you will end up writing multiple YAML "files" to the same
+	     * file/stream.
+	     *
+	     * Params:  documents = Documents to _dump (root nodes of the _documents).
+	     *
+	     * Throws:  YAMLException on error (e.g. invalid nodes,
+	     *          unable to write to file/stream).
+	     */
+	public void dump(Node[] documents...) {
+		try {
+			auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
+			auto serializer = Serializer!T(emitter, resolver_, explicitStart_, explicitEnd_, yamlVersion_, tags_);
+			foreach (ref document; documents) {
+				representer_.represent(serializer, document);
+			}
+		}
+		catch (YAMLException e) {
+			throw new YAMLException("Unable to dump YAML to stream " ~ name_ ~ " : " ~ e.msg);
+		}
+	}
 
-    package:
-        /*
-         * Emit specified events. Used for debugging/testing.
-         *
-         * Params:  events = Events to emit.
-         *
-         * Throws:  YAMLException if unable to emit.
-         */
-        void emit(Event[] events)
-        {
-            try
-            {
-                auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
-                foreach(ref event; events)
-                {
-                    emitter.emit(event);
-                }
-            }
-            catch(YAMLException e)
-            {
-                throw new YAMLException("Unable to emit YAML to stream "
-                                        ~ name_ ~ " : " ~ e.msg);
-            }
-        }
-}
-version(unittest) import std.outbuffer;
-unittest
-{
-    auto node = Node([1, 2, 3, 4, 5]);
-    dumper(new OutBuffer()).dump(node);
+	/*
+	     * Emit specified events. Used for debugging/testing.
+	     *
+	     * Params:  events = Events to emit.
+	     *
+	     * Throws:  YAMLException if unable to emit.
+	     */
+	package void emit(Event[] events) {
+		try {
+			auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
+			foreach (ref event; events) {
+				emitter.emit(event);
+			}
+		}
+		catch (YAMLException e) {
+			throw new YAMLException("Unable to emit YAML to stream " ~ name_ ~ " : " ~ e.msg);
+		}
+	}
 }
 
-unittest
-{
-    auto node1 = Node([1, 2, 3, 4, 5]);
-    auto node2 = Node("This document contains only one string");
-    dumper(new OutBuffer()).dump(node1, node2);
+version (unittest) import std.outbuffer;
+
+unittest {
+	auto node = Node([1, 2, 3, 4, 5]);
+	dumper(new OutBuffer()).dump(node);
 }
 
-unittest
-{
-    auto stream = new OutBuffer();
-    auto node = Node([1, 2, 3, 4, 5]);
-    dumper(stream).dump(node);
+unittest {
+	auto node1 = Node([1, 2, 3, 4, 5]);
+	auto node2 = Node("This document contains only one string");
+	dumper(new OutBuffer()).dump(node1, node2);
 }
 
-unittest
-{
-    auto node = Node([1, 2, 3, 4, 5]);
-    auto representer = new Representer();
-    auto resolver = new Resolver();
-    auto dumper = dumper(new OutBuffer());
-    dumper.representer = representer;
-    dumper.resolver = resolver;
-    dumper.dump(node);
+unittest {
+	auto stream = new OutBuffer();
+	auto node = Node([1, 2, 3, 4, 5]);
+	dumper(stream).dump(node);
+}
+
+unittest {
+	auto node = Node([1, 2, 3, 4, 5]);
+	auto representer = new Representer();
+	auto resolver = new Resolver();
+	auto dumper = dumper(new OutBuffer());
+	dumper.representer = representer;
+	dumper.resolver = resolver;
+	dumper.dump(node);
 }

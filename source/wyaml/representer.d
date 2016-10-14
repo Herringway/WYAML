@@ -12,7 +12,6 @@
  */
 module wyaml.representer;
 
-
 import std.algorithm;
 import std.array;
 import std.base64;
@@ -31,11 +30,9 @@ import wyaml.serializer;
 import wyaml.style;
 import wyaml.tag;
 
-
 ///Exception thrown on Representer errors.
-class RepresenterException : YAMLException
-{
-    mixin ExceptionCtors;
+class RepresenterException : YAMLException {
+	mixin ExceptionCtors;
 }
 
 /**
@@ -45,652 +42,586 @@ class RepresenterException : YAMLException
  *
  * It can also override default node formatting styles for output.
  */
-final class Representer
-{
-    private:
-        // Representer functions indexed by types.
-        Node function(ref Node, Representer)[TypeInfo] representers_;
-        // Default style for scalar nodes.
-        ScalarStyle defaultScalarStyle_ = ScalarStyle.Invalid;
-        // Default style for collection nodes.
-        CollectionStyle defaultCollectionStyle_ = CollectionStyle.Invalid;
+final class Representer {
+	// Representer functions indexed by types.
+	private Node function(ref Node, Representer)[TypeInfo] representers_;
+	// Default style for scalar nodes.
+	private ScalarStyle defaultScalarStyle_ = ScalarStyle.Invalid;
+	// Default style for collection nodes.
+	private CollectionStyle defaultCollectionStyle_ = CollectionStyle.Invalid;
 
-    public:
-        @disable bool opEquals(ref Representer);
-        @disable int opCmp(ref Representer);
+	@disable bool opEquals(ref Representer) const;
+	@disable int opCmp(ref Representer) const;
 
-        /**
-         * Construct a Representer.
-         *
-         * Params:  useDefaultRepresenters = Use default representer functions
-         *                                   for default YAML types? This can be
-         *                                   disabled to use custom representer
-         *                                   functions for default types.
-         */
-        this(const Flag!"useDefaultRepresenters" useDefaultRepresenters = Yes.useDefaultRepresenters)
-            @safe pure
-        {
-            if(!useDefaultRepresenters){return;}
-            addRepresenter!YAMLNull(&representNull);
-            addRepresenter!string(&representString);
-            addRepresenter!(ubyte[])(&representBytes);
-            addRepresenter!bool(&representBool);
-            addRepresenter!long(&representLong);
-            addRepresenter!real(&representReal);
-            addRepresenter!(Node[])(&representNodes);
-            addRepresenter!(Node.Pair[])(&representPairs);
-            addRepresenter!SysTime(&representSysTime);
-        }
+	/**
+		 * Construct a Representer.
+		 *
+		 * Params:  useDefaultRepresenters = Use default representer functions
+		 *                                   for default YAML types? This can be
+		 *                                   disabled to use custom representer
+		 *                                   functions for default types.
+		 */
+	public this(const Flag!"useDefaultRepresenters" useDefaultRepresenters = Yes.useDefaultRepresenters) @safe pure {
+		if (!useDefaultRepresenters) {
+			return;
+		}
+		addRepresenter!YAMLNull(&representNull);
+		addRepresenter!string(&representString);
+		addRepresenter!(ubyte[])(&representBytes);
+		addRepresenter!bool(&representBool);
+		addRepresenter!long(&representLong);
+		addRepresenter!real(&representReal);
+		addRepresenter!(Node[])(&representNodes);
+		addRepresenter!(Node.Pair[])(&representPairs);
+		addRepresenter!SysTime(&representSysTime);
+	}
 
-        ///Set default _style for scalars. If style is $(D ScalarStyle.Invalid), the _style is chosen automatically.
-        @property void defaultScalarStyle(ScalarStyle style) pure @safe nothrow
-        {
-            defaultScalarStyle_ = style;
-        }
+	///Set default _style for scalars. If style is $(D ScalarStyle.Invalid), the _style is chosen automatically.
+	public void defaultScalarStyle(ScalarStyle style) pure @safe nothrow {
+		defaultScalarStyle_ = style;
+	}
 
-        ///Set default _style for collections. If style is $(D CollectionStyle.Invalid), the _style is chosen automatically.
-        @property void defaultCollectionStyle(CollectionStyle style) pure @safe nothrow
-        {
-            defaultCollectionStyle_ = style;
-        }
+	///Set default _style for collections. If style is $(D CollectionStyle.Invalid), the _style is chosen automatically.
+	public void defaultCollectionStyle(CollectionStyle style) pure @safe nothrow {
+		defaultCollectionStyle_ = style;
+	}
 
-        /**
-         * Add a function to represent nodes with a specific data type.
-         *
-         * The representer function takes references to a $(D Node) storing the data
-         * type and to the $(D Representer). It returns the represented node and may
-         * throw a $(D RepresenterException). See the example for more information.
-         *
-         *
-         * Only one function may be specified for one data type. Default data
-         * types already have representer functions unless disabled in the
-         * $(D Representer) constructor.
-         *
-         *
-         * Structs and classes must implement the $(D opCmp()) operator for D:YAML
-         * support. The signature of the operator that must be implemented
-         * is $(D const int opCmp(ref const MyStruct s)) for structs where
-         * $(I MyStruct) is the struct type, and $(D int opCmp(Object o)) for
-         * classes. Note that the class $(D opCmp()) should not alter the compared
-         * values - it is not const for compatibility reasons.
-         *
-         * Params:  representer = Representer function to add.
-         *
-         * Examples:
-         *
-         * Representing a simple struct:
-         * --------------------
-         * import std.string;
-         *
-         * import wyaml.all;
-         *
-         * struct MyStruct
-         * {
-         *     int x, y, z;
-         *
-         *     //Any D:YAML type must have a custom opCmp operator.
-         *     //This is used for ordering in mappings.
-         *     const int opCmp(ref const MyStruct s)
-         *     {
-         *         if(x != s.x){return x - s.x;}
-         *         if(y != s.y){return y - s.y;}
-         *         if(z != s.z){return z - s.z;}
-         *         return 0;
-         *     }
-         * }
-         *
-         * Node representMyStruct(ref Node node, Representer representer)
-         * {
-         *     //The node is guaranteed to be MyStruct as we add representer for MyStruct.
-         *     auto value = node.to!MyStruct;
-         *     //Using custom scalar format, x:y:z.
-         *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
-         *     //Representing as a scalar, with custom tag to specify this data type.
-         *     return representer.representScalar("!mystruct.tag", scalar);
-         * }
-         *
-         * void main()
-         * {
-         *     auto dumper = Dumper("file.yaml");
-         *     auto representer = new Representer;
-         *     representer.addRepresenter!MyStruct(&representMyStruct);
-         *     dumper.representer = representer;
-         *     dumper.dump(Node(MyStruct(1,2,3)));
-         * }
-         * --------------------
-         *
-         * Representing a class:
-         * --------------------
-         * import std.string;
-         *
-         * import wyaml.all;
-         *
-         * class MyClass
-         * {
-         *     int x, y, z;
-         *
-         *     this(int x, int y, int z)
-         *     {
-         *         this.x = x;
-         *         this.y = y;
-         *         this.z = z;
-         *     }
-         *
-         *     //Any D:YAML type must have a custom opCmp operator.
-         *     //This is used for ordering in mappings.
-         *     override int opCmp(Object o)
-         *     {
-         *         MyClass s = cast(MyClass)o;
-         *         if(s is null){return -1;}
-         *         if(x != s.x){return x - s.x;}
-         *         if(y != s.y){return y - s.y;}
-         *         if(z != s.z){return z - s.z;}
-         *         return 0;
-         *     }
-         *
-         *     ///Useful for Node.to!string .
-         *     override string toString()
-         *     {
-         *         return format("MyClass(%s, %s, %s)", x, y, z);
-         *     }
-         * }
-         *
-         * //Same as representMyStruct.
-         * Node representMyClass(ref Node node, Representer representer)
-         * {
-         *     //The node is guaranteed to be MyClass as we add representer for MyClass.
-         *     auto value = node.to!MyClass;
-         *     //Using custom scalar format, x:y:z.
-         *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
-         *     //Representing as a scalar, with custom tag to specify this data type.
-         *     return representer.representScalar("!myclass.tag", scalar);
-         * }
-         *
-         * void main()
-         * {
-         *     auto dumper = Dumper("file.yaml");
-         *     auto representer = new Representer;
-         *     representer.addRepresenter!MyClass(&representMyClass);
-         *     dumper.representer = representer;
-         *     dumper.dump(Node(new MyClass(1,2,3)));
-         * }
-         * --------------------
-         */
-        void addRepresenter(T)(Node function(ref Node, Representer) representer)
-            @safe pure
-        {
-            assert((typeid(T) in representers_) is null,
-                   "Representer function for data type " ~ T.stringof ~
-                   " already specified. Can't specify another one");
-            representers_[typeid(T)] = representer;
-        }
+	/**
+		 * Add a function to represent nodes with a specific data type.
+		 *
+		 * The representer function takes references to a $(D Node) storing the data
+		 * type and to the $(D Representer). It returns the represented node and may
+		 * throw a $(D RepresenterException). See the example for more information.
+		 *
+		 *
+		 * Only one function may be specified for one data type. Default data
+		 * types already have representer functions unless disabled in the
+		 * $(D Representer) constructor.
+		 *
+		 *
+		 * Structs and classes must implement the $(D opCmp()) operator for D:YAML
+		 * support. The signature of the operator that must be implemented
+		 * is $(D const int opCmp(ref const MyStruct s)) for structs where
+		 * $(I MyStruct) is the struct type, and $(D int opCmp(Object o)) for
+		 * classes. Note that the class $(D opCmp()) should not alter the compared
+		 * values - it is not const for compatibility reasons.
+		 *
+		 * Params:  representer = Representer function to add.
+		 *
+		 * Examples:
+		 *
+		 * Representing a simple struct:
+		 * --------------------
+		 * import std.string;
+		 *
+		 * import wyaml.all;
+		 *
+		 * struct MyStruct
+		 * {
+		 *     int x, y, z;
+		 *
+		 *     //Any D:YAML type must have a custom opCmp operator.
+		 *     //This is used for ordering in mappings.
+		 *     const int opCmp(ref const MyStruct s)
+		 *     {
+		 *         if(x != s.x){return x - s.x;}
+		 *         if(y != s.y){return y - s.y;}
+		 *         if(z != s.z){return z - s.z;}
+		 *         return 0;
+		 *     }
+		 * }
+		 *
+		 * Node representMyStruct(ref Node node, Representer representer)
+		 * {
+		 *     //The node is guaranteed to be MyStruct as we add representer for MyStruct.
+		 *     auto value = node.to!MyStruct;
+		 *     //Using custom scalar format, x:y:z.
+		 *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
+		 *     //Representing as a scalar, with custom tag to specify this data type.
+		 *     return representer.representScalar("!mystruct.tag", scalar);
+		 * }
+		 *
+		 * void main()
+		 * {
+		 *     auto dumper = Dumper("file.yaml");
+		 *     auto representer = new Representer;
+		 *     representer.addRepresenter!MyStruct(&representMyStruct);
+		 *     dumper.representer = representer;
+		 *     dumper.dump(Node(MyStruct(1,2,3)));
+		 * }
+		 * --------------------
+		 *
+		 * Representing a class:
+		 * --------------------
+		 * import std.string;
+		 *
+		 * import wyaml.all;
+		 *
+		 * class MyClass
+		 * {
+		 *     int x, y, z;
+		 *
+		 *     this(int x, int y, int z)
+		 *     {
+		 *         this.x = x;
+		 *         this.y = y;
+		 *         this.z = z;
+		 *     }
+		 *
+		 *     //Any D:YAML type must have a custom opCmp operator.
+		 *     //This is used for ordering in mappings.
+		 *     override int opCmp(Object o)
+		 *     {
+		 *         MyClass s = cast(MyClass)o;
+		 *         if(s is null){return -1;}
+		 *         if(x != s.x){return x - s.x;}
+		 *         if(y != s.y){return y - s.y;}
+		 *         if(z != s.z){return z - s.z;}
+		 *         return 0;
+		 *     }
+		 *
+		 *     ///Useful for Node.to!string .
+		 *     override string toString()
+		 *     {
+		 *         return format("MyClass(%s, %s, %s)", x, y, z);
+		 *     }
+		 * }
+		 *
+		 * //Same as representMyStruct.
+		 * Node representMyClass(ref Node node, Representer representer)
+		 * {
+		 *     //The node is guaranteed to be MyClass as we add representer for MyClass.
+		 *     auto value = node.to!MyClass;
+		 *     //Using custom scalar format, x:y:z.
+		 *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
+		 *     //Representing as a scalar, with custom tag to specify this data type.
+		 *     return representer.representScalar("!myclass.tag", scalar);
+		 * }
+		 *
+		 * void main()
+		 * {
+		 *     auto dumper = Dumper("file.yaml");
+		 *     auto representer = new Representer;
+		 *     representer.addRepresenter!MyClass(&representMyClass);
+		 *     dumper.representer = representer;
+		 *     dumper.dump(Node(new MyClass(1,2,3)));
+		 * }
+		 * --------------------
+		 */
+	public void addRepresenter(T)(Node function(ref Node, Representer) representer) @safe pure {
+		assert((typeid(T) in representers_) is null, "Representer function for data type " ~ T.stringof ~ " already specified. Can't specify another one");
+		representers_[typeid(T)] = representer;
+	}
 
-        //If profiling shows a bottleneck on tag construction in these 3 methods,
-        //we'll need to take Tag directly and have string based wrappers for
-        //user code.
+	//If profiling shows a bottleneck on tag construction in these 3 methods,
+	//we'll need to take Tag directly and have string based wrappers for
+	//user code.
 
-        /**
-         * Represent a _scalar with specified _tag.
-         *
-         * This is used by representer functions that produce scalars.
-         *
-         * Params:  tag    = Tag of the _scalar.
-         *          scalar = Scalar value.
-         *          style  = Style of the _scalar. If invalid, default _style will be used.
-         *                   If the node was loaded before, previous _style will always be used.
-         *
-         * Returns: The represented node.
-         *
-         * Example:
-         * --------------------
-         * struct MyStruct
-         * {
-         *     int x, y, z;
-         *
-         *     //Any D:YAML type must have a custom opCmp operator.
-         *     //This is used for ordering in mappings.
-         *     const int opCmp(ref const MyStruct s)
-         *     {
-         *         if(x != s.x){return x - s.x;}
-         *         if(y != s.y){return y - s.y;}
-         *         if(z != s.z){return z - s.z;}
-         *         return 0;
-         *     }
-         * }
-         *
-         * Node representMyStruct(ref Node node, Representer representer)
-         * {
-         *     auto value = node.to!MyStruct;
-         *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
-         *     return representer.representScalar("!mystruct.tag", scalar);
-         * }
-         * --------------------
-         */
-        Node representScalar(string tag, string scalar,
-                             ScalarStyle style = ScalarStyle.Invalid)
-        {
-            if(style == ScalarStyle.Invalid){style = defaultScalarStyle_;}
-            return Node.rawNode(Node.Value(scalar), Mark(), Tag(tag), style,
-                                CollectionStyle.Invalid);
-        }
+	/**
+		 * Represent a _scalar with specified _tag.
+		 *
+		 * This is used by representer functions that produce scalars.
+		 *
+		 * Params:  tag    = Tag of the _scalar.
+		 *          scalar = Scalar value.
+		 *          style  = Style of the _scalar. If invalid, default _style will be used.
+		 *                   If the node was loaded before, previous _style will always be used.
+		 *
+		 * Returns: The represented node.
+		 *
+		 * Example:
+		 * --------------------
+		 * struct MyStruct
+		 * {
+		 *     int x, y, z;
+		 *
+		 *     //Any D:YAML type must have a custom opCmp operator.
+		 *     //This is used for ordering in mappings.
+		 *     const int opCmp(ref const MyStruct s)
+		 *     {
+		 *         if(x != s.x){return x - s.x;}
+		 *         if(y != s.y){return y - s.y;}
+		 *         if(z != s.z){return z - s.z;}
+		 *         return 0;
+		 *     }
+		 * }
+		 *
+		 * Node representMyStruct(ref Node node, Representer representer)
+		 * {
+		 *     auto value = node.to!MyStruct;
+		 *     auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
+		 *     return representer.representScalar("!mystruct.tag", scalar);
+		 * }
+		 * --------------------
+		 */
+	public Node representScalar(string tag, string scalar, ScalarStyle style = ScalarStyle.Invalid) {
+		if (style == ScalarStyle.Invalid) {
+			style = defaultScalarStyle_;
+		}
+		return Node.rawNode(Node.Value(scalar), Mark(), Tag(tag), style, CollectionStyle.Invalid);
+	}
 
-        /**
-         * Represent a _sequence with specified _tag, representing children first.
-         *
-         * This is used by representer functions that produce sequences.
-         *
-         * Params:  tag      = Tag of the _sequence.
-         *          sequence = Sequence of nodes.
-         *          style    = Style of the _sequence. If invalid, default _style will be used.
-         *                     If the node was loaded before, previous _style will always be used.
-         *
-         * Returns: The represented node.
-         *
-         * Throws:  $(D RepresenterException) if a child could not be represented.
-         *
-         * Example:
-         * --------------------
-         * struct MyStruct
-         * {
-         *     int x, y, z;
-         *
-         *     //Any D:YAML type must have a custom opCmp operator.
-         *     //This is used for ordering in mappings.
-         *     const int opCmp(ref const MyStruct s)
-         *     {
-         *         if(x != s.x){return x - s.x;}
-         *         if(y != s.y){return y - s.y;}
-         *         if(z != s.z){return z - s.z;}
-         *         return 0;
-         *     }
-         * }
-         *
-         * Node representMyStruct(ref Node node, Representer representer)
-         * {
-         *     auto value = node.to!MyStruct;
-         *     auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
-         *     //use flow style
-         *     return representer.representSequence("!mystruct.tag", nodes,
-         *                                          CollectionStyle.Flow);
-         * }
-         * --------------------
-         */
-        Node representSequence(string tag, Node[] sequence,
-                               CollectionStyle style = CollectionStyle.Invalid)
-        {
-            Node[] value;
-            value.length = sequence.length;
+	/**
+		 * Represent a _sequence with specified _tag, representing children first.
+		 *
+		 * This is used by representer functions that produce sequences.
+		 *
+		 * Params:  tag      = Tag of the _sequence.
+		 *          sequence = Sequence of nodes.
+		 *          style    = Style of the _sequence. If invalid, default _style will be used.
+		 *                     If the node was loaded before, previous _style will always be used.
+		 *
+		 * Returns: The represented node.
+		 *
+		 * Throws:  $(D RepresenterException) if a child could not be represented.
+		 *
+		 * Example:
+		 * --------------------
+		 * struct MyStruct
+		 * {
+		 *     int x, y, z;
+		 *
+		 *     //Any D:YAML type must have a custom opCmp operator.
+		 *     //This is used for ordering in mappings.
+		 *     const int opCmp(ref const MyStruct s)
+		 *     {
+		 *         if(x != s.x){return x - s.x;}
+		 *         if(y != s.y){return y - s.y;}
+		 *         if(z != s.z){return z - s.z;}
+		 *         return 0;
+		 *     }
+		 * }
+		 *
+		 * Node representMyStruct(ref Node node, Representer representer)
+		 * {
+		 *     auto value = node.to!MyStruct;
+		 *     auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
+		 *     //use flow style
+		 *     return representer.representSequence("!mystruct.tag", nodes,
+		 *                                          CollectionStyle.Flow);
+		 * }
+		 * --------------------
+		 */
+	public Node representSequence(string tag, Node[] sequence, CollectionStyle style = CollectionStyle.Invalid) {
+		Node[] value;
+		value.length = sequence.length;
 
-            auto bestStyle = CollectionStyle.Flow;
-            foreach(idx, ref item; sequence)
-            {
-                value[idx] = representData(item);
-                const isScalar = value[idx].isScalar;
-                const s = value[idx].scalarStyle;
-                if(!isScalar || (s != ScalarStyle.Invalid && s != ScalarStyle.Plain))
-                {
-                    bestStyle = CollectionStyle.Block;
-                }
-            }
+		auto bestStyle = CollectionStyle.Flow;
+		foreach (idx, ref item; sequence) {
+			value[idx] = representData(item);
+			const isScalar = value[idx].isScalar;
+			const s = value[idx].scalarStyle;
+			if (!isScalar || (s != ScalarStyle.Invalid && s != ScalarStyle.Plain)) {
+				bestStyle = CollectionStyle.Block;
+			}
+		}
 
-            if(style == CollectionStyle.Invalid)
-            {
-                style = defaultCollectionStyle_ != CollectionStyle.Invalid
-                        ? defaultCollectionStyle_
-                        : bestStyle;
-            }
-            return Node.rawNode(Node.Value(value), Mark(), Tag(tag),
-                                ScalarStyle.Invalid, style);
-        }
+		if (style == CollectionStyle.Invalid) {
+			style = defaultCollectionStyle_ != CollectionStyle.Invalid ? defaultCollectionStyle_ : bestStyle;
+		}
+		return Node.rawNode(Node.Value(value), Mark(), Tag(tag), ScalarStyle.Invalid, style);
+	}
 
-        /**
-         * Represent a mapping with specified _tag, representing children first.
-         *
-         * This is used by representer functions that produce mappings.
-         *
-         * Params:  tag   = Tag of the mapping.
-         *          pairs = Key-value _pairs of the mapping.
-         *          style = Style of the mapping. If invalid, default _style will be used.
-         *                  If the node was loaded before, previous _style will always be used.
-         *
-         * Returns: The represented node.
-         *
-         * Throws:  $(D RepresenterException) if a child could not be represented.
-         *
-         * Example:
-         * --------------------
-         * struct MyStruct
-         * {
-         *     int x, y, z;
-         *
-         *     //Any D:YAML type must have a custom opCmp operator.
-         *     //This is used for ordering in mappings.
-         *     const int opCmp(ref const MyStruct s)
-         *     {
-         *         if(x != s.x){return x - s.x;}
-         *         if(y != s.y){return y - s.y;}
-         *         if(z != s.z){return z - s.z;}
-         *         return 0;
-         *     }
-         * }
-         *
-         * Node representMyStruct(ref Node node, Representer representer)
-         * {
-         *     auto value = node.to!MyStruct;
-         *     auto pairs = [Node.Pair("x", value.x),
-         *                   Node.Pair("y", value.y),
-         *                   Node.Pair("z", value.z)];
-         *     return representer.representMapping("!mystruct.tag", pairs);
-         * }
-         * --------------------
-         */
-        Node representMapping(string tag, Node.Pair[] pairs,
-                              CollectionStyle style = CollectionStyle.Invalid)
-        {
-            Node.Pair[] value;
-            value.length = pairs.length;
+	/**
+		 * Represent a mapping with specified _tag, representing children first.
+		 *
+		 * This is used by representer functions that produce mappings.
+		 *
+		 * Params:  tag   = Tag of the mapping.
+		 *          pairs = Key-value _pairs of the mapping.
+		 *          style = Style of the mapping. If invalid, default _style will be used.
+		 *                  If the node was loaded before, previous _style will always be used.
+		 *
+		 * Returns: The represented node.
+		 *
+		 * Throws:  $(D RepresenterException) if a child could not be represented.
+		 *
+		 * Example:
+		 * --------------------
+		 * struct MyStruct
+		 * {
+		 *     int x, y, z;
+		 *
+		 *     //Any D:YAML type must have a custom opCmp operator.
+		 *     //This is used for ordering in mappings.
+		 *     const int opCmp(ref const MyStruct s)
+		 *     {
+		 *         if(x != s.x){return x - s.x;}
+		 *         if(y != s.y){return y - s.y;}
+		 *         if(z != s.z){return z - s.z;}
+		 *         return 0;
+		 *     }
+		 * }
+		 *
+		 * Node representMyStruct(ref Node node, Representer representer)
+		 * {
+		 *     auto value = node.to!MyStruct;
+		 *     auto pairs = [Node.Pair("x", value.x),
+		 *                   Node.Pair("y", value.y),
+		 *                   Node.Pair("z", value.z)];
+		 *     return representer.representMapping("!mystruct.tag", pairs);
+		 * }
+		 * --------------------
+		 */
+	public Node representMapping(string tag, Node.Pair[] pairs, CollectionStyle style = CollectionStyle.Invalid) {
+		Node.Pair[] value;
+		value.length = pairs.length;
 
-            auto bestStyle = CollectionStyle.Flow;
-            foreach(idx, ref pair; pairs)
-            {
-                value[idx] = Node.Pair(representData(pair.key), representData(pair.value));
-                const keyScalar = value[idx].key.isScalar;
-                const valScalar = value[idx].value.isScalar;
-                const keyStyle = value[idx].key.scalarStyle;
-                const valStyle = value[idx].value.scalarStyle;
-                if(!keyScalar ||
-                   (keyStyle != ScalarStyle.Invalid && keyStyle != ScalarStyle.Plain))
-                {
-                    bestStyle = CollectionStyle.Block;
-                }
-                if(!valScalar ||
-                   (valStyle != ScalarStyle.Invalid && valStyle != ScalarStyle.Plain))
-                {
-                    bestStyle = CollectionStyle.Block;
-                }
-            }
+		auto bestStyle = CollectionStyle.Flow;
+		foreach (idx, ref pair; pairs) {
+			value[idx] = Node.Pair(representData(pair.key), representData(pair.value));
+			const keyScalar = value[idx].key.isScalar;
+			const valScalar = value[idx].value.isScalar;
+			const keyStyle = value[idx].key.scalarStyle;
+			const valStyle = value[idx].value.scalarStyle;
+			if (!keyScalar || (keyStyle != ScalarStyle.Invalid && keyStyle != ScalarStyle.Plain)) {
+				bestStyle = CollectionStyle.Block;
+			}
+			if (!valScalar || (valStyle != ScalarStyle.Invalid && valStyle != ScalarStyle.Plain)) {
+				bestStyle = CollectionStyle.Block;
+			}
+		}
 
-            if(style == CollectionStyle.Invalid)
-            {
-                style = defaultCollectionStyle_ != CollectionStyle.Invalid
-                        ? defaultCollectionStyle_
-                        : bestStyle;
-            }
-            return Node.rawNode(Node.Value(value), Mark(), Tag(tag),
-                                ScalarStyle.Invalid, style);
-        }
+		if (style == CollectionStyle.Invalid) {
+			style = defaultCollectionStyle_ != CollectionStyle.Invalid ? defaultCollectionStyle_ : bestStyle;
+		}
+		return Node.rawNode(Node.Value(value), Mark(), Tag(tag), ScalarStyle.Invalid, style);
+	}
 
-    package:
-        //Represent a node based on its type, and return the represented result.
-        Node representData(ref Node data) @system
-        {
-            //User types are wrapped in YAMLObject.
-            auto type = data.isUserType ? data.to!YAMLObject.type : data.type;
+	//Represent a node based on its type, and return the represented result.
+	package Node representData(ref Node data) @system {
+		//User types are wrapped in YAMLObject.
+		auto type = data.isUserType ? data.to!YAMLObject.type : data.type;
 
-            enforce((type in representers_) !is null,
-                    new RepresenterException("No representer function for type "
-                                             ~ type.text ~ " , cannot represent."));
-            Node result = representers_[type](data, this);
+		enforce((type in representers_) !is null, new RepresenterException("No representer function for type " ~ type.text ~ " , cannot represent."));
+		Node result = representers_[type](data, this);
 
-            //Override tag if specified.
-            if(!data.tag_.isNull()){result.tag_ = data.tag_;}
+		//Override tag if specified.
+		if (!data.tag_.isNull()) {
+			result.tag_ = data.tag_;
+		}
 
-            //Remember style if this was loaded before.
-            if(data.scalarStyle != ScalarStyle.Invalid)
-            {
-                result.scalarStyle = data.scalarStyle;
-            }
-            if(data.collectionStyle != CollectionStyle.Invalid)
-            {
-                result.collectionStyle = data.collectionStyle;
-            }
-            return result;
-        }
+		//Remember style if this was loaded before.
+		if (data.scalarStyle != ScalarStyle.Invalid) {
+			result.scalarStyle = data.scalarStyle;
+		}
+		if (data.collectionStyle != CollectionStyle.Invalid) {
+			result.collectionStyle = data.collectionStyle;
+		}
+		return result;
+	}
 
-        //Represent a node, serializing with specified Serializer.
-        void represent(T)(ref Serializer!T serializer, ref Node node)
-        {
-            auto data = representData(node);
-            serializer.serialize(data);
-        }
+	//Represent a node, serializing with specified Serializer.
+	package void represent(T)(ref Serializer!T serializer, ref Node node) {
+		auto data = representData(node);
+		serializer.serialize(data);
+	}
 }
 
-
 ///Represent a _null _node as a _null YAML value.
-Node representNull(ref Node node, Representer representer)
-{
-    return representer.representScalar("tag:yaml.org,2002:null", "null");
+Node representNull(ref Node node, Representer representer) {
+	return representer.representScalar("tag:yaml.org,2002:null", "null");
 }
 
 ///Represent a string _node as a string scalar.
-Node representString(ref Node node, Representer representer)
-{
-    string value = node.to!string;
-    return value is null
-           ? representNull(node, representer)
-           : representer.representScalar("tag:yaml.org,2002:str", value);
+Node representString(ref Node node, Representer representer) {
+	string value = node.to!string;
+	return value is null ? representNull(node, representer) : representer.representScalar("tag:yaml.org,2002:str", value);
 }
 
 ///Represent a bytes _node as a binary scalar.
-Node representBytes(ref Node node, Representer representer) @system
-{
-    const ubyte[] value = node.to!(ubyte[]);
-    if(value is null){return representNull(node, representer);}
-    return representer.representScalar("tag:yaml.org,2002:binary",
-                                       cast(string)Base64.encode(value),
-                                       ScalarStyle.Literal);
+Node representBytes(ref Node node, Representer representer) @system {
+	const ubyte[] value = node.to!(ubyte[]);
+	if (value is null) {
+		return representNull(node, representer);
+	}
+	return representer.representScalar("tag:yaml.org,2002:binary", cast(string) Base64.encode(value), ScalarStyle.Literal);
 }
 
 ///Represent a bool _node as a bool scalar.
-Node representBool(ref Node node, Representer representer)
-{
-    return representer.representScalar("tag:yaml.org,2002:bool",
-                                       node.to!bool ? "true" : "false");
+Node representBool(ref Node node, Representer representer) {
+	return representer.representScalar("tag:yaml.org,2002:bool", node.to!bool ? "true" : "false");
 }
 
 ///Represent a long _node as an integer scalar.
-Node representLong(ref Node node, Representer representer) @system
-{
-    return representer.representScalar("tag:yaml.org,2002:int",
-                                       to!string(node.to!long));
+Node representLong(ref Node node, Representer representer) @system {
+	return representer.representScalar("tag:yaml.org,2002:int", to!string(node.to!long));
 }
 
 ///Represent a real _node as a floating point scalar.
-Node representReal(ref Node node, Representer representer) @system
-{
-    real f = cast(real)node;
-    string value = isNaN(f)                  ? ".nan":
-                   f == real.infinity        ? ".inf":
-                   f == -1.0 * real.infinity ? "-.inf":
-                   {auto a = appender!string();
-                    formattedWrite(a, "%12f", f);
-                    return a.data.strip();}();
+Node representReal(ref Node node, Representer representer) @system {
+	real f = cast(real) node;
+	string value = isNaN(f) ? ".nan" : f == real.infinity ? ".inf" : f == -1.0 * real.infinity ? "-.inf" : { auto a = appender!string(); formattedWrite(a, "%12f", f); return a.data.strip(); }();
 
-    return representer.representScalar("tag:yaml.org,2002:float", value);
+	return representer.representScalar("tag:yaml.org,2002:float", value);
 }
 
 ///Represent a SysTime _node as a timestamp.
-Node representSysTime(ref Node node, Representer representer) @system
-{
-    return representer.representScalar("tag:yaml.org,2002:timestamp",
-                                       node.to!SysTime.toISOExtString());
+Node representSysTime(ref Node node, Representer representer) @system {
+	return representer.representScalar("tag:yaml.org,2002:timestamp", node.to!SysTime.toISOExtString());
 }
 
 ///Represent a sequence _node as sequence/set.
-Node representNodes(ref Node node, Representer representer)
-{
-    auto nodes = node.to!(Node[]);
-    if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:set"))
-    {
-        ///YAML sets are mapping with null values.
-        Node.Pair[] pairs;
-        pairs.length = nodes.length;
-        Node dummy;
-        foreach(idx, ref key; nodes)
-        {
-            pairs[idx] = Node.Pair(key, representNull(dummy, representer));
-        }
-        return representer.representMapping(node.tag_.get, pairs);
-    }
-    else
-    {
-        return representer.representSequence("tag:yaml.org,2002:seq", nodes);
-    }
+Node representNodes(ref Node node, Representer representer) {
+	auto nodes = node.to!(Node[]);
+	if (!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:set")) {
+		///YAML sets are mapping with null values.
+		Node.Pair[] pairs;
+		pairs.length = nodes.length;
+		Node dummy;
+		foreach (idx, ref key; nodes) {
+			pairs[idx] = Node.Pair(key, representNull(dummy, representer));
+		}
+		return representer.representMapping(node.tag_.get, pairs);
+	} else {
+		return representer.representSequence("tag:yaml.org,2002:seq", nodes);
+	}
 }
 
 ///Represent a mapping _node as map/ordered map/pairs.
-Node representPairs(ref Node node, Representer representer) @system
-{
-    auto pairs = node.to!(Node.Pair[]);
+Node representPairs(ref Node node, Representer representer) @system {
+	auto pairs = node.to!(Node.Pair[]);
 
-    bool hasDuplicates(Node.Pair[] pairs)
-    {
-        //TODO this should be replaced by something with deterministic memory allocation.
-        auto keys = redBlackTree!Node();
-        scope(exit){keys.destroy();}
-        foreach(ref pair; pairs)
-        {
-            if(pair.key in keys){return true;}
-            keys.insert(pair.key);
-        }
-        return false;
-    }
+	bool hasDuplicates(Node.Pair[] pairs) {
+		//TODO this should be replaced by something with deterministic memory allocation.
+		auto keys = redBlackTree!Node();
+		scope (exit) {
+			keys.destroy();
+		}
+		foreach (ref pair; pairs) {
+			if (pair.key in keys) {
+				return true;
+			}
+			keys.insert(pair.key);
+		}
+		return false;
+	}
 
-    Node[] mapToSequence(Node.Pair[] pairs)
-    {
-        Node[] nodes;
-        nodes.length = pairs.length;
-        foreach(idx, ref pair; pairs)
-        {
-            nodes[idx] = representer.representMapping("tag:yaml.org,2002:map", [pair]);
-        }
-        return nodes;
-    }
+	Node[] mapToSequence(Node.Pair[] pairs) {
+		Node[] nodes;
+		nodes.length = pairs.length;
+		foreach (idx, ref pair; pairs) {
+			nodes[idx] = representer.representMapping("tag:yaml.org,2002:map", [pair]);
+		}
+		return nodes;
+	}
 
-    if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:omap"))
-    {
-        enforce(!hasDuplicates(pairs),
-                new RepresenterException("Duplicate entry in an ordered map"));
-        return representer.representSequence(node.tag_.get, mapToSequence(pairs));
-    }
-    else if(!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:pairs"))
-    {
-        return representer.representSequence(node.tag_.get, mapToSequence(pairs));
-    }
-    else
-    {
-        enforce(!hasDuplicates(pairs),
-                new RepresenterException("Duplicate entry in an unordered map"));
-        return representer.representMapping("tag:yaml.org,2002:map", pairs);
-    }
+	if (!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:omap")) {
+		enforce(!hasDuplicates(pairs), new RepresenterException("Duplicate entry in an ordered map"));
+		return representer.representSequence(node.tag_.get, mapToSequence(pairs));
+	} else if (!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:pairs")) {
+		return representer.representSequence(node.tag_.get, mapToSequence(pairs));
+	} else {
+		enforce(!hasDuplicates(pairs), new RepresenterException("Duplicate entry in an unordered map"));
+		return representer.representMapping("tag:yaml.org,2002:map", pairs);
+	}
 }
 
 //Unittests
 //These should really all be encapsulated in unittests.
 private:
-version(unittest) {
-    import wyaml.dumper;
+version (unittest) {
+	import wyaml.dumper;
 
-    struct MyStruct
-    {
-        int x, y, z;
+	struct MyStruct {
+		int x, y, z;
 
-        int opCmp(ref const MyStruct s) const pure @safe nothrow
-        {
-            if(x != s.x){return x - s.x;}
-            if(y != s.y){return y - s.y;}
-            if(z != s.z){return z - s.z;}
-            return 0;
-        }
-    }
+		int opCmp(ref const MyStruct s) const pure @safe nothrow {
+			if (x != s.x) {
+				return x - s.x;
+			}
+			if (y != s.y) {
+				return y - s.y;
+			}
+			if (z != s.z) {
+				return z - s.z;
+			}
+			return 0;
+		}
+	}
 
-    Node representMyStruct(ref Node node, Representer representer) @system
-    {
-        //The node is guaranteed to be MyStruct as we add representer for MyStruct.
-        auto value = node.to!MyStruct;
-        //Using custom scalar format, x:y:z.
-        auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
-        //Representing as a scalar, with custom tag to specify this data type.
-        return representer.representScalar("!mystruct.tag", scalar);
-    }
+	Node representMyStruct(ref Node node, Representer representer) @system {
+		//The node is guaranteed to be MyStruct as we add representer for MyStruct.
+		auto value = node.to!MyStruct;
+		//Using custom scalar format, x:y:z.
+		auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
+		//Representing as a scalar, with custom tag to specify this data type.
+		return representer.representScalar("!mystruct.tag", scalar);
+	}
 
-    Node representMyStructSeq(ref Node node, Representer representer)
-    {
-        auto value = node.to!MyStruct;
-        auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
-        return representer.representSequence("!mystruct.tag", nodes);
-    }
+	Node representMyStructSeq(ref Node node, Representer representer) {
+		auto value = node.to!MyStruct;
+		auto nodes = [Node(value.x), Node(value.y), Node(value.z)];
+		return representer.representSequence("!mystruct.tag", nodes);
+	}
 
-    Node representMyStructMap(ref Node node, Representer representer)
-    {
-        auto value = node.to!MyStruct;
-        auto pairs = [Node.Pair("x", value.x),
-                      Node.Pair("y", value.y),
-                      Node.Pair("z", value.z)];
-        return representer.representMapping("!mystruct.tag", pairs);
-    }
+	Node representMyStructMap(ref Node node, Representer representer) {
+		auto value = node.to!MyStruct;
+		auto pairs = [Node.Pair("x", value.x), Node.Pair("y", value.y), Node.Pair("z", value.z)];
+		return representer.representMapping("!mystruct.tag", pairs);
+	}
 
-    class MyClass
-    {
-        int x, y, z;
+	class MyClass {
+		int x, y, z;
 
-        this(int x, int y, int z) pure @safe nothrow
-        {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-        }
+		this(int x, int y, int z) pure @safe nothrow {
+			this.x = x;
+			this.y = y;
+			this.z = z;
+		}
 
-        override int opCmp(Object o) pure @safe nothrow
-        {
-            MyClass s = cast(MyClass)o;
-            if(s is null){return -1;}
-            if(x != s.x){return x - s.x;}
-            if(y != s.y){return y - s.y;}
-            if(z != s.z){return z - s.z;}
-            return 0;
-        }
+		override int opCmp(Object o) pure @safe nothrow {
+			MyClass s = cast(MyClass) o;
+			if (s is null) {
+				return -1;
+			}
+			if (x != s.x) {
+				return x - s.x;
+			}
+			if (y != s.y) {
+				return y - s.y;
+			}
+			if (z != s.z) {
+				return z - s.z;
+			}
+			return 0;
+		}
 
-        ///Useful for Node.to!string .
-        override string toString() @safe
-        {
-            return format("MyClass(%s, %s, %s)", x, y, z);
-        }
-    }
+		///Useful for Node.to!string .
+		override string toString() @safe {
+			return format("MyClass(%s, %s, %s)", x, y, z);
+		}
+	}
 
-    //Same as representMyStruct.
-    Node representMyClass(ref Node node, Representer representer) @system
-    {
-        //The node is guaranteed to be MyClass as we add representer for MyClass.
-        auto value = cast(MyClass)node;
-        //Using custom scalar format, x:y:z.
-        auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
-        //Representing as a scalar, with custom tag to specify this data type.
-        return representer.representScalar("!myclass.tag", scalar);
-    }
+	//Same as representMyStruct.
+	Node representMyClass(ref Node node, Representer representer) @system {
+		//The node is guaranteed to be MyClass as we add representer for MyClass.
+		auto value = cast(MyClass) node;
+		//Using custom scalar format, x:y:z.
+		auto scalar = format("%s:%s:%s", value.x, value.y, value.z);
+		//Representing as a scalar, with custom tag to specify this data type.
+		return representer.representScalar("!myclass.tag", scalar);
+	}
 
 }
-unittest
-{
-    import std.outbuffer, std.range;
-    foreach(r; [&representMyStruct,
-                &representMyStructSeq,
-                &representMyStructMap])
-    {
-        auto dumper = dumper(new OutBuffer());
-        auto representer = new Representer;
-        representer.addRepresenter!MyStruct(r);
-        dumper.representer = representer;
-        dumper.dump(Node(MyStruct(1,2,3)));
-    }
+unittest {
+	import std.outbuffer, std.range;
+
+	foreach (r; [&representMyStruct, &representMyStructSeq, &representMyStructMap]) {
+		auto dumper = dumper(new OutBuffer());
+		auto representer = new Representer;
+		representer.addRepresenter!MyStruct(r);
+		dumper.representer = representer;
+		dumper.dump(Node(MyStruct(1, 2, 3)));
+	}
 }
 
-unittest
-{
-    import std.outbuffer, std.range;
-    auto dumper = dumper(new OutBuffer());
-    auto representer = new Representer;
-    representer.addRepresenter!MyClass(&representMyClass);
-    dumper.representer = representer;
-    dumper.dump(Node(new MyClass(1,2,3)));
+unittest {
+	import std.outbuffer, std.range;
+
+	auto dumper = dumper(new OutBuffer());
+	auto representer = new Representer;
+	representer.addRepresenter!MyClass(&representMyClass);
+	dumper.representer = representer;
+	dumper.dump(Node(new MyClass(1, 2, 3)));
 }

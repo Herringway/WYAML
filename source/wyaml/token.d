@@ -8,84 +8,98 @@
 /// Code based on PyYAML: http://www.pyyaml.org
 module wyaml.token;
 
-
 import std.conv;
 
 import wyaml.exception;
 import wyaml.reader;
 import wyaml.style;
 
-
-package:
-
 /// Token types.
-enum TokenID : ubyte
-{
-    Invalid = 0,        /// Invalid (uninitialized) token
-    Directive,          /// DIRECTIVE
-    DocumentStart,      /// DOCUMENT-START
-    DocumentEnd,        /// DOCUMENT-END
-    StreamStart,        /// STREAM-START
-    StreamEnd,          /// STREAM-END
-    BlockSequenceStart, /// BLOCK-SEQUENCE-START
-    BlockMappingStart,  /// BLOCK-MAPPING-START
-    BlockEnd,           /// BLOCK-END
-    FlowSequenceStart,  /// FLOW-SEQUENCE-START
-    FlowMappingStart,   /// FLOW-MAPPING-START
-    FlowSequenceEnd,    /// FLOW-SEQUENCE-END
-    FlowMappingEnd,     /// FLOW-MAPPING-END
-    Key,                /// KEY
-    Value,              /// VALUE
-    BlockEntry,         /// BLOCK-ENTRY
-    FlowEntry,          /// FLOW-ENTRY
-    Alias,              /// ALIAS
-    Anchor,             /// ANCHOR
-    Tag,                /// TAG
-    Scalar              /// SCALAR
+package enum TokenID : ubyte {
+	/// Invalid (uninitialized) token
+	Invalid = 0,
+	/// DIRECTIVE
+	Directive,
+	/// DOCUMENT-START
+	DocumentStart,
+	/// DOCUMENT-END
+	DocumentEnd,
+	/// STREAM-START
+	StreamStart,
+	/// STREAM-END
+	StreamEnd,
+	/// BLOCK-SEQUENCE-START
+	BlockSequenceStart,
+	/// BLOCK-MAPPING-START
+	BlockMappingStart,
+	/// BLOCK-END
+	BlockEnd,
+	/// FLOW-SEQUENCE-START
+	FlowSequenceStart,
+	/// FLOW-MAPPING-START
+	FlowMappingStart,
+	/// FLOW-SEQUENCE-END
+	FlowSequenceEnd,
+	/// FLOW-MAPPING-END
+	FlowMappingEnd,
+	/// KEY
+	Key,
+	/// VALUE
+	Value,
+	/// BLOCK-ENTRY
+	BlockEntry,
+	/// FLOW-ENTRY
+	FlowEntry,
+	/// ALIAS
+	Alias,
+	/// ANCHOR
+	Anchor,
+	/// TAG
+	Tag,
+	/// SCALAR
+	Scalar
 }
 
 /// Specifies the type of a tag directive token.
-enum DirectiveType : ubyte
-{
-    // YAML version directive.
-    YAML,
-    // Tag directive.
-    TAG,
-    // Any other directive is "reserved" for future YAML versions.
-    Reserved
+package enum DirectiveType : ubyte {
+	// YAML version directive.
+	YAML,
+	// Tag directive.
+	TAG,
+	// Any other directive is "reserved" for future YAML versions.
+	Reserved
 }
 
 /// Token produced by scanner.
 ///
-struct Token
-{
-    @disable int opCmp(ref Token);
+package struct Token {
+	@disable int opCmp(ref Token) const;
+	@disable bool opEquals(ref Token) const;
+	@disable size_t toHash() nothrow @safe;
 
-    /// Value of the token, if any.
-    ///
-    /// Values are char[] instead of string, as Parser may still change them in a few
-    /// cases. Parser casts values to strings when producing Events.
-    string value;
-    /// Start position of the token in file/stream.
-    Mark startMark;
-    /// End position of the token in file/stream.
-    Mark endMark;
-    /// Token type.
-    TokenID id;
-    /// Style of scalar token, if this is a scalar token.
-    ScalarStyle style;
-    /// Type of directive for directiveToken.
-    DirectiveType directive;
-    /// Used to split value into 2 substrings for tokens that need 2 values (tagToken)
-    size_t valueDivider;
+	/// Value of the token, if any.
+	///
+	/// Values are char[] instead of string, as Parser may still change them in a few
+	/// cases. Parser casts values to strings when producing Events.
+	string value;
+	/// Start position of the token in file/stream.
+	Mark startMark;
+	/// End position of the token in file/stream.
+	Mark endMark;
+	/// Token type.
+	TokenID id;
+	/// Style of scalar token, if this is a scalar token.
+	ScalarStyle style;
+	/// Type of directive for directiveToken.
+	DirectiveType directive;
+	/// Used to split value into 2 substrings for tokens that need 2 values (tagToken)
+	size_t valueDivider;
 
-    /// Get string representation of the token ID.
-    @property string idString() @safe pure const {
-        return id.to!string;
-    }
+	/// Get string representation of the token ID.
+	@property string idString() @safe pure const {
+		return id.to!string;
+	}
 }
-
-@safe pure nothrow @nogc:
 
 /// Construct a directive token.
 ///
@@ -94,11 +108,8 @@ struct Token
 ///          value     = Value of the token.
 ///          directive = Directive type (YAML or TAG in YAML 1.1).
 ///          nameEnd   = Beginning index of second value
-Token directiveToken(const Mark start, const Mark end, string value,
-                     DirectiveType directive, const size_t nameEnd)
-{
-    return Token(value, start, end, TokenID.Directive, ScalarStyle.init,
-                 directive, nameEnd);
+package Token directiveToken(const Mark start, const Mark end, string value, DirectiveType directive, const size_t nameEnd) @safe pure nothrow @nogc {
+	return Token(value, start, end, TokenID.Directive, ScalarStyle.init, directive, nameEnd);
 }
 
 /// Construct a simple (no value) token with specified type.
@@ -106,29 +117,27 @@ Token directiveToken(const Mark start, const Mark end, string value,
 /// Params:  id    = Type of the token.
 ///          start = Start position of the token.
 ///          end   = End position of the token.
-Token simpleToken(TokenID id)(const Mark start, const Mark end)
-{
-    return Token(null, start, end, id);
+package Token simpleToken(TokenID id)(const Mark start, const Mark end) @safe pure nothrow @nogc {
+	return Token(null, start, end, id);
 }
 
 /// Construct a stream start token.
 ///
 /// Params:  start    = Start position of the token.
 ///          end      = End position of the token.
-Token streamStartToken(const Mark start, const Mark end)
-{
-    return Token(null, start, end, TokenID.StreamStart, ScalarStyle.Invalid);
+package Token streamStartToken(const Mark start, const Mark end) @safe pure nothrow @nogc {
+	return Token(null, start, end, TokenID.StreamStart, ScalarStyle.Invalid);
 }
 
 /// Aliases for construction of simple token types.
-alias simpleToken!(TokenID.StreamEnd)          streamEndToken;
-alias simpleToken!(TokenID.BlockSequenceStart) blockSequenceStartToken;
-alias simpleToken!(TokenID.BlockMappingStart)  blockMappingStartToken;
-alias simpleToken!(TokenID.BlockEnd)           blockEndToken;
-alias simpleToken!(TokenID.Key)                keyToken;
-alias simpleToken!(TokenID.Value)              valueToken;
-alias simpleToken!(TokenID.BlockEntry)         blockEntryToken;
-alias simpleToken!(TokenID.FlowEntry)          flowEntryToken;
+package alias streamEndToken = simpleToken!(TokenID.StreamEnd);
+package alias blockSequenceStartToken = simpleToken!(TokenID.BlockSequenceStart);
+package alias blockMappingStartToken = simpleToken!(TokenID.BlockMappingStart);
+package alias blockEndToken = simpleToken!(TokenID.BlockEnd);
+package alias keyToken = simpleToken!(TokenID.Key);
+package alias valueToken = simpleToken!(TokenID.Value);
+package alias blockEntryToken = simpleToken!(TokenID.BlockEntry);
+package alias flowEntryToken = simpleToken!(TokenID.FlowEntry);
 
 /// Construct a simple token with value with specified type.
 ///
@@ -138,17 +147,14 @@ alias simpleToken!(TokenID.FlowEntry)          flowEntryToken;
 ///          value        = Value of the token.
 ///          valueDivider = A hack for TagToken to store 2 values in value; the first
 ///                         value goes up to valueDivider, the second after it.
-Token simpleValueToken(TokenID id)(const Mark start, const Mark end, string value,
-                                   const size_t valueDivider = size_t.max)
-{
-    return Token(value, start, end, id, ScalarStyle.Invalid,
-                 DirectiveType.init, valueDivider);
+package Token simpleValueToken(TokenID id)(const Mark start, const Mark end, string value, const size_t valueDivider = size_t.max) @safe pure nothrow @nogc {
+	return Token(value, start, end, id, ScalarStyle.Invalid, DirectiveType.init, valueDivider);
 }
 
 /// Alias for construction of tag token.
-alias simpleValueToken!(TokenID.Tag) tagToken;
-alias simpleValueToken!(TokenID.Alias) aliasToken;
-alias simpleValueToken!(TokenID.Anchor) anchorToken;
+package alias tagToken = simpleValueToken!(TokenID.Tag);
+package alias aliasToken = simpleValueToken!(TokenID.Alias);
+package alias anchorToken = simpleValueToken!(TokenID.Anchor);
 
 /// Construct a scalar token.
 ///
@@ -156,7 +162,6 @@ alias simpleValueToken!(TokenID.Anchor) anchorToken;
 ///          end   = End position of the token.
 ///          value = Value of the token.
 ///          style = Style of the token.
-Token scalarToken(const Mark start, const Mark end, string value, const ScalarStyle style)
-{
-    return Token(value, start, end, TokenID.Scalar, style);
+package Token scalarToken(const Mark start, const Mark end, string value, const ScalarStyle style) @safe pure nothrow @nogc {
+	return Token(value, start, end, TokenID.Scalar, style);
 }

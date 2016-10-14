@@ -8,8 +8,7 @@
 module wyaml.tagdirective;
 
 ///Single tag directive. handle is the shortcut, prefix is the prefix that replaces it.
-struct TagDirective
-{
-    string handle;
-    string prefix;
+struct TagDirective {
+	string handle;
+	string prefix;
 }
