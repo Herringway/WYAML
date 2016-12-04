@@ -214,7 +214,7 @@ package final class Scanner {
 	///          any tokens left if no types specified, false otherwise.
 	public bool checkToken(const TokenID[] ids...) {
 		// Check if the next token is one of specified types.
-		while (needMoreTokens()) {
+		while (needMoreTokens) {
 			fetchToken();
 		}
 		if (!tokens_.empty) {
@@ -290,13 +290,13 @@ package final class Scanner {
 				return fetchStreamEnd();
 			}
 			const dchar c = reader_.front;
-			if (checkDirective()) {
+			if (checkDirective) {
 				return fetchDirective();
 			}
-			if (checkDocumentStart()) {
+			if (checkDocumentStart) {
 				return fetchDocumentStart();
 			}
-			if (checkDocumentEnd()) {
+			if (checkDocumentEnd) {
 				return fetchDocumentEnd();
 			}
 			// Order of the following checks is NOT significant.
@@ -332,17 +332,17 @@ package final class Scanner {
 					tokens_.push(fetchAnchor());
 					return;
 				case '?':
-					if (checkKey()) {
+					if (checkKey) {
 						return fetchKey();
 					}
 					goto default;
 				case ':':
-					if (checkValue()) {
+					if (checkValue) {
 						return fetchValue();
 					}
 					goto default;
 				case '-':
-					if (checkBlockEntry()) {
+					if (checkBlockEntry) {
 						return fetchBlockEntry();
 					}
 					goto default;
@@ -357,7 +357,7 @@ package final class Scanner {
 					}
 					break;
 				default:
-					if (checkPlain()) {
+					if (checkPlain) {
 						return fetchPlain();
 					}
 			}
