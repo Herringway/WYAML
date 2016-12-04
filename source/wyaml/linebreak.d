@@ -22,8 +22,8 @@ package string lineBreak(in LineBreak b) pure @safe nothrow {
 		case LineBreak.Unix:
 			return "\n";
 		case LineBreak.Windows:
-			return "\r";
-		case LineBreak.Macintosh:
 			return "\r\n";
+		case LineBreak.Macintosh:
+			return "\r";
 	}
 }
