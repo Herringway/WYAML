@@ -239,10 +239,8 @@ package final class Scanner {
 		while (needMoreTokens) {
 			fetchToken();
 		}
-		if (!tokens_.empty) {
-			return tokens_.peek();
-		}
-		assert(false, "No token left to peek");
+		assert(!tokens_.empty, "No tokens left to peek");
+		return tokens_.peek();
 	}
 
 	/// Return the next token, removing it from the queue.
@@ -252,11 +250,9 @@ package final class Scanner {
 		while (needMoreTokens) {
 			fetchToken();
 		}
-		if (!tokens_.empty) {
-			++tokensTaken_;
-			return tokens_.pop();
-		}
-		assert(false, "No token left to get");
+		assert(!tokens_.empty, "No tokens left to pop");
+		++tokensTaken_;
+		return tokens_.pop();
 	}
 
 	/// Determine whether or not we need to fetch more tokens before peeking/getting a token.
