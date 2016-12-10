@@ -62,6 +62,10 @@ package align(4) struct ScalarAnalysis {
 	///Analysis results.
 	BitFlags!ScalarFlags flags;
 }
+package enum YAMLVersion {
+	v1 = "1.0",
+	v2 = "1.1"
+}
 
 package alias unicodeNewLines = AliasSeq!('\u0085', '\u2028', '\u2029');
 package alias newLines = AliasSeq!('\n', unicodeNewLines);
@@ -290,14 +294,14 @@ package struct Emitter(T) {
 		enforce(eventTypeIs(EventID.DocumentStart) || eventTypeIs(EventID.StreamEnd), new EmitterException("Expected DocumentStart or StreamEnd, but got " ~ event_.idString));
 
 		if (event_.id == EventID.DocumentStart) {
-			const YAMLVersion = event_.value;
-			if (openEnded_ && (YAMLVersion !is null || event_.tagDirectives !is null)) {
+			const yamlVersion = cast(YAMLVersion)event_.value;
+			if (openEnded_ && (yamlVersion !is null || event_.tagDirectives !is null)) {
 				writeIndicator("...", Yes.needWhitespace);
 				writeIndent();
 			}
 
-			if (YAMLVersion !is null) {
-				writeVersionDirective(prepareVersion(YAMLVersion));
+			if (yamlVersion !is null) {
+				writeVersionDirective(yamlVersion);
 			}
 
 			if (event_.tagDirectives !is null) {
@@ -319,7 +323,7 @@ package struct Emitter(T) {
 				}
 			}
 
-			const implicit = first && !event_.explicitDocument && !canonical_ && YAMLVersion is null && event_.tagDirectives is null && !checkEmptyDocument();
+			const implicit = first && !event_.explicitDocument && !canonical_ && yamlVersion is null && event_.tagDirectives is null && !checkEmptyDocument();
 			if (!implicit) {
 				writeIndent();
 				writeIndicator("---", Yes.needWhitespace);
