@@ -77,7 +77,7 @@ package struct Event {
 	CollectionStyle collectionStyle = CollectionStyle.Invalid;
 
 	///Is this a null (uninitialized) event?
-	@property bool isNull() const pure @safe nothrow {
+	@property bool isNull() const pure @safe nothrow @nogc {
 		return id == EventID.Invalid;
 	}
 
