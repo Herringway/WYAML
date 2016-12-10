@@ -271,14 +271,6 @@ package struct Emitter(T) {
 		}
 	}
 
-	///Determines if the type of current event is as specified. Throws if no event.
-	private bool eventTypeIs(in EventID id) const {
-		enforce(!event_.isNull, new EmitterException("Expected an event, but no event is available."));
-		return event_.id == id;
-	}
-
-	//States.
-
 	//Stream handlers.
 
 	///Handle start of a file/stream.
@@ -790,12 +782,6 @@ package struct Emitter(T) {
 		}
 
 		return ScalarStyle.DoubleQuoted;
-	}
-
-	///Prepare YAML version string for output.
-	private static string prepareVersion(const string YAMLVersion) {
-		enforce(YAMLVersion.split(".")[0] == "1", new EmitterException("Unsupported YAML version: " ~ YAMLVersion));
-		return YAMLVersion;
 	}
 
 	///Encode an Unicode character for tag directive and write it to writer.
