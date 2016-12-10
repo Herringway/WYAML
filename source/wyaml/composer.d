@@ -10,8 +10,6 @@
  */
 module wyaml.composer;
 
-import core.memory;
-
 import std.array;
 import std.conv;
 import std.exception;
@@ -170,7 +168,7 @@ package final class Composer {
 	}
 
 	///Compose a scalar node.
-	private Node composeScalarNode() @system {
+	private Node composeScalarNode() {
 		immutable event = parser_.getEvent();
 		const tag = resolver_.resolve(NodeID.Scalar, event.tag, event.value, event.implicit);
 
@@ -183,7 +181,7 @@ package final class Composer {
 	///
 	/// Params: pairAppenderLevel = Current level of the pair appender stack.
 	///         nodeAppenderLevel = Current level of the node appender stack.
-	private Node composeSequenceNode(const uint pairAppenderLevel, const uint nodeAppenderLevel) @system {
+	private Node composeSequenceNode(const uint pairAppenderLevel, const uint nodeAppenderLevel) {
 		ensureAppendersExist(pairAppenderLevel, nodeAppenderLevel);
 		auto nodeAppender = &(nodeAppenders_[nodeAppenderLevel]);
 
@@ -194,10 +192,6 @@ package final class Composer {
 			nodeAppender.put(composeNode(pairAppenderLevel, nodeAppenderLevel + 1));
 		}
 
-		core.memory.GC.disable();
-		scope (exit) {
-			core.memory.GC.enable();
-		}
 		Node node = constructor_.node(startEvent.startMark, parser_.getEvent().endMark, tag, nodeAppender.data.dup, startEvent.collectionStyle);
 		nodeAppender.clear();
 
@@ -217,7 +211,7 @@ package final class Composer {
 		 *
 		 * Returns: Flattened mapping as pairs.
 		 */
-	private Node.Pair[] flatten(ref Node root, const Mark startMark, const Mark endMark, const uint pairAppenderLevel, const uint nodeAppenderLevel) @system {
+	private Node.Pair[] flatten(ref Node root, const Mark startMark, const Mark endMark, const uint pairAppenderLevel, const uint nodeAppenderLevel) {
 		void error(Node node) {
 			//this is Composer, but the code is related to Constructor.
 			throw new ConstructorException(
@@ -253,10 +247,6 @@ package final class Composer {
 			error(root);
 		}
 
-		core.memory.GC.disable();
-		scope (exit) {
-			core.memory.GC.enable();
-		}
 		auto flattened = pairAppender.data;
 		pairAppender.clear();
 
@@ -288,10 +278,6 @@ package final class Composer {
 			merge(*pairAppender, flatten(node[0], startEvent.startMark, node[1], pairAppenderLevel + 1, nodeAppenderLevel));
 		}
 
-		core.memory.GC.disable();
-		scope (exit) {
-			core.memory.GC.enable();
-		}
 		Node node = constructor_.node(startEvent.startMark, parser_.getEvent().endMark, tag, pairAppender.data.dup, startEvent.collectionStyle);
 
 		pairAppender.clear();
