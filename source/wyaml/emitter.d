@@ -84,14 +84,18 @@ package struct Emitter(T) {
 	private T stream_;
 
 	///Stack of states.
-	private void delegate()[] states_;
+	private bool delegate() nothrow[] states_;
 	///Current state.
-	private void delegate() state_;
+	private bool delegate() nothrow state_;
 
 	///Event queue.
 	private Queue!Event events_;
 	///Event we're currently emitting.
-	private Event event_;
+	private auto event_() const pure nothrow @safe @nogc out(result) {
+		assert(!result.isNull);
+	} body {
+		return events_.peek();
+	}
 
 	///Stack of previous indentation levels.
 	private int[] indents_;
@@ -187,23 +191,22 @@ package struct Emitter(T) {
 	public void emit(Event event) {
 		events_.push(event);
 		while (!needMoreEvents()) {
-			event_ = events_.pop();
-			state_();
-			event_.destroy();
+			enforce(state_(), new YAMLException("Reached unexpected "~event_.idString));
+			events_.pop();
 		}
 	}
 
 	///Pop and return the newest state in states_.
-	private void delegate() popState() {
-		enforce(states_.length > 0, new YAMLException("Emitter: Need to pop a state but there are no states left"));
+	private bool delegate() nothrow popState() nothrow {
+		assert(states_.length > 0, "Emitter: Need to pop a state but there are no states left");
 		const result = states_.back;
 		states_.popBack();
 		return result;
 	}
 
 	///Pop and return the newest indent in indents_.
-	private int popIndent() {
-		enforce(indents_.length > 0, new YAMLException("Emitter: Need to pop an indent level but there are no indent levels left"));
+	private int popIndent() nothrow {
+		assert(indents_.length > 0, "Emitter: Need to pop an indent level but there are no indent levels left");
 		const result = indents_.back;
 		indents_.popBack();
 		return result;
@@ -215,39 +218,43 @@ package struct Emitter(T) {
 	}
 
 	///In some cases, we wait for a few next events before emitting.
-	private bool needMoreEvents() {
-		if (events_.length == 0) {
+	private bool needMoreEvents() nothrow {
+		if (events_.empty) {
 			return true;
 		}
 
-		const event = events_.peek();
-		if (event.id == EventID.DocumentStart) {
-			return needEvents(1);
+		switch (events_.peek().id) {
+			case EventID.DocumentStart:
+				return needEvents(1);
+			case EventID.SequenceStart:
+				return needEvents(2);
+			case EventID.MappingStart:
+				return needEvents(3);
+			default:
+				return false;
 		}
-		if (event.id == EventID.SequenceStart) {
-			return needEvents(2);
-		}
-		if (event.id == EventID.MappingStart) {
-			return needEvents(3);
-		}
-
-		return false;
 	}
 
 	///Determines if we need specified number of more events.
-	private bool needEvents(in uint count) {
+	private bool needEvents(in uint count) nothrow {
 		int level = 0;
 		foreach (event; events_) {
-			if (event.id.among(EventID.DocumentStart, EventID.SequenceStart, EventID.MappingStart)) {
-				++level;
-			} else if (event.id.among(EventID.DocumentEnd, EventID.SequenceEnd, EventID.MappingEnd)) {
-				--level;
-			} else if (event.id == EventID.StreamStart) {
-				level = -1;
-			}
-
-			if (level < 0) {
-				return false;
+			switch (event.id) {
+				//More events follow these
+				case EventID.DocumentStart, EventID.SequenceStart, EventID.MappingStart:
+					++level;
+					break;
+				//Marks end of related start events
+				case EventID.DocumentEnd, EventID.SequenceEnd, EventID.MappingEnd:
+					--level;
+					if (level < 0) {
+						return false;
+					}
+					break;
+				//Reached end of document
+				case EventID.StreamStart:
+					return false;
+				default: break;
 			}
 		}
 
@@ -255,7 +262,7 @@ package struct Emitter(T) {
 	}
 
 	///Increase indentation level.
-	private void increaseIndent(const Flag!"flow" flow = No.flow, const bool indentless = false) {
+	private void increaseIndent(const Flag!"flow" flow = No.flow, const bool indentless = false) nothrow {
 		indents_ ~= indent_;
 		if (indent_ == -1) {
 			indent_ = flow ? bestIndent_ : 0;
@@ -275,23 +282,28 @@ package struct Emitter(T) {
 	//Stream handlers.
 
 	///Handle start of a file/stream.
-	private void expectStreamStart() {
-		enforce(eventTypeIs(EventID.StreamStart), new EmitterException("Expected StreamStart, but got " ~ event_.idString));
+	private bool expectStreamStart() nothrow {
+		if (event_.id != EventID.StreamStart) {
+			return false;
+		}
 
 		writeStreamStart();
 		state_ = &expectDocumentStart!(Yes.first);
+		return true;
 	}
 
 	///Expect nothing, throwing if we still have something.
-	private void expectNothing() const {
-		throw new EmitterException("Expected nothing, but got " ~ event_.idString);
+	private bool expectNothing() const nothrow pure @safe @nogc {
+		return false;
 	}
 
 	//Document handlers.
 
 	///Handle start of a document.
-	private void expectDocumentStart(Flag!"first" first)() {
-		enforce(eventTypeIs(EventID.DocumentStart) || eventTypeIs(EventID.StreamEnd), new EmitterException("Expected DocumentStart or StreamEnd, but got " ~ event_.idString));
+	private bool expectDocumentStart(Flag!"first" first)() nothrow {
+		if (!event_.id.among(EventID.DocumentStart, EventID.StreamEnd)) {
+			return false;
+		}
 
 		if (event_.id == EventID.DocumentStart) {
 			const yamlVersion = cast(YAMLVersion)event_.value;
@@ -305,17 +317,21 @@ package struct Emitter(T) {
 			}
 
 			if (event_.tagDirectives !is null) {
-				tagDirectives_ = event_.tagDirectives;
-				sort!"icmp(a.handle, b.handle) < 0"(tagDirectives_);
+				tagDirectives_ = event_.tagDirectives.dup;
+				try {
+					tagDirectives_.sort!"icmp(a.handle, b.handle) < 0"();
+				} catch (Exception) {
+					return false;
+				}
 
 				foreach (ref pair; tagDirectives_) {
-					writeTagDirective(prepareTagHandle(pair.handle), prepareTagPrefix(pair.prefix));
+					if (!pair.handle.isValidTagHandle) {
+						return false;
+					}
+					writeTagDirective(pair.handle, prepareTagPrefix(pair.prefix));
 				}
 			}
 
-			bool eq(ref TagDirective a, ref TagDirective b) {
-				return a.handle == b.handle;
-			}
 			//Add any default tag directives that have not been overriden.
 			foreach (ref def; defaultTagDirectives_) {
 				if (!tagDirectives_.canFind(def)) {
@@ -340,11 +356,14 @@ package struct Emitter(T) {
 			writeStreamEnd();
 			state_ = &expectNothing;
 		}
+		return true;
 	}
 
 	///Handle end of a document.
-	private void expectDocumentEnd() {
-		enforce(eventTypeIs(EventID.DocumentEnd), new EmitterException("Expected DocumentEnd, but got " ~ event_.idString));
+	private bool expectDocumentEnd() nothrow {
+		if (event_.id != EventID.DocumentEnd) {
+			return false;
+		}
 
 		writeIndent();
 		if (event_.explicitDocument) {
@@ -352,28 +371,29 @@ package struct Emitter(T) {
 			writeIndent();
 		}
 		state_ = &expectDocumentStart!(No.first);
+		return true;
 	}
 
 	///Handle the root node of a document.
-	private void expectRootNode() {
+	private bool expectRootNode() nothrow {
 		states_ ~= &expectDocumentEnd;
-		expectNode(Context.Root);
+		return expectNode(Context.Root);
 	}
 
 	///Handle a mapping node.
 	//
 	//Params: simpleKey = Are we in a simple key?
-	private void expectMappingNode(const bool simpleKey = false) {
-		expectNode(simpleKey ? Context.MappingSimpleKey : Context.MappingNoSimpleKey);
+	private bool expectMappingNode(const bool simpleKey = false) nothrow {
+		return expectNode(simpleKey ? Context.MappingSimpleKey : Context.MappingNoSimpleKey);
 	}
 
 	///Handle a sequence node.
-	private void expectSequenceNode() {
-		expectNode(Context.Sequence);
+	private bool expectSequenceNode() nothrow {
+		return expectNode(Context.Sequence);
 	}
 
 	///Handle a new node. Context specifies where in the document we are.
-	private void expectNode(const Context context) {
+	private bool expectNode(const Context context) nothrow {
 		context_ = context;
 
 		const flowCollection = event_.collectionStyle == CollectionStyle.Flow;
@@ -406,18 +426,22 @@ package struct Emitter(T) {
 				}
 				break;
 			default:
-				throw new EmitterException("Expected Alias, Scalar, SequenceStart or MappingStart, but got: " ~ event_.idString);
+				return false;
 		}
+		return true;
 	}
 	///Handle an alias.
-	private void expectAlias() {
-		enforce(!event_.anchor.isNull(), new EmitterException("Anchor is not specified for alias"));
+	private bool expectAlias() nothrow {
+		if (event_.anchor.isNull()) {
+			return false;
+		}
 		processAnchor("*");
 		state_ = popState();
+		return true;
 	}
 
 	///Handle a scalar.
-	private void expectScalar() {
+	private void expectScalar() nothrow {
 		increaseIndent(Yes.flow);
 		processScalar();
 		indent_ = popIndent();
@@ -427,7 +451,7 @@ package struct Emitter(T) {
 	//Flow sequence handlers.
 
 	///Handle a flow sequence.
-	private void expectFlowSequence() {
+	private void expectFlowSequence() nothrow {
 		writeIndicator("[", Yes.needWhitespace, Yes.whitespace);
 		++flowLevel_;
 		increaseIndent(Yes.flow);
@@ -435,7 +459,7 @@ package struct Emitter(T) {
 	}
 
 	///Handle a flow sequence item.
-	private void expectFlowSequenceItem(Flag!"first" first)() {
+	private bool expectFlowSequenceItem(Flag!"first" first)() nothrow {
 		if (event_.id == EventID.SequenceEnd) {
 			indent_ = popIndent();
 			--flowLevel_;
@@ -446,7 +470,7 @@ package struct Emitter(T) {
 				}
 			writeIndicator("]", No.needWhitespace);
 			state_ = popState();
-			return;
+			return true;
 		}
 		static if (!first) {
 			writeIndicator(",", No.needWhitespace);
@@ -455,21 +479,22 @@ package struct Emitter(T) {
 			writeIndent();
 		}
 		states_ ~= &expectFlowSequenceItem!(No.first);
-		expectSequenceNode();
+		return expectSequenceNode();
 	}
 
 	//Flow mapping handlers.
 
 	///Handle a flow mapping.
-	private void expectFlowMapping() {
+	private bool expectFlowMapping() nothrow {
 		writeIndicator("{", Yes.needWhitespace, Yes.whitespace);
 		++flowLevel_;
 		increaseIndent(Yes.flow);
 		state_ = &expectFlowMappingKey!(Yes.first);
+		return true;
 	}
 
 	///Handle a key in a flow mapping.
-	private void expectFlowMappingKey(Flag!"first" first)() {
+	private bool expectFlowMappingKey(Flag!"first" first)() nothrow {
 		if (event_.id == EventID.MappingEnd) {
 			indent_ = popIndent();
 			--flowLevel_;
@@ -480,7 +505,7 @@ package struct Emitter(T) {
 				}
 			writeIndicator("}", No.needWhitespace);
 			state_ = popState();
-			return;
+			return true;
 		}
 
 		static if (!first) {
@@ -491,114 +516,114 @@ package struct Emitter(T) {
 		}
 		if (!canonical_ && checkSimpleKey()) {
 			states_ ~= &expectFlowMappingSimpleValue;
-			expectMappingNode(true);
-			return;
+			return expectMappingNode(true);
 		}
 
 		writeIndicator("?", Yes.needWhitespace);
 		states_ ~= &expectFlowMappingValue;
-		expectMappingNode();
+		return expectMappingNode();
 	}
 
 	///Handle a simple value in a flow mapping.
-	private void expectFlowMappingSimpleValue() {
+	private bool expectFlowMappingSimpleValue() nothrow {
 		writeIndicator(":", No.needWhitespace);
 		states_ ~= &expectFlowMappingKey!(No.first);
-		expectMappingNode();
+		return expectMappingNode();
 	}
 
 	///Handle a complex value in a flow mapping.
-	private void expectFlowMappingValue() {
+	private bool expectFlowMappingValue() nothrow {
 		if (canonical_ || column_ > bestWidth_) {
 			writeIndent();
 		}
 		writeIndicator(":", Yes.needWhitespace);
 		states_ ~= &expectFlowMappingKey!(No.first);
-		expectMappingNode();
+		return expectMappingNode();
 	}
 
 	//Block sequence handlers.
 
 	///Handle a block sequence.
-	private void expectBlockSequence() {
+	private bool expectBlockSequence() nothrow {
 		const indentless = (context_ == Context.MappingNoSimpleKey || context_ == Context.MappingSimpleKey) && !indentation_;
 		increaseIndent(No.flow, indentless);
 		state_ = &expectBlockSequenceItem!(Yes.first);
+		return true;
 	}
 
 	///Handle a block sequence item.
-	private void expectBlockSequenceItem(Flag!"first" first)() {
+	private bool expectBlockSequenceItem(Flag!"first" first)() nothrow {
 		static if (!first)
 			if (event_.id == EventID.SequenceEnd) {
 				indent_ = popIndent();
 				state_ = popState();
-				return;
+				return true;
 			}
 
 		writeIndent();
 		writeIndicator("-", Yes.needWhitespace, No.whitespace, Yes.indentation);
 		states_ ~= &expectBlockSequenceItem!(No.first);
-		expectSequenceNode();
+		return expectSequenceNode();
 	}
 
 	//Block mapping handlers.
 
 	///Handle a block mapping.
-	private void expectBlockMapping() {
+	private bool expectBlockMapping() nothrow {
 		increaseIndent(No.flow);
 		state_ = &expectBlockMappingKey!(Yes.first);
+		return true;
 	}
 
 	///Handle a key in a block mapping.
-	private void expectBlockMappingKey(Flag!"first" first)() {
+	private bool expectBlockMappingKey(Flag!"first" first)() nothrow {
 		static if (!first)
 			if (event_.id == EventID.MappingEnd) {
 				indent_ = popIndent();
 				state_ = popState();
-				return;
+				return true;
 			}
 
 		writeIndent();
 		if (checkSimpleKey()) {
 			states_ ~= &expectBlockMappingSimpleValue;
-			expectMappingNode(true);
-			return;
+			return expectMappingNode(true);
 		}
 
 		writeIndicator("?", Yes.needWhitespace, No.whitespace, Yes.indentation);
 		states_ ~= &expectBlockMappingValue;
-		expectMappingNode();
+		return expectMappingNode();
 	}
 
 	///Handle a simple value in a block mapping.
-	private void expectBlockMappingSimpleValue() {
+	private bool expectBlockMappingSimpleValue() nothrow {
 		writeIndicator(":", No.needWhitespace);
 		states_ ~= &expectBlockMappingKey!(No.first);
-		expectMappingNode();
+		return expectMappingNode();
 	}
 
 	///Handle a complex value in a block mapping.
-	private void expectBlockMappingValue() {
+	private bool expectBlockMappingValue() nothrow {
 		writeIndent();
 		writeIndicator(":", Yes.needWhitespace, No.whitespace, Yes.indentation);
 		states_ ~= &expectBlockMappingKey!(No.first);
-		expectMappingNode();
+		return expectMappingNode();
 	}
 
 	//Checkers.
 
 	///Check if an empty sequence is next.
-	private bool checkEmptySequence() const {
+	private bool checkEmptySequence() const nothrow {
 		return event_.id == EventID.SequenceStart && events_.length > 0 && events_.peek().id == EventID.SequenceEnd;
 	}
 
 	///Check if an empty mapping is next.
-	private bool checkEmptyMapping() const {
+	private bool checkEmptyMapping() const nothrow {
 		return event_.id == EventID.MappingStart && events_.length > 0 && events_.peek().id == EventID.MappingEnd;
 	}
 
 	///Check if an empty document is next.
-	private bool checkEmptyDocument() const {
+	private bool checkEmptyDocument() const nothrow {
 		if (event_.id != EventID.DocumentStart || events_.length == 0) {
 			return false;
 		}
@@ -609,7 +634,7 @@ package struct Emitter(T) {
 	}
 
 	///Check if a simple key is next.
-	private bool checkSimpleKey() {
+	private bool checkSimpleKey() nothrow {
 		uint length = 0;
 		const id = event_.id;
 		const scalar = id == EventID.Scalar;
@@ -644,7 +669,7 @@ package struct Emitter(T) {
 	}
 
 	///Process and write a scalar.
-	private void processScalar() {
+	private bool processScalar() nothrow {
 		if (analysis_.flags & ScalarFlags.isNull) {
 			analysis_ = analyzeScalar(event_.value);
 		}
@@ -658,31 +683,36 @@ package struct Emitter(T) {
 		//{
 		//    writeIndent();
 		//}
-		with (ScalarWriter!T(this, analysis_.scalar, context_ != Context.MappingSimpleKey)) final switch (style_) {
-			case ScalarStyle.Invalid:
-				assert(false);
-			case ScalarStyle.DoubleQuoted:
-				writeDoubleQuoted();
-				break;
-			case ScalarStyle.SingleQuoted:
-				writeSingleQuoted();
-				break;
-			case ScalarStyle.Folded:
-				writeFolded();
-				break;
-			case ScalarStyle.Literal:
-				writeLiteral();
-				break;
-			case ScalarStyle.Plain:
-				writePlain();
-				break;
+		try {
+			with (ScalarWriter!T(this, analysis_.scalar, context_ != Context.MappingSimpleKey)) final switch (style_) {
+				case ScalarStyle.Invalid:
+					assert(false);
+				case ScalarStyle.DoubleQuoted:
+					writeDoubleQuoted();
+					break;
+				case ScalarStyle.SingleQuoted:
+					writeSingleQuoted();
+					break;
+				case ScalarStyle.Folded:
+					writeFolded();
+					break;
+				case ScalarStyle.Literal:
+					writeLiteral();
+					break;
+				case ScalarStyle.Plain:
+					writePlain();
+					break;
+			}
+		} catch (Exception) {
+			return false;
 		}
 		analysis_.flags |= ScalarFlags.isNull;
 		style_ = ScalarStyle.Invalid;
+		return true;
 	}
 
 	///Process and write an anchor/alias.
-	private void processAnchor(const string indicator) {
+	private void processAnchor(const string indicator) nothrow {
 		if (event_.anchor.isNull()) {
 			preparedAnchor_ = null;
 			return;
@@ -698,7 +728,7 @@ package struct Emitter(T) {
 	}
 
 	///Process and write a tag.
-	private void processTag() {
+	private void processTag() nothrow {
 		Tag tag = event_.tag;
 
 		if (event_.id == EventID.Scalar) {
@@ -718,7 +748,6 @@ package struct Emitter(T) {
 			return;
 		}
 
-		enforce(!tag.isNull(), new EmitterException("Tag is not specified"));
 		if (preparedTag_ is null) {
 			preparedTag_ = prepareTag(tag);
 		}
@@ -729,7 +758,7 @@ package struct Emitter(T) {
 	}
 
 	///Determine style to write the current scalar in.
-	private ScalarStyle chooseScalarStyle() {
+	private ScalarStyle chooseScalarStyle() nothrow {
 		if (analysis_.flags & ScalarFlags.isNull) {
 			analysis_ = analyzeScalar(event_.value);
 		}
@@ -779,26 +808,16 @@ package struct Emitter(T) {
 		}
 	}
 
-	///Prepare tag directive handle for output.
-	private static string prepareTagHandle(const string handle) {
-		enforce(handle !is null && handle != "", new EmitterException("Tag handle must not be empty"));
-
-		if (handle.length > 1)
-			foreach (const dchar c; handle[1 .. $ - 1]) {
-				enforce(isAlphaNum(c) || c.among('-', '_'), new EmitterException("Invalid character: " ~ to!string(c) ~ " in tag handle " ~ handle));
-			}
-		return handle;
-	}
 
 	///Prepare tag directive prefix for output.
-	private static string prepareTagPrefix(const string prefix) {
-		enforce(prefix !is null && prefix != "", new EmitterException("Tag prefix must not be empty"));
-
+	private static string prepareTagPrefix(const string prefix) nothrow in {
+		assert(!prefix.empty, "Tag prefix must not be empty");
+	} body {
 		auto appender = appender!string();
 		const offset = prefix[0] == '!' ? 1 : 0;
 		size_t start = 0;
 		size_t end = 0;
-		foreach (const size_t i, const dchar c; prefix) {
+		foreach (i, c; prefix) {
 			const size_t idx = i + offset;
 			if (isAlphaNum(c) || c.among(invalidTagChars, '!', '%')) {
 				end = idx + 1;
@@ -809,8 +828,11 @@ package struct Emitter(T) {
 				appender.put(prefix[start .. idx]);
 			}
 			start = end = idx + 1;
+			try {
+				encodeChar(appender, c);
+			} catch (Exception) {
 
-			encodeChar(appender, c);
+			}
 		}
 
 		end = min(end, prefix.length);
@@ -821,9 +843,9 @@ package struct Emitter(T) {
 	}
 
 	///Prepare tag for output.
-	private string prepareTag(in Tag tag) {
-		enforce(!tag.isNull(), new EmitterException("Tag must not be empty"));
-
+	private string prepareTag(in Tag tag) nothrow in {
+		assert(!tag.isNull(),"Tag must not be empty");
+	} body {
 		string tagString = tag.get;
 		if (tagString == "!") {
 			return tagString;
@@ -832,7 +854,11 @@ package struct Emitter(T) {
 		string suffix = tagString;
 
 		//Sort lexicographically by prefix.
-		sort!"icmp(a.prefix, b.prefix) < 0"(tagDirectives_);
+		try {
+			tagDirectives_.sort!"icmp(a.prefix, b.prefix) < 0"();
+		} catch (Exception) {
+
+		}
 		foreach (ref pair; tagDirectives_) {
 			auto prefix = pair.prefix;
 			if (tagString.startsWith(prefix) && (prefix != "!" || prefix.length < tagString.length)) {
@@ -845,7 +871,7 @@ package struct Emitter(T) {
 		appender.put(handle !is null && handle != "" ? handle : "!<");
 		size_t start = 0;
 		size_t end = 0;
-		foreach (const dchar c; suffix) {
+		foreach (c; suffix) {
 			if (isAlphaNum(c) || c.among(invalidTagChars) || (c == '!' && handle != "!")) {
 				++end;
 				continue;
@@ -854,8 +880,11 @@ package struct Emitter(T) {
 				appender.put(suffix[start .. end]);
 			}
 			start = end = end + 1;
+			try {
+				encodeChar(appender, c);
+			} catch (Exception) {
 
-			encodeChar(appender, c);
+			}
 		}
 
 		if (start < end) {
@@ -869,17 +898,20 @@ package struct Emitter(T) {
 	}
 
 	///Prepare anchor for output.
-	private static string prepareAnchor(const Anchor anchor) {
-		enforce(!anchor.isNull() && anchor.get != "", new EmitterException("Anchor must not be empty"));
+	private static string prepareAnchor(const Anchor anchor) nothrow in {
+		assert(!anchor.isNull() && anchor.get != "", "Anchor must not be empty");
+	} body {
 		const str = anchor.get;
-		foreach (const dchar c; str) {
-			enforce(isAlphaNum(c) || c.among('-', '_'), new EmitterException("Invalid character: " ~ to!string(c) ~ " in anchor: " ~ str));
+		foreach (c; str) {
+			if (!(isAlphaNum(c) || c.among('-', '_'))) {
+				return "";
+			}//, new EmitterException("Invalid character: " ~ to!string(c) ~ " in anchor: " ~ str));
 		}
 		return str;
 	}
 
 	///Analyze specifed scalar and return the analysis result.
-	private static ScalarAnalysis analyzeScalar(string scalar) {
+	private static ScalarAnalysis analyzeScalar(string scalar) nothrow {
 		ScalarAnalysis analysis;
 		analysis.flags &= ~BitFlags!ScalarFlags(ScalarFlags.isNull);
 		analysis.scalar = scalar;
@@ -897,7 +929,7 @@ package struct Emitter(T) {
 		bool leadingSpace, leadingBreak, trailingSpace, trailingBreak, breakSpace, spaceBreak;
 
 		//Check document indicators.
-		if (scalar.startsWith("---", "...")) {
+		if (scalar.byDchar.startsWith("---"d, "..."d)) {
 			blockIndicators = flowIndicators = true;
 		}
 
@@ -910,7 +942,7 @@ package struct Emitter(T) {
 		//The previous character is a space/break (false by default).
 		bool previousSpace, previousBreak;
 
-		foreach (const size_t index, const dchar c; scalar) {
+		foreach (index, c; scalar) {
 			//Check for indicators.
 			if (index == 0) {
 				//Leading indicators are special characters.
@@ -1044,16 +1076,16 @@ package struct Emitter(T) {
 	//Writers.
 
 	///Start the YAML stream (write the unicode byte order mark).
-	private void writeStreamStart() {
+	private void writeStreamStart() nothrow {
 		//TODO: add BOM for UTF-16, UTF-32 (0xFEFF)
 	}
 
 	///End the YAML stream.
-	private void writeStreamEnd() {
+	private void writeStreamEnd() nothrow {
 	}
 
 	///Write an indicator (e.g. ":", "[", ">", etc.).
-	private void writeIndicator(const string indicator, const Flag!"needWhitespace" needWhitespace, const Flag!"whitespace" whitespace = No.whitespace, const Flag!"indentation" indentation = No.indentation) {
+	private void writeIndicator(const string indicator, const Flag!"needWhitespace" needWhitespace, const Flag!"whitespace" whitespace = No.whitespace, const Flag!"indentation" indentation = No.indentation) nothrow {
 		const bool prefixSpace = !whitespace_ && needWhitespace;
 		whitespace_ = whitespace;
 		indentation_ = indentation_ && indentation;
@@ -1067,7 +1099,7 @@ package struct Emitter(T) {
 	}
 
 	///Write indentation.
-	private void writeIndent() {
+	private void writeIndent() nothrow {
 		const indent = indent_ == -1 ? 0 : indent_;
 
 		if (!indentation_ || column_ > indent || (column_ == indent && !whitespace_)) {
@@ -1089,7 +1121,7 @@ package struct Emitter(T) {
 	}
 
 	///Start new line.
-	private void writeLineBreak(const string data = null) {
+	private void writeLineBreak(const string data = null) nothrow {
 		whitespace_ = indentation_ = true;
 		++line_;
 		column_ = 0;
@@ -1097,14 +1129,14 @@ package struct Emitter(T) {
 	}
 
 	///Write a YAML version directive.
-	private void writeVersionDirective(const string versionText) {
+	private void writeVersionDirective(const YAMLVersion versionText) nothrow {
 		stream_.put("%YAML ");
 		stream_.put(versionText);
 		writeLineBreak();
 	}
 
 	///Write a tag directive.
-	private void writeTagDirective(const string handle, const string prefix) {
+	private void writeTagDirective(const string handle, const string prefix) nothrow {
 		stream_.put("%TAG ");
 		stream_.put(handle);
 		stream_.put(" ");
@@ -1113,6 +1145,22 @@ package struct Emitter(T) {
 	}
 }
 
+///Prepare tag directive handle for output.
+private bool isValidTagHandle(const string handle) nothrow in {
+	assert(!handle.empty, "Tag handle must not be empty");
+} body {
+	if (handle.length > 1) {
+		foreach (c; handle[1 .. $ - 1]) {
+			if (!(isAlphaNum(c) || c.among('-', '_'))) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+unittest {
+	assert("!aaaa".isValidTagHandle);
+}
 ///RAII struct used to write out scalar values.
 private struct ScalarWriter(T) {
 	invariant() {
