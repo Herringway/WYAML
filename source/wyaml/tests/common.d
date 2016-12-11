@@ -23,8 +23,7 @@ package void run2(alias func, string[] testExts, T...)(string testTitle) {
 		try {
 			func(buildTestArgs!(testExts, testName), testName);
 			write(".");
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			write("Error");
 			writeln(e);
 		}
@@ -32,12 +31,13 @@ package void run2(alias func, string[] testExts, T...)(string testTitle) {
 }
 
 package template buildTestArgs(string[] exts, string T) {
-	static if (exts.length > 1)
+	static if (exts.length > 1) {
 		alias buildTestArgs = AliasSeq!(import(T ~ "." ~ exts[0]), buildTestArgs!(exts[1 .. $], T));
-	else static if (exts.length == 1)
+	} else static if (exts.length == 1) {
 		alias buildTestArgs = AliasSeq!(import(T ~ "." ~ exts[0]));
-	else
+	} else {
 		alias buildTestArgs = AliasSeq!();
+	}
 }
 
 package void writeComparison(string expectedLabel = "Expected value", string actualLabel = "Actual value", T, U)(string testName, T expected, U actual) {
@@ -68,8 +68,9 @@ package void writeItem(string label, T)(T item) {
 	import std.stdio : writeln;
 
 	writeln(label, ":");
-	static if (is(typeof(item.debugString)))
+	static if (is(typeof(item.debugString))) {
 		writeln(item.debugString);
-	else
+	} else {
 		writeln(item.text);
+	}
 }

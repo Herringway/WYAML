@@ -29,8 +29,9 @@ unittest {
 		string output;
 		Node[] readNodes;
 
-		scope (failure)
+		scope (failure) {
 			writeComparison!("Expected nodes", "Read nodes", "Output")(testName, expectedNodes, readNodes, output);
+		}
 
 		auto emitStream = new OutBuffer;
 		auto representer = new Representer;
@@ -50,12 +51,11 @@ unittest {
 		loader.constructor = constructor;
 		readNodes = loader.loadAll().array;
 
-		foreach (expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength))
+		foreach (expected, read; lockstep(expectedNodes, readNodes, StoppingPolicy.requireSameLength)) {
 			assert(expected == read);
+		}
 	}
 
-	alias testGroup = AliasSeq!("aliases-cdumper-bug", "construct-binary", "construct-bool", "construct-custom", "construct-float", "construct-int", "construct-map", "construct-merge",
-		"construct-null", "construct-omap", "construct-pairs", "construct-seq", "construct-set", "construct-str-ascii", "construct-str-utf8", "construct-str", "construct-timestamp",
-		"construct-value", "duplicate-merge-key", "float-representer-2.3-bug", "invalid-single-quote-bug", "more-floats", "negative-float-bug", "single-dot-is-not-float-bug", "timestamp-bugs", "utf8");
+	alias testGroup = AliasSeq!("aliases-cdumper-bug", "construct-binary", "construct-bool", "construct-custom", "construct-float", "construct-int", "construct-map", "construct-merge", "construct-null", "construct-omap", "construct-pairs", "construct-seq", "construct-set", "construct-str-ascii", "construct-str-utf8", "construct-str", "construct-timestamp", "construct-value", "duplicate-merge-key", "float-representer-2.3-bug", "invalid-single-quote-bug", "more-floats", "negative-float-bug", "single-dot-is-not-float-bug", "timestamp-bugs", "utf8");
 	run2!(testRepresenterTypes, [], testGroup)("Representer");
 }

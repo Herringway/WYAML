@@ -23,8 +23,9 @@ unittest {
 		string correctTag;
 		Node node;
 
-		scope (failure)
+		scope (failure) {
 			writeComparison!("Correct tag", "Node")(testName, correctTag, node);
+		}
 
 		correctTag = detect.strip();
 		node = Loader(data).loadAll().front;

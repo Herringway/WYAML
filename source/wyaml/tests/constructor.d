@@ -79,8 +79,7 @@ version (unittest) {
 	}
 
 	Node[] constructFloat() {
-		return [Node([pair("canonical", cast(real) 685230.15), pair("exponential", cast(real) 685230.15), pair("fixed", cast(real) 685230.15), pair("sexagesimal", cast(real) 685230.15),
-			pair("negative infinity", -real.infinity), pair("not a number", real.nan)])];
+		return [Node([pair("canonical", cast(real) 685230.15), pair("exponential", cast(real) 685230.15), pair("fixed", cast(real) 685230.15), pair("sexagesimal", cast(real) 685230.15), pair("negative infinity", -real.infinity), pair("not a number", real.nan)])];
 	}
 
 	Node[] constructInt() {
@@ -88,34 +87,27 @@ version (unittest) {
 	}
 
 	Node[] constructMap() {
-		return [Node([pair("Block style", [pair("Clark", "Evans"), pair("Brian", "Ingerson"), pair("Oren", "Ben-Kiki")]), pair("Flow style", [pair("Clark", "Evans"), pair("Brian", "Ingerson"),
-			pair("Oren", "Ben-Kiki")])])];
+		return [Node([pair("Block style", [pair("Clark", "Evans"), pair("Brian", "Ingerson"), pair("Oren", "Ben-Kiki")]), pair("Flow style", [pair("Clark", "Evans"), pair("Brian", "Ingerson"), pair("Oren", "Ben-Kiki")])])];
 	}
 
 	Node[] constructMerge() {
-		return [Node([Node([pair("x", 1L), pair("y", 2L)]), Node([pair("x", 0L), pair("y", 2L)]), Node([pair("r", 10L)]), Node([pair("r", 1L)]), Node([pair("x", 1L), pair("y", 2L), pair("r", 10L),
-			pair("label", "center/big")]), Node([pair("r", 10L), pair("label", "center/big"), pair("x", 1L), pair("y", 2L)]), Node([pair("label", "center/big"), pair("x", 1L), pair("y", 2L), pair("r", 10L)]),
-			Node([pair("x", 1L), pair("label", "center/big"), pair("r", 10L), pair("y", 2L)])])];
+		return [Node([Node([pair("x", 1L), pair("y", 2L)]), Node([pair("x", 0L), pair("y", 2L)]), Node([pair("r", 10L)]), Node([pair("r", 1L)]), Node([pair("x", 1L), pair("y", 2L), pair("r", 10L), pair("label", "center/big")]), Node([pair("r", 10L), pair("label", "center/big"), pair("x", 1L), pair("y", 2L)]), Node([pair("label", "center/big"), pair("x", 1L), pair("y", 2L), pair("r", 10L)]), Node([pair("x", 1L), pair("label", "center/big"), pair("r", 10L), pair("y", 2L)])])];
 	}
 
 	Node[] constructNull() {
-		return [Node(YAMLNull()), Node([pair("empty", YAMLNull()), pair("canonical", YAMLNull()), pair("english", YAMLNull()), pair(YAMLNull(), "null key")]), Node([pair("sparse", [Node(YAMLNull()),
-			Node("2nd entry"), Node(YAMLNull()), Node("4th entry"), Node(YAMLNull())])])];
+		return [Node(YAMLNull()), Node([pair("empty", YAMLNull()), pair("canonical", YAMLNull()), pair("english", YAMLNull()), pair(YAMLNull(), "null key")]), Node([pair("sparse", [Node(YAMLNull()), Node("2nd entry"), Node(YAMLNull()), Node("4th entry"), Node(YAMLNull())])])];
 	}
 
 	Node[] constructOMap() {
-		return [Node([pair("Bestiary", [pair("aardvark", "African pig-like ant eater. Ugly."), pair("anteater", "South-American ant eater. Two species."), pair("anaconda",
-			"South-American constrictor snake. Scaly.")]), pair("Numbers", [pair("one", 1L), pair("two", 2L), pair("three", 3L)])])];
+		return [Node([pair("Bestiary", [pair("aardvark", "African pig-like ant eater. Ugly."), pair("anteater", "South-American ant eater. Two species."), pair("anaconda", "South-American constrictor snake. Scaly.")]), pair("Numbers", [pair("one", 1L), pair("two", 2L), pair("three", 3L)])])];
 	}
 
 	Node[] constructPairs() {
-		return [Node([pair("Block tasks", Node([pair("meeting", "with team."), pair("meeting", "with boss."), pair("break", "lunch."), pair("meeting", "with client.")], "tag:yaml.org,2002:pairs")),
-			pair("Flow tasks", Node([pair("meeting", "with team"), pair("meeting", "with boss")], "tag:yaml.org,2002:pairs"))])];
+		return [Node([pair("Block tasks", Node([pair("meeting", "with team."), pair("meeting", "with boss."), pair("break", "lunch."), pair("meeting", "with client.")], "tag:yaml.org,2002:pairs")), pair("Flow tasks", Node([pair("meeting", "with team"), pair("meeting", "with boss")], "tag:yaml.org,2002:pairs"))])];
 	}
 
 	Node[] constructSeq() {
-		return [Node([pair("Block style", [Node("Mercury"), Node("Venus"), Node("Earth"), Node("Mars"), Node("Jupiter"), Node("Saturn"), Node("Uranus"), Node("Neptune"), Node("Pluto")]),
-			pair("Flow style", [Node("Mercury"), Node("Venus"), Node("Earth"), Node("Mars"), Node("Jupiter"), Node("Saturn"), Node("Uranus"), Node("Neptune"), Node("Pluto")])])];
+		return [Node([pair("Block style", [Node("Mercury"), Node("Venus"), Node("Earth"), Node("Mars"), Node("Jupiter"), Node("Saturn"), Node("Uranus"), Node("Neptune"), Node("Pluto")]), pair("Flow style", [Node("Mercury"), Node("Venus"), Node("Earth"), Node("Mars"), Node("Jupiter"), Node("Saturn"), Node("Uranus"), Node("Neptune"), Node("Pluto")])])];
 	}
 
 	Node[] constructSet() {
@@ -135,16 +127,11 @@ version (unittest) {
 	}
 
 	Node[] constructTimestamp() {
-		alias DT = DateTime;
-		alias ST = SysTime;
-		return [Node([pair("canonical", ST(DT(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())), pair("valid iso8601", ST(DT(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())),
-			pair("space separated", ST(DT(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())), pair("no time zone (Z)", ST(DT(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())),
-			pair("date (00:00:00Z)", ST(DT(2002, 12, 14), UTC()))])];
+		return [Node([pair("canonical", SysTime(DateTime(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())), pair("valid iso8601", SysTime(DateTime(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())), pair("space separated", SysTime(DateTime(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())), pair("no time zone (Z)", SysTime(DateTime(2001, 12, 15, 2, 59, 43), 1000000.dur!"hnsecs", UTC())), pair("date (00:00:00Z)", SysTime(DateTime(2002, 12, 14), UTC()))])];
 	}
 
 	Node[] constructValue() {
-		return [Node([pair("link with", [Node("library1.dll"), Node("library2.dll")])]), Node([pair("link with", [Node([pair("=", "library1.dll"), pair("version", cast(real) 1.2)]), Node([pair("=",
-			"library2.dll"), pair("version", cast(real) 2.3)])])])];
+		return [Node([pair("link with", [Node("library1.dll"), Node("library2.dll")])]), Node([pair("link with", [Node([pair("=", "library1.dll"), pair("version", cast(real) 1.2)]), Node([pair("=", "library2.dll"), pair("version", cast(real) 2.3)])])])];
 	}
 
 	Node[] duplicateMergeKey() {
@@ -172,12 +159,7 @@ version (unittest) {
 	}
 
 	Node[] timestampBugs() {
-		alias DT = DateTime;
-		alias ST = SysTime;
-		alias STZ = immutable SimpleTimeZone;
-		return [Node([Node(ST(DT(2001, 12, 15, 3, 29, 43), 1000000.dur!"hnsecs", UTC())), Node(ST(DT(2001, 12, 14, 16, 29, 43), 1000000.dur!"hnsecs", UTC())), Node(ST(DT(2001, 12, 14, 21, 59, 43),
-			10100.dur!"hnsecs", UTC())), Node(ST(DT(2001, 12, 14, 21, 59, 43), new STZ(60.dur!"minutes"))), Node(ST(DT(2001, 12, 14, 21, 59, 43), new STZ(-90.dur!"minutes"))), Node(ST(DT(2005, 7, 8,
-			17, 35, 4), 5176000.dur!"hnsecs", UTC()))])];
+		return [Node([Node(SysTime(DateTime(2001, 12, 15, 3, 29, 43), 1000000.dur!"hnsecs", UTC())), Node(SysTime(DateTime(2001, 12, 14, 16, 29, 43), 1000000.dur!"hnsecs", UTC())), Node(SysTime(DateTime(2001, 12, 14, 21, 59, 43), 10100.dur!"hnsecs", UTC())), Node(SysTime(DateTime(2001, 12, 14, 21, 59, 43), new immutable SimpleTimeZone(60.dur!"minutes"))), Node(SysTime(DateTime(2001, 12, 14, 21, 59, 43), new immutable SimpleTimeZone(-90.dur!"minutes"))), Node(SysTime(DateTime(2005, 7, 8, 17, 35, 4), 5176000.dur!"hnsecs", UTC()))])];
 	}
 
 	Node[] utf8() {
