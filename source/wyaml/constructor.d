@@ -14,10 +14,10 @@ module wyaml.constructor;
 import std.array;
 import std.algorithm;
 import std.base64;
-import std.container;
 import std.conv;
 import std.datetime;
 import std.exception;
+import std.range;
 import std.regex;
 import std.string;
 import std.traits;
@@ -613,21 +613,17 @@ Node.Pair[] getPairs(string type, Node[] nodes) {
 
 	return pairs;
 }
+///Test for duplicate keys
+bool hasDuplicates(Node.Pair[] nodes) {
+	auto index = new size_t[nodes.length];
+	makeIndex!((x,y) => x.key < y.key)(nodes, index);
+	return indexed(nodes, index).uniq.walkLength != nodes.length;
+}
 
 /// Construct an ordered map (ordered sequence of key:value pairs without duplicates) _node.
 Node.Pair[] constructOrderedMap(ref Node node) {
 	auto pairs = getPairs("ordered map", node.to!(Node[]));
-
-	//Detect duplicates.
-	//TODO this should be replaced by something with deterministic memory allocation.
-	auto keys = redBlackTree!Node();
-	scope (exit) {
-		keys.destroy();
-	}
-	foreach (ref pair; pairs) {
-		enforce(!(pair.key in keys), new Exception("Duplicate entry in an ordered map: " ~ pair.key.debugString()));
-		keys.insert(pair.key);
-	}
+	enforce(!pairs.hasDuplicates, new Exception("Found duplicate entry in an ordered map"));
 	return pairs;
 }
 
@@ -675,23 +671,8 @@ Node.Pair[] constructPairs(ref Node node) {
 /// Construct a set _node.
 Node[] constructSet(ref Node node) {
 	auto pairs = node.to!(Node.Pair[]);
-
-	// In future, the map here should be replaced with something with deterministic
-	// memory allocation if possible.
-	// Detect duplicates.
-	ubyte[Node] map;
-	scope (exit) {
-		map.destroy();
-	}
-	Node[] nodes;
-	foreach (ref pair; pairs) {
-		enforce((pair.key in map) is null, new Exception("Duplicate entry in a set"));
-		map[pair.key] = 0;
-		nodes.assumeSafeAppend();
-		nodes ~= pair.key;
-	}
-
-	return nodes;
+	enforce(!pairs.hasDuplicates, new Exception("Found duplicate entry in an ordered map"));
+	return pairs.map!(x => x.key).array;
 }
 
 unittest {
@@ -741,16 +722,7 @@ Node[] constructSequence(ref Node node) {
 /// Construct an unordered map (unordered set of key:value _pairs without duplicates) _node.
 Node.Pair[] constructMap(ref Node node) {
 	auto pairs = node.to!(Node.Pair[]);
-	//Detect duplicates.
-	//TODO this should be replaced by something with deterministic memory allocation.
-	auto keys = redBlackTree!Node();
-	scope (exit) {
-		keys.destroy();
-	}
-	foreach (ref pair; pairs) {
-		enforce(!(pair.key in keys), new Exception("Duplicate entry in a map: " ~ pair.key.debugString()));
-		keys.insert(pair.key);
-	}
+	enforce(!pairs.hasDuplicates, new Exception("Found duplicate entry in an ordered map"));
 	return pairs;
 }
 
