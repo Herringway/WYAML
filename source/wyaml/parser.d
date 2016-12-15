@@ -96,8 +96,6 @@ import wyaml.tagdirective;
 package class ParserException : MarkedYAMLException {
 	mixin MarkedExceptionCtors;
 }
-///Default tag handle shortcuts and replacements.
-private alias defaultTagDirectives_ = AliasSeq!(TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:"));
 
 /// Generates events from tokens provided by a Scanner.
 ///
@@ -231,7 +229,7 @@ package final class Parser {
 	private Event parseImplicitDocumentStart() @trusted {
 		// Parse an implicit document.
 		if (!scanner_.checkToken(TokenID.Directive, TokenID.DocumentStart, TokenID.StreamEnd)) {
-			tagDirectives_ = [defaultTagDirectives_];
+			tagDirectives_ = [defaultTagDirectives];
 			const token = scanner_.peekToken();
 
 			states_ ~= &parseDocumentEnd;
@@ -322,7 +320,7 @@ package final class Parser {
 		TagDirective[] value = tagDirectives_;
 
 		//Add any default tag handles that haven't been overridden.
-		foreach (defaultPair; defaultTagDirectives_) {
+		foreach (defaultPair; defaultTagDirectives) {
 			bool found = false;
 			foreach (ref pair; tagDirectives_)
 				if (defaultPair.handle == pair.handle) {

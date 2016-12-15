@@ -145,7 +145,7 @@ package struct Serializer(T) {
 		//If the node has an anchor, emit an anchor (as aliasEvent) on the
 		//first occurrence, save it in serializedNodes_, and emit an alias
 		//if it reappears.
-		Anchor aliased = Anchor(null);
+		Anchor aliased = Anchor();
 		if (anchorable(node) && (node in anchors_) !is null) {
 			aliased = anchors_[node];
 			if ((node in serializedNodes_) !is null) {

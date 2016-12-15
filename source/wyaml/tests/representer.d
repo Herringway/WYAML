@@ -16,6 +16,7 @@ unittest {
 	import std.range;
 	import std.typecons;
 
+	import wyaml.tag;
 	import wyaml.tests.common;
 	import wyaml.tests.constructor;
 
@@ -43,8 +44,8 @@ unittest {
 
 		output = emitStream.text;
 		auto constructor = new Constructor;
-		constructor.addConstructorMapping!constructClass("!tag1");
-		constructor.addConstructorScalar!constructStruct("!tag2");
+		constructor.addConstructorMapping!constructClass(Tag("!tag1"));
+		constructor.addConstructorScalar!constructStruct(Tag("!tag2"));
 
 		auto loader = Loader(emitStream.text);
 		loader.name = "TEST";

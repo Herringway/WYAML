@@ -254,8 +254,8 @@ unittest {
 		enforce((testName in expected) !is null, new Exception("Unimplemented constructor test: " ~ testName));
 
 		auto constructor = new Constructor;
-		constructor.addConstructorMapping!constructClass("!tag1");
-		constructor.addConstructorScalar!constructStruct("!tag2");
+		constructor.addConstructorMapping!constructClass(Tag("!tag1"));
+		constructor.addConstructorScalar!constructStruct(Tag("!tag2"));
 
 		auto loader = Loader(data);
 		loader.constructor = constructor;

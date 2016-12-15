@@ -71,14 +71,13 @@ package alias unicodeNewLines = AliasSeq!('\u0085', '\u2028', '\u2029');
 package alias newLines = AliasSeq!('\n', unicodeNewLines);
 package alias flowIndicatorSeq = AliasSeq!(',', '?', '[', ']', '{', '}');
 package alias specialCharSeq = AliasSeq!('#', ',', '[', ']', '{', '}', '&', '*', '!', '|', '>', '\'', '"', '%', '@', '`');
-package alias invalidTagChars = AliasSeq!('-', ';', '/', '?', ':', '@', '&', '=', '+', '$', ',', '_', '.', '~', '*', '\'', '(', ')', '[', ']');
 
 //Emits YAML events into a file/stream.
 package struct Emitter(T) {
 	private alias TagDirective = wyaml.tagdirective.TagDirective;
 
 	///Default tag handle shortcuts and replacements.
-	private static TagDirective[] defaultTagDirectives_ = [TagDirective("!", "!"), TagDirective("!!", "tag:yaml.org,2002:")];
+	private static TagDirective[] defaultTagDirectives_ = [defaultTagDirectives];
 
 	///Stream to write to.
 	private T stream_;
@@ -311,16 +310,13 @@ package struct Emitter(T) {
 			if (event_.tagDirectives !is null) {
 				tagDirectives_ = event_.tagDirectives.dup;
 				try {
-					tagDirectives_.sort!"icmp(a.handle, b.handle) < 0"();
+					tagDirectives_.sort();
 				} catch (Exception) {
 					return false;
 				}
 
 				foreach (ref pair; tagDirectives_) {
-					if (!pair.handle.isValidTagHandle) {
-						return false;
-					}
-					writeTagDirective(pair.handle, prepareTagPrefix(pair.prefix));
+					writeTagDirective(pair);
 				}
 			}
 
@@ -634,14 +630,14 @@ package struct Emitter(T) {
 
 		if ((id == EventID.Alias || scalar || collectionStart) && !event_.anchor.isNull()) {
 			if (preparedAnchor_ is null) {
-				preparedAnchor_ = prepareAnchor(event_.anchor);
+				preparedAnchor_ = event_.anchor;
 			}
 			length += preparedAnchor_.length;
 		}
 
 		if ((scalar || collectionStart) && !event_.tag.isNull()) {
 			if (preparedTag_ is null) {
-				preparedTag_ = prepareTag(event_.tag);
+				preparedTag_ = event_.tag.withDirectives(tagDirectives_);
 			}
 			length += preparedTag_.length;
 		}
@@ -710,7 +706,7 @@ package struct Emitter(T) {
 			return;
 		}
 		if (preparedAnchor_ is null) {
-			preparedAnchor_ = prepareAnchor(event_.anchor);
+			preparedAnchor_ = event_.anchor;
 		}
 		if (preparedAnchor_ !is null && preparedAnchor_ != "") {
 			writeIndicator(indicator, Yes.needWhitespace);
@@ -722,6 +718,7 @@ package struct Emitter(T) {
 	///Process and write a tag.
 	private void processTag() nothrow {
 		Tag tag = event_.tag;
+		enum defaultTag = Tag("!");
 
 		if (event_.id == EventID.Scalar) {
 			if (style_ == ScalarStyle.Invalid) {
@@ -732,7 +729,7 @@ package struct Emitter(T) {
 				return;
 			}
 			if (event_.implicit && tag.isNull()) {
-				tag = Tag("!");
+				tag = defaultTag;
 				preparedTag_ = null;
 			}
 		} else if ((!canonical_ || tag.isNull()) && event_.implicit) {
@@ -741,7 +738,7 @@ package struct Emitter(T) {
 		}
 
 		if (preparedTag_ is null) {
-			preparedTag_ = prepareTag(tag);
+			preparedTag_ = tag.withDirectives(tagDirectives_);
 		}
 		if (preparedTag_ !is null && preparedTag_ != "") {
 			writeIndicator(preparedTag_, Yes.needWhitespace);
@@ -782,118 +779,6 @@ package struct Emitter(T) {
 		}
 
 		return ScalarStyle.DoubleQuoted;
-	}
-
-	///Encode an Unicode character for tag directive and write it to writer.
-	private static void encodeChar(Writer)(ref Writer writer, in dchar c) {
-		char[4] data;
-		const bytes = encode(data, c);
-		//For each byte add string in format %AB , where AB are hex digits of the byte.
-		foreach (const char b; data[0 .. bytes]) {
-			formattedWrite(writer, "%%%02X", cast(ubyte) b);
-		}
-	}
-
-
-	///Prepare tag directive prefix for output.
-	private static string prepareTagPrefix(const string prefix) nothrow in {
-		assert(!prefix.empty, "Tag prefix must not be empty");
-	} body {
-		auto appender = appender!string();
-		const offset = prefix[0] == '!' ? 1 : 0;
-		size_t start = 0;
-		size_t end = 0;
-		foreach (i, c; prefix) {
-			const size_t idx = i + offset;
-			if (isAlphaNum(c) || c.among(invalidTagChars, '!', '%')) {
-				end = idx + 1;
-				continue;
-			}
-
-			if (start < idx) {
-				appender.put(prefix[start .. idx]);
-			}
-			start = end = idx + 1;
-			try {
-				encodeChar(appender, c);
-			} catch (Exception) {
-
-			}
-		}
-
-		end = min(end, prefix.length);
-		if (start < end) {
-			appender.put(prefix[start .. end]);
-		}
-		return appender.data;
-	}
-
-	///Prepare tag for output.
-	private string prepareTag(in Tag tag) nothrow in {
-		assert(!tag.isNull(),"Tag must not be empty");
-	} body {
-		string tagString = tag.get;
-		if (tagString == "!") {
-			return tagString;
-		}
-		string handle = null;
-		string suffix = tagString;
-
-		//Sort lexicographically by prefix.
-		try {
-			tagDirectives_.sort!"icmp(a.prefix, b.prefix) < 0"();
-		} catch (Exception) {
-
-		}
-		foreach (ref pair; tagDirectives_) {
-			auto prefix = pair.prefix;
-			if (tagString.startsWith(prefix) && (prefix != "!" || prefix.length < tagString.length)) {
-				handle = pair.handle;
-				suffix = tagString[prefix.length .. $];
-			}
-		}
-
-		auto appender = appender!string();
-		appender.put(handle !is null && handle != "" ? handle : "!<");
-		size_t start = 0;
-		size_t end = 0;
-		foreach (c; suffix) {
-			if (isAlphaNum(c) || c.among(invalidTagChars) || (c == '!' && handle != "!")) {
-				++end;
-				continue;
-			}
-			if (start < end) {
-				appender.put(suffix[start .. end]);
-			}
-			start = end = end + 1;
-			try {
-				encodeChar(appender, c);
-			} catch (Exception) {
-
-			}
-		}
-
-		if (start < end) {
-			appender.put(suffix[start .. end]);
-		}
-		if (handle is null || handle == "") {
-			appender.put(">");
-		}
-
-		return appender.data;
-	}
-
-	///Prepare anchor for output.
-	private static string prepareAnchor(const Anchor anchor) nothrow in {
-		assert(!anchor.isNull() && anchor.get != "", "Anchor must not be empty");
-	} body {
-		const str = anchor.get;
-		foreach (c; str) {
-			if (!(isAlphaNum(c) || c.among('-', '_'))) {
-				return "";
-			}//, new EmitterException("Invalid character: " ~ to!string(c) ~ " in anchor: " ~ str));
-		}
-		return str;
 	}
 
 	///Analyze specifed scalar and return the analysis result.
@@ -961,9 +846,6 @@ package struct Emitter(T) {
 			}
 
 			//Check for line breaks, special, and unicode characters.
-			if (c.among(newLines)) {
-				lineBreaks = true;
-			}
 			if (!(c == '\n' || (c >= '\x20' && c <= '\x7E')) && !((c == '\u0085' || (c >= '\xA0' && c <= '\uD7FF') || (c >= '\uE000' && c <= '\uFFFD')) && c != '\uFEFF')) {
 				specialCharacters = true;
 			}
@@ -982,6 +864,7 @@ package struct Emitter(T) {
 				previousSpace = true;
 				previousBreak = false;
 			} else if (c.among(newLines)) {
+				lineBreaks = true;
 				if (index == 0) {
 					leadingBreak = true;
 				}
@@ -1122,31 +1005,15 @@ package struct Emitter(T) {
 	}
 
 	///Write a tag directive.
-	private void writeTagDirective(const string handle, const string prefix) nothrow {
+	private void writeTagDirective(const TagDirective directive) nothrow {
 		stream_.put("%TAG ");
-		stream_.put(handle);
+		stream_.put(directive.handle);
 		stream_.put(" ");
-		stream_.put(prefix);
+		stream_.put(directive.prefix);
 		writeLineBreak();
 	}
 }
 
-///Prepare tag directive handle for output.
-private bool isValidTagHandle(const string handle) nothrow in {
-	assert(!handle.empty, "Tag handle must not be empty");
-} body {
-	if (handle.length > 1) {
-		foreach (c; handle[1 .. $ - 1]) {
-			if (!(isAlphaNum(c) || c.among('-', '_'))) {
-				return false;
-			}
-		}
-	}
-	return true;
-}
-unittest {
-	assert("!aaaa".isValidTagHandle);
-}
 ///RAII struct used to write out scalar values.
 private struct ScalarWriter(T) {
 	invariant() {

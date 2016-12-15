@@ -74,23 +74,23 @@ final class Constructor {
 			return;
 		}
 
-		addConstructorScalar!constructNull("tag:yaml.org,2002:null");
-		addConstructorScalar!constructBool("tag:yaml.org,2002:bool");
-		addConstructorScalar!constructLong("tag:yaml.org,2002:int");
-		addConstructorScalar!constructReal("tag:yaml.org,2002:float");
-		addConstructorScalar!constructBinary("tag:yaml.org,2002:binary");
-		addConstructorScalar!constructTimestamp("tag:yaml.org,2002:timestamp");
-		addConstructorScalar!constructString("tag:yaml.org,2002:str");
+		addConstructorScalar!constructNull(Tag("tag:yaml.org,2002:null"));
+		addConstructorScalar!constructBool(Tag("tag:yaml.org,2002:bool"));
+		addConstructorScalar!constructLong(Tag("tag:yaml.org,2002:int"));
+		addConstructorScalar!constructReal(Tag("tag:yaml.org,2002:float"));
+		addConstructorScalar!constructBinary(Tag("tag:yaml.org,2002:binary"));
+		addConstructorScalar!constructTimestamp(Tag("tag:yaml.org,2002:timestamp"));
+		addConstructorScalar!constructString(Tag("tag:yaml.org,2002:str"));
 
 		///In a mapping, the default value is kept as an entry with the '=' key.
-		addConstructorScalar!constructString("tag:yaml.org,2002:value");
+		addConstructorScalar!constructString(Tag("tag:yaml.org,2002:value"));
 
-		addConstructorSequence!constructOrderedMap("tag:yaml.org,2002:omap");
-		addConstructorSequence!constructPairs("tag:yaml.org,2002:pairs");
-		addConstructorMapping!constructSet("tag:yaml.org,2002:set");
-		addConstructorSequence!constructSequence("tag:yaml.org,2002:seq");
-		addConstructorMapping!constructMap("tag:yaml.org,2002:map");
-		addConstructorScalar!constructMerge("tag:yaml.org,2002:merge");
+		addConstructorSequence!constructOrderedMap(Tag("tag:yaml.org,2002:omap"));
+		addConstructorSequence!constructPairs(Tag("tag:yaml.org,2002:pairs"));
+		addConstructorMapping!constructSet(Tag("tag:yaml.org,2002:set"));
+		addConstructorSequence!constructSequence(Tag("tag:yaml.org,2002:seq"));
+		addConstructorMapping!constructMap(Tag("tag:yaml.org,2002:map"));
+		addConstructorScalar!constructMerge(Tag("tag:yaml.org,2002:merge"));
 	}
 
 	/** Add a constructor function from scalar.
@@ -779,7 +779,7 @@ unittest {
 	string data = "!mystruct 1:2:3";
 	auto loader = Loader(data);
 	auto constructor = new Constructor;
-	constructor.addConstructorScalar!constructMyStructScalar("!mystruct");
+	constructor.addConstructorScalar!constructMyStructScalar(Tag("!mystruct"));
 	loader.constructor = constructor;
 	immutable node = loader.loadAll().front;
 
@@ -790,7 +790,7 @@ unittest {
 	string data = "!mystruct [1, 2, 3]";
 	auto loader = Loader(data);
 	auto constructor = new Constructor;
-	constructor.addConstructorSequence!constructMyStructSequence("!mystruct");
+	constructor.addConstructorSequence!constructMyStructSequence(Tag("!mystruct"));
 	loader.constructor = constructor;
 	immutable node = loader.loadAll().front;
 
@@ -801,7 +801,7 @@ unittest {
 	string data = "!mystruct {x: 1, y: 2, z: 3}";
 	auto loader = Loader(data);
 	auto constructor = new Constructor;
-	constructor.addConstructorMapping!constructMyStructMapping("!mystruct");
+	constructor.addConstructorMapping!constructMyStructMapping(Tag("!mystruct"));
 	loader.constructor = constructor;
 	immutable node = loader.loadAll().front;
 
