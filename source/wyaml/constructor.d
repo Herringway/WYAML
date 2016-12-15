@@ -615,12 +615,10 @@ Node.Pair[] constructOrderedMap(ref Node node) {
 }
 
 unittest {
-	alias Pair = Node.Pair;
-
 	Node[] alternateTypes(uint length) {
 		Node[] pairs;
 		foreach (long i; 0 .. length) {
-			auto pair = (i % 2) ? Pair(i.to!string, i) : Pair(i, i.to!string);
+			auto pair = (i % 2) ? Node.Pair(i.to!string, i) : Node.Pair(i, i.to!string);
 			pairs.assumeSafeAppend();
 			pairs ~= Node([pair]);
 		}
@@ -630,7 +628,7 @@ unittest {
 	Node[] sameType(uint length) {
 		Node[] pairs;
 		foreach (long i; 0 .. length) {
-			auto pair = Pair(i.to!string, i);
+			auto pair = Node.Pair(i.to!string, i);
 			pairs.assumeSafeAppend();
 			pairs ~= Node([pair]);
 		}

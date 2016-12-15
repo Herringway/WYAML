@@ -1258,9 +1258,6 @@ unittest {
 	}
 
 	unittest {
-		alias Value = Node.Value;
-		alias Pair = Node.Pair;
-
 		Node narray = Node([11, 12, 13, 14]);
 		Node nmap = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
 
@@ -1271,9 +1268,6 @@ unittest {
 	}
 
 	unittest {
-		alias Value = Node.Value;
-		alias Pair = Node.Pair;
-
 		Node narray = Node([11, 12, 13, 14]);
 		Node nmap = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
 
@@ -1378,13 +1372,10 @@ unittest {
 	}
 
 	unittest {
-		alias Value = Node.Value;
-		alias Pair = Node.Pair;
-
-		Node n1 = Node(Value(11L));
-		Node n2 = Node(Value(12L));
-		Node n3 = Node(Value(13L));
-		Node n4 = Node(Value(14L));
+		Node n1 = Node(Node.Value(11L));
+		Node n2 = Node(Node.Value(12L));
+		Node n3 = Node(Node.Value(13L));
+		Node n4 = Node(Node.Value(14L));
 		Node narray = Node([n1, n2, n3, n4]);
 
 		int[] array, array2;
@@ -1401,9 +1392,6 @@ unittest {
 	}
 
 	unittest {
-		alias Value = Node.Value;
-		alias Pair = Node.Pair;
-
 		Node n1 = Node(11L);
 		Node n2 = Node(12L);
 		Node n3 = Node(13L);
