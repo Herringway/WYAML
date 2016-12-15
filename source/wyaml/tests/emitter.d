@@ -68,7 +68,7 @@ unittest {
 		auto loader = Loader(data);
 		auto events = cast(Event[]) loader.parse();
 		auto emitStream = new OutBuffer;
-		dumper(emitStream).emit(events);
+		Dumper().emit(emitStream, events);
 		scope (failure) {
 			writeComparison!("Original", "Output")(testName, data, emitStream.text);
 		}
@@ -91,9 +91,9 @@ unittest {
 		auto events = cast(Event[]) loader.parse();
 		foreach (canonical; [false, true]) {
 			auto emitStream = new OutBuffer;
-			auto dumper = dumper(emitStream);
+			auto dumper = Dumper();
 			dumper.canonical = canonical;
-			dumper.emit(events);
+			dumper.emit(emitStream, events);
 			scope (failure) {
 				writeComparison!("Canonical", "Output")(testName, canonical, emitStream.text);
 			}
@@ -131,7 +131,7 @@ unittest {
 					styledEvents ~= event;
 				}
 				auto emitStream = new OutBuffer;
-				dumper(emitStream).emit(styledEvents);
+				Dumper().emit(emitStream, styledEvents);
 				scope (failure) {
 					writeComparison!("Original", "Output")(testName, flowStyle.text ~ style.text, emitStream.text);
 				}

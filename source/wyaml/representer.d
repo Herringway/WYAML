@@ -593,20 +593,20 @@ unittest {
 	import std.outbuffer, std.range;
 
 	foreach (r; [&representMyStruct, &representMyStructSeq, &representMyStructMap]) {
-		auto dumper = dumper(new OutBuffer());
+		auto dumper = Dumper();
 		auto representer = new Representer;
 		representer.addRepresenter!MyStruct(r);
 		dumper.representer = representer;
-		dumper.dump(Node(MyStruct(1, 2, 3)));
+		dumper.dump(new OutBuffer, Node(MyStruct(1, 2, 3)));
 	}
 }
 
 unittest {
 	import std.outbuffer, std.range;
 
-	auto dumper = dumper(new OutBuffer());
+	auto dumper = Dumper();
 	auto representer = new Representer;
 	representer.addRepresenter!MyClass(&representMyClass);
 	dumper.representer = representer;
-	dumper.dump(Node(new MyClass(1, 2, 3)));
+	dumper.dump(new OutBuffer, Node(new MyClass(1, 2, 3)));
 }

@@ -38,9 +38,9 @@ unittest {
 		auto representer = new Representer;
 		representer.addRepresenter!TestClass(&representClass);
 		representer.addRepresenter!TestStruct(&representStruct);
-		auto dumper = dumper(emitStream);
+		auto dumper = Dumper();
 		dumper.representer = representer;
-		dumper.dump(expectedNodes);
+		dumper.dump(emitStream, expectedNodes);
 
 		output = emitStream.text;
 		auto constructor = new Constructor;

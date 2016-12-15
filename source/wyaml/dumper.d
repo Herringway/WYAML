@@ -25,9 +25,6 @@ import wyaml.resolver;
 import wyaml.serializer;
 import wyaml.tagdirective;
 
-auto dumper(T)(T range) if (isOutputRange!(T, char[])) {
-	return Dumper!T(range);
-}
 /**
  * Dumps YAML documents to files or streams.
  *
@@ -77,14 +74,11 @@ auto dumper(T)(T range) if (isOutputRange!(T, char[])) {
  * dumper.dump(node);
  * --------------------
  */
-private struct Dumper(T) if (isOutputRange!(T, char[])) {
+public struct Dumper {
 	//Resolver to resolve tags.
 	private Resolver resolver_;
 	//Representer to represent data types.
 	private Representer representer_;
-
-	//Stream to write to.
-	private T stream_;
 
 	//Write scalars in canonical form?
 	private bool canonical_;
@@ -105,18 +99,6 @@ private struct Dumper(T) if (isOutputRange!(T, char[])) {
 
 	//Name of the output file or stream, used in error messages.
 	private string name_ = "<unknown>";
-
-	@disable this();
-	@disable int opCmp(ref Emitter!T) const;
-	@disable bool opEquals(ref Emitter!T) const;
-	@disable size_t toHash() nothrow @safe;
-
-	///Construct a Dumper writing to a _stream. This is useful to e.g. write to memory.
-	public this(T stream) {
-		resolver_ = new Resolver();
-		representer_ = new Representer();
-		stream_ = stream;
-	}
 
 	///Set stream _name. Used in debugging messages.
 	public void name(string name) {
@@ -224,9 +206,15 @@ private struct Dumper(T) if (isOutputRange!(T, char[])) {
 	     * Throws:  YAMLException on error (e.g. invalid nodes,
 	     *          unable to write to file/stream).
 	     */
-	public void dump(Node[] documents...) {
+	public void dump(T)(T stream, Node[] documents...) if (isOutputRange!(T, char[])) {
+		if (resolver_ is null) {
+			resolver_ = new Resolver;
+		}
+		if (representer_ is null) {
+			representer_ = new Representer;
+		}
 		try {
-			auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
+			auto emitter = Emitter!T(stream, canonical_, indent_, textWidth_, lineBreak_);
 			auto serializer = Serializer!T(emitter, resolver_, explicitStart_, explicitEnd_, yamlVersion_, tags_);
 			foreach (ref document; documents) {
 				representer_.represent(serializer, document);
@@ -244,9 +232,9 @@ private struct Dumper(T) if (isOutputRange!(T, char[])) {
 	     *
 	     * Throws:  YAMLException if unable to emit.
 	     */
-	package void emit(Event[] events) {
+	version(unittest) package void emit(T)(T stream, Event[] events) if (isOutputRange!(T, char[])) {
 		try {
-			auto emitter = Emitter!T(stream_, canonical_, indent_, textWidth_, lineBreak_);
+			auto emitter = Emitter!T(stream, canonical_, indent_, textWidth_, lineBreak_);
 			foreach (ref event; events) {
 				emitter.emit(event);
 			}
@@ -261,27 +249,27 @@ version (unittest) import std.outbuffer;
 
 unittest {
 	auto node = Node([1, 2, 3, 4, 5]);
-	dumper(new OutBuffer()).dump(node);
+	Dumper().dump(new OutBuffer, node);
 }
 
 unittest {
 	auto node1 = Node([1, 2, 3, 4, 5]);
 	auto node2 = Node("This document contains only one string");
-	dumper(new OutBuffer()).dump(node1, node2);
+	Dumper().dump(new OutBuffer, node1, node2);
 }
 
 unittest {
 	auto stream = new OutBuffer();
 	auto node = Node([1, 2, 3, 4, 5]);
-	dumper(stream).dump(node);
+	Dumper().dump(stream, node);
 }
 
 unittest {
 	auto node = Node([1, 2, 3, 4, 5]);
 	auto representer = new Representer();
 	auto resolver = new Resolver();
-	auto dumper = dumper(new OutBuffer());
+	auto dumper = Dumper();
 	dumper.representer = representer;
 	dumper.resolver = resolver;
-	dumper.dump(node);
+	dumper.dump(new OutBuffer, node);
 }
