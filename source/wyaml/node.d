@@ -121,6 +121,13 @@ package final class YAMLContainer(T) if (!Node.allowed!T)
 	assert(t.text == "YAMLContainer(test)");
 }
 
+///Test for duplicate keys
+bool hasDuplicates(Node.Pair[] nodes) {
+	auto index = new size_t[nodes.length];
+	makeIndex!((x,y) => x.key < y.key)(nodes, index);
+	return indexed(nodes, index).uniq.walkLength != nodes.length;
+}
+
 // Key-value pair of YAML nodes, used in mappings.
 private struct Pair {
 	/// Key node.

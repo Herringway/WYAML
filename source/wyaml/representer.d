@@ -482,21 +482,6 @@ Node representNodes(ref Node node, Representer representer) {
 Node representPairs(ref Node node, Representer representer) @system {
 	auto pairs = node.to!(Node.Pair[]);
 
-	bool hasDuplicates(Node.Pair[] pairs) {
-		//TODO this should be replaced by something with deterministic memory allocation.
-		auto keys = redBlackTree!Node();
-		scope (exit) {
-			keys.destroy();
-		}
-		foreach (ref pair; pairs) {
-			if (pair.key in keys) {
-				return true;
-			}
-			keys.insert(pair.key);
-		}
-		return false;
-	}
-
 	Node[] mapToSequence(Node.Pair[] pairs) {
 		Node[] nodes;
 		nodes.length = pairs.length;
@@ -507,12 +492,12 @@ Node representPairs(ref Node node, Representer representer) @system {
 	}
 
 	if (!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:omap")) {
-		enforce(!hasDuplicates(pairs), new RepresenterException("Duplicate entry in an ordered map"));
+		enforce(!pairs.hasDuplicates, new RepresenterException("Duplicate entry in an ordered map"));
 		return representer.representSequence(node.tag_.get, mapToSequence(pairs));
 	} else if (!node.tag_.isNull() && node.tag_ == Tag("tag:yaml.org,2002:pairs")) {
 		return representer.representSequence(node.tag_.get, mapToSequence(pairs));
 	} else {
-		enforce(!hasDuplicates(pairs), new RepresenterException("Duplicate entry in an unordered map"));
+		enforce(!pairs.hasDuplicates, new RepresenterException("Duplicate entry in an unordered map"));
 		return representer.representMapping("tag:yaml.org,2002:map", pairs);
 	}
 }

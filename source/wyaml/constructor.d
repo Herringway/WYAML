@@ -606,12 +606,6 @@ Node.Pair[] getPairs(string type, Node[] nodes) {
 
 	return pairs;
 }
-///Test for duplicate keys
-bool hasDuplicates(Node.Pair[] nodes) {
-	auto index = new size_t[nodes.length];
-	makeIndex!((x,y) => x.key < y.key)(nodes, index);
-	return indexed(nodes, index).uniq.walkLength != nodes.length;
-}
 
 /// Construct an ordered map (ordered sequence of key:value pairs without duplicates) _node.
 Node.Pair[] constructOrderedMap(ref Node node) {
