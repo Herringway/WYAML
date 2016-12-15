@@ -278,7 +278,6 @@ package struct Emitter(T) {
 			return false;
 		}
 
-		writeStreamStart();
 		state_ = &expectDocumentStart!(Yes.first);
 		return true;
 	}
@@ -341,7 +340,6 @@ package struct Emitter(T) {
 				writeIndicator("...", Yes.needWhitespace);
 				writeIndent();
 			}
-			writeStreamEnd();
 			state_ = &expectNothing;
 		}
 		return true;
@@ -943,15 +941,6 @@ package struct Emitter(T) {
 	}
 
 	//Writers.
-
-	///Start the YAML stream (write the unicode byte order mark).
-	private void writeStreamStart() nothrow {
-		//TODO: add BOM for UTF-16, UTF-32 (0xFEFF)
-	}
-
-	///End the YAML stream.
-	private void writeStreamEnd() nothrow {
-	}
 
 	///Write an indicator (e.g. ":", "[", ">", etc.).
 	private void writeIndicator(const string indicator, const Flag!"needWhitespace" needWhitespace, const Flag!"whitespace" whitespace = No.whitespace, const Flag!"indentation" indentation = No.indentation) nothrow {
