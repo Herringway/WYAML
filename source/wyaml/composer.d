@@ -116,7 +116,7 @@ package final class Composer {
 		//Drop the DOCUMENT-END event.
 		parser_.getEvent();
 
-		anchors_.destroy();
+		anchors_.clear();
 		return node;
 	}
 

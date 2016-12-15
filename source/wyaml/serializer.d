@@ -82,10 +82,8 @@ package struct Serializer(T) {
 		anchorNode(node);
 		serializeNode(node);
 		emitter_.emit(documentEndEvent(Mark(), Mark(), explicitEnd_));
-		serializedNodes_.destroy();
-		anchors_.destroy();
-		Anchor[Node] emptyAnchors;
-		anchors_ = emptyAnchors;
+		serializedNodes_.clear();
+		anchors_.clear();
 		lastAnchorID_ = 0;
 	}
 
