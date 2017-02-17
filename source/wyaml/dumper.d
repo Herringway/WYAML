@@ -113,57 +113,40 @@ public struct Dumper {
 	}
 
 	/**
-	     * Specify tag directives.
-	     *
-	     * A tag directive specifies a shorthand notation for specifying _tags.
-	     * Each tag directive associates a handle with a prefix. This allows for
-	     * compact tag notation.
-	     *
-	     * Each handle specified MUST start and end with a '!' character
-	     * (a single character "!" handle is allowed as well).
-	     *
-	     * Only alphanumeric characters, '-', and '__' may be used in handles.
-	     *
-	     * Each prefix MUST not be empty.
-	     *
-	     * The "!!" handle is used for default YAML _tags with prefix
-	     * "tag:yaml.org,2002:". This can be overridden.
-	     *
-	     * Params:  tags = Tag directives (keys are handles, values are prefixes).
-	     *
-	     * Example:
-	     * --------------------
-	     * Dumper dumper = Dumper("file.yaml");
-	     * string[string] directives;
-	     * directives["!short!"] = "tag:long.org,2011:";
-	     * //This will emit tags starting with "tag:long.org,2011"
-	     * //with a "!short!" prefix instead.
-	     * dumper.tagDirectives(directives);
-	     * dumper.dump(Node("foo"));
-	     * --------------------
-	     */
-	public void tagDirectives(string[string] tags) {
-		TagDirective[] t;
-		foreach (handle, prefix; tags) {
-			assert(handle.length >= 1 && handle[0] == '!' && handle[$ - 1] == '!', "A tag handle is empty or does not start and end with a '!' character : " ~ handle);
-			assert(prefix.length >= 1, "A tag prefix is empty");
-			t ~= TagDirective(handle, prefix);
-		}
-		tags_ = t;
+	* Specify tag directives.
+	*
+	* A tag directive specifies a shorthand notation for specifying _tags.
+	* Each tag directive associates a handle with a prefix. This allows for
+	* compact tag notation.
+	*
+	* Each handle specified MUST start and end with a '!' character
+	* (a single character "!" handle is allowed as well).
+	*
+	* Only alphanumeric characters, '-', and '__' may be used in handles.
+	*
+	* Each prefix MUST not be empty.
+	*
+	* The "!!" handle is used for default YAML _tags with prefix
+	* "tag:yaml.org,2002:". This can be overridden.
+	*
+	* Params:  tags = Tag directives (keys are handles, values are prefixes).
+	*/
+	public void tagDirectives(TagDirective[] directives) nothrow {
+		tags_ = directives;
 	}
 
 	/**
-	     * Dump one or more YAML _documents to the file/stream.
-	     *
-	     * Note that while you can call dump() multiple times on the same
-	     * dumper, you will end up writing multiple YAML "files" to the same
-	     * file/stream.
-	     *
-	     * Params:  documents = Documents to _dump (root nodes of the _documents).
-	     *
-	     * Throws:  YAMLException on error (e.g. invalid nodes,
-	     *          unable to write to file/stream).
-	     */
+	* Dump one or more YAML _documents to the file/stream.
+	*
+	* Note that while you can call dump() multiple times on the same
+	* dumper, you will end up writing multiple YAML "files" to the same
+	* file/stream.
+	*
+	* Params:  documents = Documents to _dump (root nodes of the _documents).
+	*
+	* Throws:  YAMLException on error (e.g. invalid nodes,
+	*          unable to write to file/stream).
+	*/
 	public void dump(T)(T stream, Node[] documents...) if (isOutputRange!(T, char[])) {
 		if (resolver_ is null) {
 			resolver_ = new Resolver;
@@ -184,12 +167,12 @@ public struct Dumper {
 	}
 
 	/*
-	     * Emit specified events. Used for debugging/testing.
-	     *
-	     * Params:  events = Events to emit.
-	     *
-	     * Throws:  YAMLException if unable to emit.
-	     */
+	* Emit specified events. Used for debugging/testing.
+	*
+	* Params:  events = Events to emit.
+	*
+	* Throws:  YAMLException if unable to emit.
+	*/
 	version(unittest) package void emit(T)(T stream, Event[] events) if (isOutputRange!(T, char[])) {
 		try {
 			auto emitter = Emitter!T(stream, canonical_, indent_, textWidth_, lineBreak_);
@@ -202,32 +185,45 @@ public struct Dumper {
 		}
 	}
 }
-
-version (unittest) import std.outbuffer;
-
+///Write to a file
 unittest {
 	auto node = Node([1, 2, 3, 4, 5]);
-	Dumper().dump(new OutBuffer, node);
+	scope(exit) if ("file.yaml".exists) std.file.remove("file.yaml");
+	Dumper().dump(File("file.yaml", "w").lockingTextWriter, node);
 }
-
+///Write multiple YAML documents to a file
 unittest {
 	auto node1 = Node([1, 2, 3, 4, 5]);
 	auto node2 = Node("This document contains only one string");
-	Dumper().dump(new OutBuffer, node1, node2);
+	scope(exit) if ("file.yaml".exists) std.file.remove("file.yaml");
+	Dumper().dump(File("file.yaml", "w").lockingTextWriter, node1, node2);
 }
-
+///Write to memory
 unittest {
-	auto stream = new OutBuffer();
+	auto stream = new OutBuffer;
 	auto node = Node([1, 2, 3, 4, 5]);
 	Dumper().dump(stream, node);
 }
-
+///Use a custom representer/resolver to support custom data types and/or implicit tags
 unittest {
 	auto node = Node([1, 2, 3, 4, 5]);
-	auto representer = new Representer();
-	auto resolver = new Resolver();
+	auto representer = new Representer;
+	auto resolver = new Resolver;
+	//Add representer functions / resolver expressions here...
 	auto dumper = Dumper();
 	dumper.representer = representer;
 	dumper.resolver = resolver;
-	dumper.dump(new OutBuffer, node);
+	scope(exit) if ("file.yaml".exists) std.file.remove("file.yaml");
+	dumper.dump(File("file.yaml", "w").lockingTextWriter, node);
 }
+unittest {
+	auto dumper = Dumper();
+	TagDirective[] directives;
+	directives ~= TagDirective("!short!", "tag:long.org,2011:");
+	//This will emit tags starting with "tag:long.org,2011"
+	//with a "!short!" prefix instead.
+	dumper.tagDirectives(directives);
+	scope(exit) if ("file.yaml".exists) std.file.remove("file.yaml");
+	dumper.dump(File("file.yaml", "w").lockingTextWriter, Node("foo"));
+}
+version (unittest) import std.outbuffer, std.stdio, std.file;

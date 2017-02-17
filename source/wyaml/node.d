@@ -1169,370 +1169,368 @@ unittest {
 		assert(!node.isUserType);
 	}
 	{
-		auto node = Node(new class {
-			int a = 5;}
-);
-			assert(node.isUserType);
-		}
-		{
-			auto node = Node("string");
-			assert(node.to!string == "string");
-		}
+		auto node = Node(new class { int a = 5; });
+		assert(node.isUserType);
+	}
+	{
+		auto node = Node("string");
+		assert(node.to!string == "string");
+	}
+}
+
+unittest {
+	with (Node([1, 2, 3])) {
+		assert(!isScalar() && isSequence && !isMapping && !isUserType);
+		assert(length == 3);
+		assert(opIndex(2).to!int == 3);
 	}
 
-	unittest {
-		with (Node([1, 2, 3])) {
-			assert(!isScalar() && isSequence && !isMapping && !isUserType);
-			assert(length == 3);
-			assert(opIndex(2).to!int == 3);
-		}
+	// Will be emitted as a sequence (default for arrays)
+	auto seq = Node([1, 2, 3, 4, 5]);
+	// Will be emitted as a set (overriden tag)
+	auto set = Node([1, 2, 3, 4, 5], "tag:yaml.org,2002:set");
+}
 
-		// Will be emitted as a sequence (default for arrays)
-		auto seq = Node([1, 2, 3, 4, 5]);
-		// Will be emitted as a set (overriden tag)
-		auto set = Node([1, 2, 3, 4, 5], "tag:yaml.org,2002:set");
+unittest {
+	int[string] aa;
+	aa["1"] = 1;
+	aa["2"] = 2;
+	with (Node(aa)) {
+		assert(!isScalar() && !isSequence && isMapping && !isUserType);
+		assert(length == 2);
+		assert(opIndex("2").to!int == 2);
 	}
 
-	unittest {
-		int[string] aa;
-		aa["1"] = 1;
-		aa["2"] = 2;
-		with (Node(aa)) {
-			assert(!isScalar() && !isSequence && isMapping && !isUserType);
-			assert(length == 2);
-			assert(opIndex("2").to!int == 2);
-		}
+	// Will be emitted as an unordered mapping (default for mappings)
+	immutable map = Node([1 : "a", 2 : "b"]);
+	assert(map[1] == "a");
+	assert(map[2] == "b");
+	// Will be emitted as an ordered map (overriden tag)
+	immutable omap = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:omap");
+	assert(omap[1] == "a");
+	assert(omap[2] == "b");
+	// Will be emitted as pairs (overriden tag)
+	immutable pairs = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:pairs");
+	assert(pairs[1] == "a");
+	assert(pairs[2] == "b");
+}
 
-		// Will be emitted as an unordered mapping (default for mappings)
-		immutable map = Node([1 : "a", 2 : "b"]);
-		assert(map[1] == "a");
-		assert(map[2] == "b");
-		// Will be emitted as an ordered map (overriden tag)
-		immutable omap = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:omap");
-		assert(omap[1] == "a");
-		assert(omap[2] == "b");
-		// Will be emitted as pairs (overriden tag)
-		immutable pairs = Node([1 : "a", 2 : "b"], "tag:yaml.org,2002:pairs");
-		assert(pairs[1] == "a");
-		assert(pairs[2] == "b");
+unittest {
+	with (Node(["1", "2"], [1, 2])) {
+		assert(!isScalar() && !isSequence && isMapping && !isUserType);
+		assert(length == 2);
+		assert(opIndex("2").to!int == 2);
+	}
+	//TODO: implement slicing
+	//assert(Node(["1", "2"])[0..$] == ["1", "2"]);
+
+	// Will be emitted as an unordered mapping (default for mappings)
+	immutable map = Node([1, 2], ["a", "b"]);
+	assert(map[1] == "a");
+	assert(map[2] == "b");
+	// Will be emitted as an ordered map (overriden tag)
+	immutable omap = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:omap");
+	assert(omap[1] == "a");
+	assert(omap[2] == "b");
+	// Will be emitted as pairs (overriden tag)
+	immutable pairs = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:pairs");
+	assert(pairs[1] == "a");
+	assert(pairs[2] == "b");
+}
+
+unittest {
+	auto node = Node(42);
+
+	assert(node == 42);
+	assert(node != "42");
+	assert(node != "43");
+
+	auto node2 = Node(YAMLNull());
+	assert(node2 == YAMLNull());
+	assert(node2.toString() == "null");
+}
+
+unittest {
+	assertThrown!NodeException(Node("42").to!int);
+	Node(YAMLNull()).to!YAMLNull;
+}
+
+unittest {
+	Node narray = Node([11, 12, 13, 14]);
+	Node nmap = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
+
+	assert(narray[0].to!int == 11);
+	assert(null !is collectException(narray[42]));
+	assert(nmap["11"].to!int == 11);
+	assert(nmap["14"].to!int == 14);
+}
+
+unittest {
+	Node narray = Node([11, 12, 13, 14]);
+	Node nmap = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
+
+	assert(narray[0].to!int == 11);
+	assert(null !is collectException(narray[42]));
+	assert(nmap["11"].to!int == 11);
+	assert(nmap["14"].to!int == 14);
+	assert(null !is collectException(nmap["42"]));
+
+	narray.add(YAMLNull());
+	nmap.add(YAMLNull(), "Nothing");
+	assert(narray[4].to!YAMLNull == YAMLNull());
+	assert(nmap[YAMLNull()].to!string == "Nothing");
+
+	assertThrown!NodeException(nmap[11]);
+	assertThrown!NodeException(nmap[14]);
+}
+
+// Unittest for opAssign().
+unittest {
+	auto seq = Node([1, 2, 3, 4, 5]);
+	auto assigned = seq;
+	assert(seq == assigned, "Node.opAssign() doesn't produce an equivalent copy");
+}
+
+// Unittest for contains() and in operator.
+unittest {
+	auto seq = Node([1, 2, 3, 4, 5]);
+	assert(seq.contains(3));
+	assert(seq.contains(5));
+	assert(!seq.contains("5"));
+	assert(!seq.contains(6));
+	assert(!seq.contains(float.nan));
+	assertThrown(5 !in seq);
+
+	auto seq2 = Node(["1", "2"]);
+	assert(seq2.contains("1"));
+	assert(!seq2.contains(1));
+
+	auto map = Node(["1", "2", "3", "4"], [1, 2, 3, 4]);
+	assert(map.contains(1));
+	assert(!map.contains("1"));
+	assert(!map.contains(5));
+	assert(!map.contains(float.nan));
+	assert("1" in map);
+	assert("4" in map);
+	assert(1 !in map);
+	assert("5" !in map);
+
+	assert(!seq.contains(YAMLNull()));
+	assert(!map.contains(YAMLNull()));
+	assert(YAMLNull() !in map);
+	seq.add(YAMLNull());
+	map.add("Nothing", YAMLNull());
+	assert(seq.contains(YAMLNull()));
+	assert(map.contains(YAMLNull()));
+	assert(YAMLNull() !in map);
+	map.add(YAMLNull(), "Nothing");
+	assert(YAMLNull() in map);
+
+	auto map2 = Node([1, 2, 3, 4], [1, 2, 3, 4]);
+	assert(!map2.contains("1"));
+	assert(map2.contains(1));
+	assert("1" !in map2);
+	assert(1 in map2);
+
+	// scalar
+	assertThrown!NodeException(Node(1).contains(4));
+	assertThrown(4 !in Node(1));
+
+	auto mapNan = Node([1.0, 2, double.nan], [1, double.nan, 5]);
+
+	assert(mapNan.contains(double.nan));
+	assert(double.nan in mapNan);
+}
+
+unittest {
+	with (Node([1, 2, 3, 4, 3])) {
+		opIndexAssign(42, 3);
+		assert(length == 5);
+		assert(opIndex(3).to!int == 42);
+
+		opIndexAssign(YAMLNull(), 0);
+		assert(opIndex(0) == YAMLNull());
+	}
+	with (Node(["1", "2", "3"], [4, 5, 6])) {
+		opIndexAssign(42, "3");
+		opIndexAssign(123, 456);
+		assert(length == 4);
+		assert(opIndex("3").to!int == 42);
+		assert(opIndex(456).to!int == 123);
+
+		opIndexAssign(43, 3);
+		//3 and "3" should be different
+		assert(length == 5);
+		assert(opIndex("3").to!int == 42);
+		assert(opIndex(3).to!int == 43);
+
+		opIndexAssign(YAMLNull(), "2");
+		assert(opIndex("2") == YAMLNull());
+	}
+}
+
+unittest {
+	Node n1 = Node(Node.Value(11L));
+	Node n2 = Node(Node.Value(12L));
+	Node n3 = Node(Node.Value(13L));
+	Node n4 = Node(Node.Value(14L));
+	Node narray = Node([n1, n2, n3, n4]);
+
+	int[] array, array2;
+	foreach (int value; narray) {
+		array ~= value;
 	}
 
-	unittest {
-		with (Node(["1", "2"], [1, 2])) {
-			assert(!isScalar() && !isSequence && isMapping && !isUserType);
-			assert(length == 2);
-			assert(opIndex("2").to!int == 2);
-		}
-		//TODO: implement slicing
-		//assert(Node(["1", "2"])[0..$] == ["1", "2"]);
-
-		// Will be emitted as an unordered mapping (default for mappings)
-		immutable map = Node([1, 2], ["a", "b"]);
-		assert(map[1] == "a");
-		assert(map[2] == "b");
-		// Will be emitted as an ordered map (overriden tag)
-		immutable omap = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:omap");
-		assert(omap[1] == "a");
-		assert(omap[2] == "b");
-		// Will be emitted as pairs (overriden tag)
-		immutable pairs = Node([1, 2], ["a", "b"], "tag:yaml.org,2002:pairs");
-		assert(pairs[1] == "a");
-		assert(pairs[2] == "b");
+	foreach (Node node; narray) {
+		array2 ~= node.to!int;
 	}
 
-	unittest {
-		auto node = Node(42);
+	assert(array == [11, 12, 13, 14]);
+	assert(array2 == [11, 12, 13, 14]);
+}
 
-		assert(node == 42);
-		assert(node != "42");
-		assert(node != "43");
+unittest {
+	Node n1 = Node(11L);
+	Node n2 = Node(12L);
+	Node n3 = Node(13L);
+	Node n4 = Node(14L);
 
-		auto node2 = Node(YAMLNull());
-		assert(node2 == YAMLNull());
-		assert(node2.toString() == "null");
+	Node k1 = Node("11");
+	Node k2 = Node("12");
+	Node k3 = Node("13");
+	Node k4 = Node("14");
+
+	Node nmap1 = Node([Pair(k1, n1), Pair(k2, n2), Pair(k3, n3), Pair(k4, n4)]);
+
+	int[string] expected = ["11" : 11, "12" : 12, "13" : 13, "14" : 14];
+	int[string] array;
+	foreach (string key, int value; nmap1) {
+		array[key] = value;
 	}
 
-	unittest {
-		assertThrown!NodeException(Node("42").to!int);
-		Node(YAMLNull()).to!YAMLNull;
-	}
+	assert(array == expected);
 
-	unittest {
-		Node narray = Node([11, 12, 13, 14]);
-		Node nmap = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
+	Node nmap2 = Node([Pair(k1, Node(5L)), Pair(k2, Node(true)), Pair(k3, Node(1.0L)), Pair(k4, Node("yarly"))]);
 
-		assert(narray[0].to!int == 11);
-		assert(null !is collectException(narray[42]));
-		assert(nmap["11"].to!int == 11);
-		assert(nmap["14"].to!int == 14);
-	}
-
-	unittest {
-		Node narray = Node([11, 12, 13, 14]);
-		Node nmap = Node(["11", "12", "13", "14"], [11, 12, 13, 14]);
-
-		assert(narray[0].to!int == 11);
-		assert(null !is collectException(narray[42]));
-		assert(nmap["11"].to!int == 11);
-		assert(nmap["14"].to!int == 14);
-		assert(null !is collectException(nmap["42"]));
-
-		narray.add(YAMLNull());
-		nmap.add(YAMLNull(), "Nothing");
-		assert(narray[4].to!YAMLNull == YAMLNull());
-		assert(nmap[YAMLNull()].to!string == "Nothing");
-
-		assertThrown!NodeException(nmap[11]);
-		assertThrown!NodeException(nmap[14]);
-	}
-
-	// Unittest for opAssign().
-	unittest {
-		auto seq = Node([1, 2, 3, 4, 5]);
-		auto assigned = seq;
-		assert(seq == assigned, "Node.opAssign() doesn't produce an equivalent copy");
-	}
-
-	// Unittest for contains() and in operator.
-	unittest {
-		auto seq = Node([1, 2, 3, 4, 5]);
-		assert(seq.contains(3));
-		assert(seq.contains(5));
-		assert(!seq.contains("5"));
-		assert(!seq.contains(6));
-		assert(!seq.contains(float.nan));
-		assertThrown(5 !in seq);
-
-		auto seq2 = Node(["1", "2"]);
-		assert(seq2.contains("1"));
-		assert(!seq2.contains(1));
-
-		auto map = Node(["1", "2", "3", "4"], [1, 2, 3, 4]);
-		assert(map.contains(1));
-		assert(!map.contains("1"));
-		assert(!map.contains(5));
-		assert(!map.contains(float.nan));
-		assert("1" in map);
-		assert("4" in map);
-		assert(1 !in map);
-		assert("5" !in map);
-
-		assert(!seq.contains(YAMLNull()));
-		assert(!map.contains(YAMLNull()));
-		assert(YAMLNull() !in map);
-		seq.add(YAMLNull());
-		map.add("Nothing", YAMLNull());
-		assert(seq.contains(YAMLNull()));
-		assert(map.contains(YAMLNull()));
-		assert(YAMLNull() !in map);
-		map.add(YAMLNull(), "Nothing");
-		assert(YAMLNull() in map);
-
-		auto map2 = Node([1, 2, 3, 4], [1, 2, 3, 4]);
-		assert(!map2.contains("1"));
-		assert(map2.contains(1));
-		assert("1" !in map2);
-		assert(1 in map2);
-
-		// scalar
-		assertThrown!NodeException(Node(1).contains(4));
-		assertThrown(4 !in Node(1));
-
-		auto mapNan = Node([1.0, 2, double.nan], [1, double.nan, 5]);
-
-		assert(mapNan.contains(double.nan));
-		assert(double.nan in mapNan);
-	}
-
-	unittest {
-		with (Node([1, 2, 3, 4, 3])) {
-			opIndexAssign(42, 3);
-			assert(length == 5);
-			assert(opIndex(3).to!int == 42);
-
-			opIndexAssign(YAMLNull(), 0);
-			assert(opIndex(0) == YAMLNull());
-		}
-		with (Node(["1", "2", "3"], [4, 5, 6])) {
-			opIndexAssign(42, "3");
-			opIndexAssign(123, 456);
-			assert(length == 4);
-			assert(opIndex("3").to!int == 42);
-			assert(opIndex(456).to!int == 123);
-
-			opIndexAssign(43, 3);
-			//3 and "3" should be different
-			assert(length == 5);
-			assert(opIndex("3").to!int == 42);
-			assert(opIndex(3).to!int == 43);
-
-			opIndexAssign(YAMLNull(), "2");
-			assert(opIndex("2") == YAMLNull());
-		}
-	}
-
-	unittest {
-		Node n1 = Node(Node.Value(11L));
-		Node n2 = Node(Node.Value(12L));
-		Node n3 = Node(Node.Value(13L));
-		Node n4 = Node(Node.Value(14L));
-		Node narray = Node([n1, n2, n3, n4]);
-
-		int[] array, array2;
-		foreach (int value; narray) {
-			array ~= value;
-		}
-
-		foreach (Node node; narray) {
-			array2 ~= node.to!int;
-		}
-
-		assert(array == [11, 12, 13, 14]);
-		assert(array2 == [11, 12, 13, 14]);
-	}
-
-	unittest {
-		Node n1 = Node(11L);
-		Node n2 = Node(12L);
-		Node n3 = Node(13L);
-		Node n4 = Node(14L);
-
-		Node k1 = Node("11");
-		Node k2 = Node("12");
-		Node k3 = Node("13");
-		Node k4 = Node("14");
-
-		Node nmap1 = Node([Pair(k1, n1), Pair(k2, n2), Pair(k3, n3), Pair(k4, n4)]);
-
-		int[string] expected = ["11" : 11, "12" : 12, "13" : 13, "14" : 14];
-		int[string] array;
-		foreach (string key, int value; nmap1) {
-			array[key] = value;
-		}
-
-		assert(array == expected);
-
-		Node nmap2 = Node([Pair(k1, Node(5L)), Pair(k2, Node(true)), Pair(k3, Node(1.0L)), Pair(k4, Node("yarly"))]);
-
-		foreach (string key, Node value; nmap2) {
-			switch (key) {
-				case "11":
-					assert(cast(int) value == 5);
-					break;
-				case "12":
-					assert(cast(bool) value == true);
-					break;
-				case "13":
-					assert(cast(float) value == 1.0);
-					break;
-				case "14":
-					assert(cast(string) value == "yarly");
-					break;
-				default:
-					assert(false);
-			}
+	foreach (string key, Node value; nmap2) {
+		switch (key) {
+			case "11":
+				assert(cast(int) value == 5);
+				break;
+			case "12":
+				assert(cast(bool) value == true);
+				break;
+			case "13":
+				assert(cast(float) value == 1.0);
+				break;
+			case "14":
+				assert(cast(string) value == "yarly");
+				break;
+			default:
+				assert(false);
 		}
 	}
+}
 
-	unittest {
-		with (Node([1, 2, 3, 4])) {
-			add(5.0f);
-			assert(cast(float) opIndex(4) == 5.0f);
+unittest {
+	with (Node([1, 2, 3, 4])) {
+		add(5.0f);
+		assert(cast(float) opIndex(4) == 5.0f);
+	}
+}
+
+unittest {
+	with (Node([1, 2], [3, 4])) {
+		add(5, "6");
+		assert(cast(string) opIndex(5) == "6");
+	}
+}
+
+unittest {
+	auto mapping = Node(["foo", "baz"], ["bar", "qux"]);
+	assert("bad" !in mapping && ("bad" in mapping) is null);
+	Node* foo = "foo" in mapping;
+	assert(foo !is null);
+	assert(*foo == Node("bar"));
+	assert((*foo).toString() == "bar");
+	assert(cast(string)*foo == "bar");
+	*foo = Node("newfoo");
+	assert(mapping["foo"] == Node("newfoo"));
+}
+
+unittest {
+	with (Node([1, 2, 3, 4, 3])) {
+		remove(3);
+		assert(length == 4);
+		assert(opIndex(2).to!int == 4);
+		assert(opIndex(3).to!int == 3);
+
+		add(YAMLNull());
+		assert(length == 5);
+		remove(YAMLNull());
+		assert(length == 4);
+	}
+	with (Node(["1", "2", "3"], [4, 5, 6])) {
+		remove(4);
+		assert(length == 2);
+		add("nullkey", YAMLNull());
+		assert(length == 3);
+		remove(YAMLNull());
+		assert(length == 2);
+	}
+}
+
+unittest {
+	with (Node([1, 2, 3, 4, 3])) {
+		removeAt(3);
+		assertThrown!NodeException(removeAt("3"));
+		assert(length == 4);
+		assert(opIndex(3).to!int == 3);
+	}
+	with (Node(["1", "2", "3"], [4, 5, 6])) {
+		// no integer 2 key, so don't remove anything
+		removeAt(2);
+		assert(length == 3);
+		removeAt("2");
+		assert(length == 2);
+		add(YAMLNull(), "nullval");
+		assert(length == 3);
+		removeAt(YAMLNull());
+		assert(length == 2);
+	}
+}
+
+// Merge a pair into an array of pairs based on merge rules in the YAML spec.
+//
+// The new pair will only be added if there is not already a pair
+// with the same key.
+//
+// Params:  pairs   = Appender managing the array of pairs to merge into.
+//          toMerge = Pair to merge.
+package void merge(ref Appender!(Node.Pair[]) pairs, ref Node.Pair toMerge) {
+	foreach (ref pair; pairs.data) {
+		if (pair.key == toMerge.key) {
+			return;
 		}
 	}
+	pairs.put(toMerge);
+}
 
-	unittest {
-		with (Node([1, 2], [3, 4])) {
-			add(5, "6");
-			assert(cast(string) opIndex(5) == "6");
-		}
+// Merge pairs into an array of pairs based on merge rules in the YAML spec.
+//
+// Any new pair will only be added if there is not already a pair
+// with the same key.
+//
+// Params:  pairs   = Appender managing the array of pairs to merge into.
+//          toMerge = Pairs to merge.
+package void merge(ref Appender!(Node.Pair[]) pairs, Node.Pair[] toMerge) {
+	bool eq(ref Node.Pair a, ref Node.Pair b) {
+		return a.key == b.key;
 	}
 
-	unittest {
-		auto mapping = Node(["foo", "baz"], ["bar", "qux"]);
-		assert("bad" !in mapping && ("bad" in mapping) is null);
-		Node* foo = "foo" in mapping;
-		assert(foo !is null);
-		assert(*foo == Node("bar"));
-		assert((*foo).toString() == "bar");
-		assert(cast(string)*foo == "bar");
-		*foo = Node("newfoo");
-		assert(mapping["foo"] == Node("newfoo"));
-	}
-
-	unittest {
-		with (Node([1, 2, 3, 4, 3])) {
-			remove(3);
-			assert(length == 4);
-			assert(opIndex(2).to!int == 4);
-			assert(opIndex(3).to!int == 3);
-
-			add(YAMLNull());
-			assert(length == 5);
-			remove(YAMLNull());
-			assert(length == 4);
-		}
-		with (Node(["1", "2", "3"], [4, 5, 6])) {
-			remove(4);
-			assert(length == 2);
-			add("nullkey", YAMLNull());
-			assert(length == 3);
-			remove(YAMLNull());
-			assert(length == 2);
+	foreach (ref pair; toMerge) {
+		if (!canFind!eq(pairs.data, pair)) {
+			pairs.put(pair);
 		}
 	}
-
-	unittest {
-		with (Node([1, 2, 3, 4, 3])) {
-			removeAt(3);
-			assertThrown!NodeException(removeAt("3"));
-			assert(length == 4);
-			assert(opIndex(3).to!int == 3);
-		}
-		with (Node(["1", "2", "3"], [4, 5, 6])) {
-			// no integer 2 key, so don't remove anything
-			removeAt(2);
-			assert(length == 3);
-			removeAt("2");
-			assert(length == 2);
-			add(YAMLNull(), "nullval");
-			assert(length == 3);
-			removeAt(YAMLNull());
-			assert(length == 2);
-		}
-	}
-
-	// Merge a pair into an array of pairs based on merge rules in the YAML spec.
-	//
-	// The new pair will only be added if there is not already a pair
-	// with the same key.
-	//
-	// Params:  pairs   = Appender managing the array of pairs to merge into.
-	//          toMerge = Pair to merge.
-	package void merge(ref Appender!(Node.Pair[]) pairs, ref Node.Pair toMerge) {
-		foreach (ref pair; pairs.data) {
-			if (pair.key == toMerge.key) {
-				return;
-			}
-		}
-		pairs.put(toMerge);
-	}
-
-	// Merge pairs into an array of pairs based on merge rules in the YAML spec.
-	//
-	// Any new pair will only be added if there is not already a pair
-	// with the same key.
-	//
-	// Params:  pairs   = Appender managing the array of pairs to merge into.
-	//          toMerge = Pairs to merge.
-	package void merge(ref Appender!(Node.Pair[]) pairs, Node.Pair[] toMerge) {
-		bool eq(ref Node.Pair a, ref Node.Pair b) {
-			return a.key == b.key;
-		}
-
-		foreach (ref pair; toMerge) {
-			if (!canFind!eq(pairs.data, pair)) {
-				pairs.put(pair);
-			}
-		}
-	}
+}
