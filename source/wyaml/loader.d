@@ -40,43 +40,6 @@ unittest {
  *
  * User specified Constructor and/or Resolver can be used to support new
  * tags / data types.
- *
- * Examples:
- *
- * Load single YAML document from a file:
- * --------------------
- * auto rootNode = Loader("file.yaml").load();
- * ...
- * --------------------
- *
- * Load all YAML documents from a file:
- * --------------------
- * auto nodes = Loader("file.yaml").loadAll();
- * ...
- * --------------------
- *
- * Iterate over YAML documents in a file, lazily loading them:
- * --------------------
- * auto loader = Loader("file.yaml");
- *
- * foreach (ref node; loader)
- * {
- *     ...
- * }
- * --------------------
- *
- * Use a custom constructor/resolver to support custom data types and/or implicit tags:
- * --------------------
- * auto constructor = new Constructor();
- * auto resolver    = new Resolver();
- *
- * // Add constructor functions / resolver expressions here...
- *
- * auto loader = Loader("file.yaml");
- * loader.constructor = constructor;
- * loader.resolver    = resolver;
- * auto rootNode      = loader.load(node);
- * --------------------
  */
 struct Loader {
 	// Reads character data from a stream.
@@ -255,6 +218,32 @@ struct Loader {
 			constructor_ = new Constructor();
 		}
 	}
+}
+///Load single YAML document from a file
+unittest {
+	auto rootNode = Loader("file.yaml").load();
+}
+///Load all YAML documents from a file
+unittest {
+	auto nodes = Loader("file.yaml").loadAll();
+}
+///Iterate over YAML documents in a file, lazily loading them
+unittest {
+	auto loader = Loader("file.yaml");
+
+	foreach (ref node; loader) {
+		//...
+	}
+}
+///Use a custom constructor/resolver to support custom data types and/or implicit tags
+unittest {
+	auto constructor = new Constructor();
+	auto resolver = new Resolver();
+	// Add constructor functions / resolver expressions here...
+	auto loader = Loader("file.yaml");
+	loader.constructor = constructor;
+	loader.resolver = resolver;
+	auto rootNode = loader.load();
 }
 ///
 unittest {

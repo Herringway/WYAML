@@ -5,10 +5,10 @@
 //          http://www.boost.org/LICENSE_1_0.txt)
 
 /**
- * YAML dumper.
- *
- * Code based on $(LINK2 http://www.pyyaml.org, PyYAML).
- */
+* YAML dumper.
+*
+* Code based on $(LINK2 http://www.pyyaml.org, PyYAML).
+*/
 module wyaml.dumper;
 
 import std.range;
@@ -26,54 +26,13 @@ import wyaml.serializer;
 import wyaml.tagdirective;
 
 /**
- * Dumps YAML documents to files or streams.
- *
- * User specified Representer and/or Resolver can be used to support new
- * tags / data types.
- *
- * Setters are provided to affect output details (style, encoding, etc.).
- *
- * Examples:
- *
- * Write to a file:
- * --------------------
- * auto node = Node([1, 2, 3, 4, 5]);
- * Dumper("file.yaml").dump(node);
- * --------------------
- *
- * Write multiple YAML documents to a file:
- * --------------------
- * auto node1 = Node([1, 2, 3, 4, 5]);
- * auto node2 = Node("This document contains only one string");
- * Dumper("file.yaml").dump(node1, node2);
- *
- * //Or with an array:
- * //Dumper("file.yaml").dump([node1, node2]);
- *
- *
- * --------------------
- *
- * Write to memory:
- * --------------------
- * auto stream = new MemoryStream();
- * auto node = Node([1, 2, 3, 4, 5]);
- * Dumper(stream).dump(node);
- * --------------------
- *
- * Use a custom representer/resolver to support custom data types and/or implicit tags:
- * --------------------
- * auto node = Node([1, 2, 3, 4, 5]);
- * auto representer = new Representer();
- * auto resolver = new Resolver();
- *
- * //Add representer functions / resolver expressions here...
- *
- * auto dumper = Dumper("file.yaml");
- * dumper.representer = representer;
- * dumper.resolver = resolver;
- * dumper.dump(node);
- * --------------------
- */
+* Dumps YAML documents to files or streams.
+*
+* User specified Representer and/or Resolver can be used to support new
+* tags / data types.
+*
+* Setters are provided to affect output details (style, encoding, etc.).
+*/
 public struct Dumper {
 	//Resolver to resolve tags.
 	private Resolver resolver_;
@@ -121,8 +80,7 @@ public struct Dumper {
 	}
 
 	///Set indentation width. 2 by default. Must not be zero.
-	public void indent(uint indent)
-	in {
+	public void indent(uint indent) in {
 		assert(indent != 0, "Can't use zero YAML indent width");
 	}
 	body {
