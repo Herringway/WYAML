@@ -786,6 +786,20 @@ struct Node {
 		}
 	}
 
+	/++ Slices a sequence node.
+	+
+	+ Fails on all other node types.
+	+
+	+ Params:
+	+ x: Index of first node in slice
+	+ y: Index of node to end slice at
+	+/
+	public auto opSlice(size_t x, size_t y) {
+		enforce(isSequence, new NodeException("Trying to slice a non-sequence", startMark_));
+
+		return this.to!(Node[])[x..y];
+	}
+
 	/** Remove first (if any) occurence of a value in a collection.
 	 *
 	 * This method can only be called on collection nodes.
@@ -1224,8 +1238,7 @@ unittest {
 		assert(node.length == 2);
 		assert(node["2"].to!int == 2);
 	}
-	//TODO: implement slicing
-	//assert(Node(["1", "2"])[0..$] == ["1", "2"]);
+	assert(Node(["1", "2"])[0..$] == ["1", "2"]);
 
 	// Will be emitted as an unordered mapping (default for mappings)
 	immutable map = Node([1, 2], ["a", "b"]);
