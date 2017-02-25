@@ -21,8 +21,8 @@ import std.datetime;
 import std.exception;
 import std.format;
 import std.math;
-import std.typecons;
 import std.string;
+import std.typecons;
 
 import wyaml.exception;
 import wyaml.node;

@@ -6,13 +6,11 @@
 
 module wyaml.tests.common;
 
-public import wyaml;
-
 import std.conv;
 import std.meta;
 
 package void run2(alias func, string[] testExts, T...)(string testTitle) {
-	import std.stdio : writeln, write;
+	import std.stdio : write, writeln;
 
 	writeln("=========================================");
 	writeln("WYAML ", testTitle, " test");

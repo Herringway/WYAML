@@ -9,14 +9,14 @@
 module wyaml.scanner;
 
 import std.algorithm;
-import std.conv;
 import std.ascii : isAlphaNum, isDigit, isHexDigit;
+import std.conv;
 import std.exception;
 import std.meta;
 import std.range;
 import std.string;
+import std.traits : isArray, Unqual;
 import std.typecons;
-import std.traits : Unqual, isArray;
 import std.utf;
 
 import wyaml.escapes;

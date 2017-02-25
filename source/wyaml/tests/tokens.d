@@ -7,12 +7,14 @@
 module wyaml.tests.tokens;
 
 unittest {
-	import std.array;
+	import std.array : array;
 	import std.conv : to;
-	import std.meta;
+	import std.meta : AliasSeq;
+	import std.string : split;
 
-	import wyaml.tests.common;
-	import wyaml.token;
+	import wyaml.loader : Loader;
+	import wyaml.tests.common : run2, writeComparison;
+	import wyaml.token :TokenID;
 
 	/**
 	 * Test tokens output by scanner.

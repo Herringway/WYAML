@@ -9,8 +9,8 @@ module wyaml.tests.compare;
 unittest {
 	import std.meta : AliasSeq;
 	import std.range : lockstep, StoppingPolicy;
-	import wyaml.tests.common;
-	import wyaml.token;
+	import wyaml.loader : Loader;
+	import wyaml.tests.common : run2, writeComparison;
 
 	/// Test parser by comparing output from parsing equivalent YAML data.
 	///

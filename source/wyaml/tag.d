@@ -7,8 +7,8 @@
 ///YAML tag.
 module wyaml.tag;
 
-import std.array;
 import std.algorithm;
+import std.array;
 import std.exception;
 import std.meta;
 import std.uni;

@@ -19,8 +19,8 @@ import std.regex;
 import std.typecons;
 import std.utf;
 
-import wyaml.node;
 import wyaml.exception;
+import wyaml.node;
 import wyaml.tag;
 
 /**

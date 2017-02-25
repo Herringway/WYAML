@@ -7,10 +7,12 @@
 module wyaml.tests.inputoutput;
 
 unittest {
-	import std.array : split, front, join;
+	import std.array : front, join, split;
 	import std.conv : to;
 
-	import wyaml.tests.common;
+	import wyaml.loader : Loader;
+	import wyaml.node : Node;
+	import wyaml.tests.common : run2;
 
 	/// Unicode input unittest. Tests various encodings.
 	///

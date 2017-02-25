@@ -9,8 +9,8 @@ module wyaml.exception;
 
 import std.algorithm;
 import std.array;
-import std.string;
 import std.conv;
+import std.string;
 
 /// Base class for all exceptions thrown by D:YAML.
 class YAMLException : Exception {

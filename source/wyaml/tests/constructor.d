@@ -7,14 +7,19 @@
 module wyaml.tests.constructor;
 
 version (unittest) {
-	import std.conv : to, text;
-	import std.datetime : DateTime, SysTime, SimpleTimeZone, dur, UTC;
+	import std.conv : text, to;
+	import std.datetime : DateTime, dur, SimpleTimeZone, SysTime, UTC;
 	import std.exception : enforce;
 	import std.meta : AliasSeq;
 	import std.range : lockstep, StoppingPolicy;
 	import std.string : format;
 	import std.typecons : No;
 
+	import wyaml.constructor : Constructor;
+	import wyaml.loader : Loader;
+	import wyaml.node : Node, YAMLNull;
+	import wyaml.representer : Representer;
+	import wyaml.resolver : Resolver;
 	import wyaml.tag;
 	import wyaml.tests.common;
 

@@ -11,12 +11,13 @@
  */
 module wyaml.constructor;
 
-import std.array;
 import std.algorithm;
+import std.array;
 import std.base64;
 import std.conv;
 import std.datetime;
 import std.exception;
+import std.meta;
 import std.range;
 import std.regex;
 import std.string;
@@ -24,10 +25,10 @@ import std.traits;
 import std.typecons;
 import std.utf;
 
-import wyaml.node;
 import wyaml.exception;
-import wyaml.tag;
+import wyaml.node;
 import wyaml.style;
+import wyaml.tag;
 
 // Exception thrown at constructor errors.
 package class ConstructorException : YAMLException {

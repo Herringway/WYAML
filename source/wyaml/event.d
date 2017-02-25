@@ -18,9 +18,9 @@ import std.typecons;
 import wyaml.anchor;
 import wyaml.exception;
 import wyaml.reader;
+import wyaml.style;
 import wyaml.tag;
 import wyaml.tagdirective;
-import wyaml.style;
 
 ///Event types.
 package enum EventID : ubyte {

@@ -11,12 +11,15 @@ unittest {
 	import std.conv : text;
 	import std.outbuffer : OutBuffer;
 	import std.range : lockstep;
-	import std.typecons : tuple, AliasSeq;
+	import std.typecons : AliasSeq, tuple;
 
-	import wyaml.dumper;
-	import wyaml.event;
-	import wyaml.tests.common;
-	import wyaml.token;
+	import wyaml.constructor : Constructor;
+	import wyaml.dumper : Dumper;
+	import wyaml.event : Event, EventID, mappingStartEvent, scalarEvent, sequenceStartEvent;
+	import wyaml.loader : Loader, Mark;
+	import wyaml.resolver : Resolver;
+	import wyaml.tests.common : run2, writeComparison;
+	import wyaml.token : CollectionStyle, ScalarStyle;
 
 	/// Determine if events in events1 are equivalent to events in events2.
 	///

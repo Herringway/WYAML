@@ -11,7 +11,8 @@ unittest {
 	import std.exception : assertThrown;
 	import std.meta : AliasSeq;
 
-	import wyaml.tests.common;
+	import wyaml.loader : Loader;
+	import wyaml.tests.common : run2;
 
 	/// Loader error unittest from file stream.
 	///

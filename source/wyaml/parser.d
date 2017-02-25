@@ -22,9 +22,9 @@ import wyaml.event;
 import wyaml.exception;
 import wyaml.scanner;
 import wyaml.style;
-import wyaml.token;
 import wyaml.tag;
 import wyaml.tagdirective;
+import wyaml.token;
 
 /**
  * The following YAML grammar is LL(1) and is parsed by a recursive descent

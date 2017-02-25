@@ -7,7 +7,7 @@
 ///Tag directives.
 module wyaml.tagdirective;
 
-import std.algorithm : all, startsWith, endsWith, among;
+import std.algorithm : all, among, endsWith, startsWith;
 import std.ascii : isAlphaNum;
 import std.exception : enforce;
 import std.range;

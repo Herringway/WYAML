@@ -7,11 +7,13 @@
 module wyaml.tests.resolver;
 
 unittest {
-	import std.array;
-	import std.meta;
-	import std.string;
+	import std.array : front;
+	import std.meta : AliasSeq;
+	import std.string : strip;
 
-	import wyaml.tests.common;
+	import wyaml.loader : Loader;
+	import wyaml.node : Node;
+	import wyaml.tests.common : run2, writeComparison;
 
 	/**
 	 * Implicit tag resolution unittest.

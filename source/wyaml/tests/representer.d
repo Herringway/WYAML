@@ -7,24 +7,27 @@
 module wyaml.tests.representer;
 
 unittest {
-	import std.array;
-	import std.conv;
-	import std.exception;
-	import std.meta;
-	import std.outbuffer;
-	import std.path;
-	import std.range;
-	import std.typecons;
+	import std.array : array;
+	import std.conv : text;
+	import std.exception : enforce;
+	import std.outbuffer : OutBuffer;
+	import std.range : lockstep, StoppingPolicy;
+	import std.typecons : AliasSeq;
 
-	import wyaml.tag;
-	import wyaml.tests.common;
-	import wyaml.tests.constructor;
+	import wyaml.constructor : Constructor;
+	import wyaml.dumper : Dumper;
+	import wyaml.loader : Loader;
+	import wyaml.node : Node;
+	import wyaml.representer : Representer;
+	import wyaml.tag : Tag;
+	import wyaml.tests.common : run2, writeComparison;
+	import wyaml.tests.constructor : constructClass, constructStruct, expected, representClass, representStruct, TestClass, TestStruct;
 
 	/// Representer unittest.
 	///
 	/// Params: testName = Name of the test being run.
 	void testRepresenterTypes(string testName) {
-		enforce((testName in wyaml.tests.constructor.expected) !is null, new Exception("Unimplemented representer test: " ~ testName));
+		enforce((testName in expected) !is null, new Exception("Unimplemented representer test: " ~ testName));
 
 		Node[] expectedNodes = expected[testName];
 		string output;
