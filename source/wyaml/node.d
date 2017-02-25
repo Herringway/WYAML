@@ -1519,13 +1519,16 @@ unittest {
 	}
 }
 
-// Merge a pair into an array of pairs based on merge rules in the YAML spec.
-//
-// The new pair will only be added if there is not already a pair
-// with the same key.
-//
-// Params:  pairs   = Appender managing the array of pairs to merge into.
-//          toMerge = Pair to merge.
+/++
++Merge a pair into an array of pairs based on merge rules in the YAML spec.
++
++The new pair will only be added if there is not already a pair
++with the same key.
++
++Params:
++	pairs = Appender managing the array of pairs to merge into.
++	toMerge = Pair to merge.
++/
 package void merge(ref Appender!(Node.Pair[]) pairs, ref Node.Pair toMerge) {
 	foreach (ref pair; pairs.data) {
 		if (pair.key == toMerge.key) {
@@ -1535,13 +1538,16 @@ package void merge(ref Appender!(Node.Pair[]) pairs, ref Node.Pair toMerge) {
 	pairs.put(toMerge);
 }
 
-// Merge pairs into an array of pairs based on merge rules in the YAML spec.
-//
-// Any new pair will only be added if there is not already a pair
-// with the same key.
-//
-// Params:  pairs   = Appender managing the array of pairs to merge into.
-//          toMerge = Pairs to merge.
+/++
++Merge pairs into an array of pairs based on merge rules in the YAML spec.
++
++Any new pair will only be added if there is not already a pair
++with the same key.
++
++Params:
++	pairs = Appender managing the array of pairs to merge into.
++	toMerge = Pairs to merge.
++/
 package void merge(ref Appender!(Node.Pair[]) pairs, Node.Pair[] toMerge) {
 	bool eq(ref Node.Pair a, ref Node.Pair b) {
 		return a.key == b.key;
