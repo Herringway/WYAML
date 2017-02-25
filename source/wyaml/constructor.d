@@ -320,13 +320,13 @@ YAMLMerge constructMerge(ref Node node) @safe pure nothrow @nogc {
 
 /// Construct a boolean _node.
 bool constructBool(ref Node node) {
-	static yes = ["yes", "true", "on"];
-	static no = ["no", "false", "off"];
+	alias yes = AliasSeq!("yes", "true", "on");
+	alias no = AliasSeq!("no", "false", "off");
 	string value = node.to!string().toLower();
-	if (yes.canFind(value)) {
+	if (value.among(yes)) {
 		return true;
 	}
-	if (no.canFind(value)) {
+	if (value.among(no)) {
 		return false;
 	}
 	throw new Exception("Unable to parse boolean value: " ~ value);
