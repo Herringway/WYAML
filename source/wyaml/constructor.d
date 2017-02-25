@@ -37,8 +37,8 @@ package class ConstructorException : YAMLException {
 	/// Params:  msg   = Error message.
 	///          start = Start position of the error context.
 	///          end   = End position of the error context.
-	this(string msg, Mark start, Mark end, string file = __FILE__, int line = __LINE__) @safe pure nothrow {
-		super(msg ~ "\nstart: " ~ start.toString() ~ "\nend: " ~ end.toString(), file, line);
+	this(string msg, string file = __FILE__, int line = __LINE__) @safe pure nothrow @nogc {
+		super(msg, file, line);
 	}
 }
 
@@ -264,23 +264,18 @@ final class Constructor {
 	package Node node(T, U)(const Mark start, const Mark end, const Tag tag, T value, U style) if ((is(T : string) || is(T == Node[]) || is(T == Node.Pair[])) && (is(U : CollectionStyle) || is(U : ScalarStyle))) {
 		enum type = is(T : string) ? "scalar" :  is(T == Node[]) ? "sequence" :  is(T == Node.Pair[]) ? "mapping" : "ERROR";
 
-		enforce((tag in delegateLocation!T) !is null, new ConstructorException("No constructor function from " ~ type ~ " for tag " ~ tag.get(), start, end));
+		enforce((tag in delegateLocation!T) !is null, new ConstructorException("No constructor function from " ~ type ~ " for tag " ~ tag.get()));
 
 		Node node = Node(value);
-		try {
-			static if (is(U : ScalarStyle)) {
-				alias scalarStyle = style;
-				alias collectionStyle = CollectionStyle.Invalid;
-			} else static if (is(U : CollectionStyle)) {
-				alias scalarStyle = ScalarStyle.Invalid;
-				alias collectionStyle = style;
-			} else
-				static assert(false);
-			return Node.rawNode(delegateLocation!T[tag](node), start, tag, scalarStyle, collectionStyle);
-		}
-		catch (Exception e) {
-			throw new ConstructorException("Error constructing " ~ typeid(T).text ~ ":\n" ~ e.msg, start, end);
-		}
+		static if (is(U : ScalarStyle)) {
+			alias scalarStyle = style;
+			alias collectionStyle = CollectionStyle.Invalid;
+		} else static if (is(U : CollectionStyle)) {
+			alias scalarStyle = ScalarStyle.Invalid;
+			alias collectionStyle = style;
+		} else
+			static assert(false);
+		return Node.rawNode(delegateLocation!T[tag](node), tag, scalarStyle, collectionStyle);
 	}
 
 	/*

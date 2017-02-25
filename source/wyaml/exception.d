@@ -15,7 +15,7 @@ import std.string;
 /// Base class for all exceptions thrown by D:YAML.
 class YAMLException : Exception {
 	/// Construct a YAMLException with specified message and position where it was thrown.
-	public this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+	public this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow @nogc {
 		super(msg, file, line);
 	}
 }
@@ -71,6 +71,11 @@ package abstract class MarkedYAMLException : YAMLException {
 		super(problem ~ '\n' ~ problemMark.toString(), file, line);
 	}
 
+	// Construct a MarkedYAMLException with specified problem and both start and end markers.
+	this(string problem, const Mark problemMarkStart, const Mark problemMarkEnd, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		super(problem ~ "\nStart:" ~ problemMarkStart.toString()~"\nEnd: "~problemMarkEnd.toString(), file, line);
+	}
+
 	/// Construct a MarkedYAMLException from a struct storing constructor parameters.
 	this(ref const(MarkedYAMLExceptionData) data) @safe pure nothrow {
 		this(data.context, data.contextMark, data.problem, data.problemMark);
@@ -96,6 +101,9 @@ package template MarkedExceptionCtors() {
 
 	public this(string problem, const Mark problemMark, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
 		super(problem, problemMark, file, line);
+	}
+	public this(string problem, const Mark problemMarkStart, const Mark problemMarkEnd, string file = __FILE__, size_t line = __LINE__) @safe pure nothrow {
+		super(problem, problemMarkStart, problemMarkEnd, file, line);
 	}
 
 	public this(ref const(MarkedYAMLExceptionData) data) @safe pure nothrow {

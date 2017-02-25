@@ -214,7 +214,7 @@ package final class Composer {
 	private Node.Pair[] flatten(ref Node root, const Mark startMark, const Mark endMark, const uint pairAppenderLevel, const uint nodeAppenderLevel) {
 		void error(Node node) {
 			//this is Composer, but the code is related to Constructor.
-			throw new ConstructorException(
+			throw new ComposerException(
 				"While constructing a mapping, expected a mapping or a list of mappings for merging, but found: " ~ node.type.text ~ " NOTE: line/column shows topmost parent to which the content is being merged",
 				startMark, endMark);
 		}

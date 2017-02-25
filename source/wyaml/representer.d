@@ -258,7 +258,7 @@ final class Representer {
 		if (style == ScalarStyle.Invalid) {
 			style = defaultScalarStyle_;
 		}
-		return Node.rawNode(Node.Value(scalar), Mark(), Tag(tag), style, CollectionStyle.Invalid);
+		return Node.rawNode(Node.Value(scalar), Tag(tag), style, CollectionStyle.Invalid);
 	}
 
 	/**
@@ -319,7 +319,7 @@ final class Representer {
 		if (style == CollectionStyle.Invalid) {
 			style = defaultCollectionStyle_ != CollectionStyle.Invalid ? defaultCollectionStyle_ : bestStyle;
 		}
-		return Node.rawNode(Node.Value(value), Mark(), Tag(tag), ScalarStyle.Invalid, style);
+		return Node.rawNode(Node.Value(value), Tag(tag), ScalarStyle.Invalid, style);
 	}
 
 	/**
@@ -385,7 +385,7 @@ final class Representer {
 		if (style == CollectionStyle.Invalid) {
 			style = defaultCollectionStyle_ != CollectionStyle.Invalid ? defaultCollectionStyle_ : bestStyle;
 		}
-		return Node.rawNode(Node.Value(value), Mark(), Tag(tag), ScalarStyle.Invalid, style);
+		return Node.rawNode(Node.Value(value), Tag(tag), ScalarStyle.Invalid, style);
 	}
 
 	//Represent a node based on its type, and return the represented result.

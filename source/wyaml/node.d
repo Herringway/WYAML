@@ -31,8 +31,8 @@ class NodeException : YAMLException {
 	//
 	// Params:  msg   = Error message.
 	//          start = Start position of the node.
-	package this(string msg, Mark start, string file = __FILE__, int line = __LINE__) @safe pure {
-		super(msg ~ "\nNode at: " ~ start.text, file, line);
+	this(string msg, string file = __FILE__, size_t line = __LINE__) @safe pure {
+		super(msg, file, line);
 	}
 }
 
@@ -195,8 +195,6 @@ struct Node {
 
 	// Stored value.
 	private Value value_;
-	// Start position of the node.
-	private Mark startMark_;
 
 	// Tag of the node.
 	package Tag tag_;
@@ -462,7 +460,7 @@ struct Node {
 				if (object.type is typeid(T)) {
 					return (cast(YAMLContainer!(Unqual!T)) object).value_;
 				}
-				throw new NodeException("Node has unexpected type: " ~ object.type.text ~ ". Expected: " ~ typeid(T).text, startMark_);
+				throw new NodeException("Node has unexpected type: " ~ object.type.text ~ ". Expected: " ~ typeid(T).text);
 			}
 
 		// If we're getting from a mapping and we're not getting Node.Pair[],
@@ -479,12 +477,12 @@ struct Node {
 			} else if (isFloat()) {
 				return cast(T)(value_.get!(const real));
 			} else {
-				throw new NodeException("Unable to convert node value to floating point", startMark_);
+				throw new NodeException("Unable to convert node value to floating point");
 			}
 		} else static if (isIntegral!T) {
-			enforce(isInt(), new NodeException("Unable to convert node value to integer", startMark_));
+			enforce!NodeException(isInt(), "Unable to convert node value to integer");
 			const temp = value_.get!(const long);
-			enforce(temp >= T.min && temp <= T.max, new NodeException("Integer value of type " ~ typeid(T).text ~ " out of range. Value: " ~ to!string(temp), startMark_));
+			enforce!NodeException(temp >= T.min && temp <= T.max, "Integer value of type " ~ typeid(T).text ~ " out of range. Value: " ~ to!string(temp));
 			return temp.to!T;
 		} else {
 			assert(0, "Cannot cast this node to "~T.stringof);
@@ -493,15 +491,14 @@ struct Node {
 
 	public T toString(T = string, Flag!"stringConversion" stringConversion = Yes.stringConversion)() const if (isSomeString!T) {
 		static if (!stringConversion) {
-			if (isString)
-				return value_.get!string.to!T;
-			throw new NodeException("Node stores unexpected type: " ~ type.text ~ ". Expected: " ~ typeid(T).text, startMark_);
+			enforce!NodeException(isString, "Node stores unexpected type: " ~ type.text ~ ". Expected: " ~ typeid(T).text);
+			return value_.get!string.to!T;
 		} else {
 			try { //Variant does not support const coercing?
 				return (cast() value_).coerce!T;
 			}
 			catch (VariantException e) {
-				throw new NodeException("Unable to convert node value to string", startMark_);
+				throw new NodeException("Unable to convert node value to string");
 			}
 		}
 	}
@@ -519,7 +516,7 @@ struct Node {
 		} else if (isMapping) {
 			return value_.get!(const Pair[]).length;
 		}
-		throw new NodeException("Trying to get length of a " ~ nodeTypeString ~ " node", startMark_);
+		throw new NodeException("Trying to get length of a " ~ nodeTypeString ~ " node");
 	}
 
 	public alias opDollar = length;
@@ -552,13 +549,11 @@ struct Node {
 			assert(false);
 		} else if (isMapping) {
 			auto idx = findPair(index);
-			if (idx >= 0) {
-				return cast(Node) value_.get!(Pair[])[idx].value;
-			}
+			enforce!NodeException(idx >= 0, "Mapping index not found" ~ (isSomeString!T ? ": " ~ to!string(index) : ""));
 
-			throw new NodeException("Mapping index not found" ~ (isSomeString!T ? ": " ~ to!string(index) : ""), startMark_);
+			return cast(Node) value_.get!(Pair[])[idx].value;
 		}
-		throw new NodeException("Trying to index a " ~ nodeTypeString ~ " node", startMark_);
+		throw new NodeException("Trying to index a " ~ nodeTypeString ~ " node");
 	}
 
 	/** Determine if a collection contains specified value.
@@ -579,7 +574,7 @@ struct Node {
 		if (isMapping)
 			return findPair!(T, No.key)(rhs) >= 0;
 
-		throw new NodeException("Trying to use contains() on a " ~ nodeTypeString ~ " node", startMark_);
+		throw new NodeException("Trying to use contains() on a " ~ nodeTypeString ~ " node");
 	}
 
 	/// Assignment (shallow copy) by value.
@@ -590,7 +585,6 @@ struct Node {
 	/// Assignment (shallow copy) by reference.
 	public void opAssign(ref Node rhs) @safe nothrow {
 		assumeWontThrow(() @trusted{ value_ = rhs.value_; }());
-		startMark_ = rhs.startMark_;
 		tag_ = rhs.tag_;
 		scalarStyle = rhs.scalarStyle;
 		collectionStyle = rhs.collectionStyle;
@@ -649,7 +643,7 @@ struct Node {
 			return;
 		}
 
-		throw new NodeException("Trying to index a " ~ nodeTypeString ~ " node", startMark_);
+		throw new NodeException("Trying to index a " ~ nodeTypeString ~ " node");
 	}
 
 	/** Foreach over a sequence, getting each element as T.
@@ -661,7 +655,7 @@ struct Node {
 	 *          element could not be converted to specified type.
 	 */
 	public int opApply(T)(int delegate(ref T) dg) {
-		enforce(isSequence, new NodeException("Trying to sequence-foreach over a " ~ nodeTypeString ~ " node", startMark_));
+		enforce!NodeException(isSequence, "Trying to sequence-foreach over a " ~ nodeTypeString ~ " node");
 
 		int result = 0;
 		foreach (ref node; cast(Node[]) this) {
@@ -687,7 +681,7 @@ struct Node {
 	 *          element could not be converted to specified type.
 	 */
 	public int opApply(K, V)(int delegate(ref K, ref V) dg) {
-		enforce(isMapping, new NodeException("Trying to mapping-foreach over a " ~ nodeTypeString ~ " node", startMark_));
+		enforce!NodeException(isMapping, "Trying to mapping-foreach over a " ~ nodeTypeString ~ " node");
 
 		int result = 0;
 		foreach (ref pair; cast(Node.Pair[]) this) {
@@ -727,7 +721,7 @@ struct Node {
 	 * Params:  value = Value to _add to the sequence.
 	 */
 	public void add(T)(T value) {
-		enforce(isSequence(), new NodeException("Trying to add an element to a " ~ nodeTypeString ~ " node", startMark_));
+		enforce!NodeException(isSequence(), "Trying to add an element to a " ~ nodeTypeString ~ " node");
 
 		auto nodes = this.to!(Node[]);
 		static if (is(Unqual!T == Node)) {
@@ -754,7 +748,7 @@ struct Node {
 	 *          value = Value to _add.
 	 */
 	public void add(K, V)(K key, V value) {
-		enforce(isMapping(), new NodeException("Trying to add a key-value pair to a " ~ nodeTypeString ~ " node", startMark_));
+		enforce!NodeException(isMapping(), "Trying to add a key-value pair to a " ~ nodeTypeString ~ " node");
 
 		auto pairs = this.to!(Node.Pair[]);
 		pairs ~= Pair(key, value);
@@ -776,7 +770,7 @@ struct Node {
 	 * See_Also: contains
 	 */
 	public auto opBinaryRight(string op, K)(K key) if (op == "in") {
-		enforce(isMapping, new NodeException("Trying to use 'in' on a " ~ nodeTypeString ~ " node", startMark_));
+		enforce!NodeException(isMapping, "Trying to use 'in' on a " ~ nodeTypeString ~ " node");
 
 		auto idx = findPair(key);
 		if (idx < 0) {
@@ -795,7 +789,7 @@ struct Node {
 	+ y: Index of node to end slice at
 	+/
 	public auto opSlice(size_t x, size_t y) {
-		enforce(isSequence, new NodeException("Trying to slice a non-sequence", startMark_));
+		enforce!NodeException(isSequence, "Trying to slice a non-sequence");
 
 		return this.to!(Node[])[x..y];
 	}
@@ -853,16 +847,14 @@ struct Node {
 	// Construct a node from raw data.
 	//
 	// Params:  value           = Value of the node.
-	//          startMark       = Start position of the node in file.
 	//          tag             = Tag of the node.
 	//          scalarStyle     = Scalar style of the node.
 	//          collectionStyle = Collection style of the node.
 	//
 	// Returns: Constructed node.
-	package static Node rawNode(Value value, const Mark startMark, const Tag tag, const ScalarStyle scalarStyle, const CollectionStyle collectionStyle) {
+	package static Node rawNode(Value value, const Tag tag, const ScalarStyle scalarStyle, const CollectionStyle collectionStyle) nothrow {
 		Node node;
-		node.value_ = value;
-		node.startMark_ = startMark;
+		assumeWontThrow({ node.value_ = value; }());
 		node.tag_ = tag;
 		node.scalarStyle = scalarStyle;
 		node.collectionStyle = collectionStyle;
@@ -1083,7 +1075,7 @@ struct Node {
 
 	// Implementation of remove() and removeAt()
 	private void remove_(T, Flag!"key" key, string func)(T rhs) {
-		enforce(isSequence || isMapping, new NodeException("Trying to " ~ func ~ "() from a " ~ nodeTypeString ~ " node", startMark_));
+		enforce!NodeException(isSequence || isMapping, "Trying to " ~ func ~ "() from a " ~ nodeTypeString ~ " node");
 
 		static void removeElem(E, I)(ref Node node, I index) {
 			auto elems = node.value_.get!(E[]);
@@ -1148,9 +1140,9 @@ struct Node {
 		assert(isSequence, "checkSequenceIndex() called on a " ~ nodeTypeString ~ " node");
 
 		static if (!isIntegral!T) {
-			throw new NodeException("Indexing a sequence with a non-integral type.", startMark_);
+			throw new NodeException("Indexing a sequence with a non-integral type.");
 		} else {
-			enforce(index >= 0 && index < value_.get!(const Node[]).length, new NodeException("Sequence index out of range: " ~ to!string(index), startMark_));
+			enforce!NodeException(index >= 0 && index < value_.get!(const Node[]).length, "Sequence index out of range: " ~ to!string(index));
 		}
 	}
 
@@ -1164,13 +1156,11 @@ struct Node {
 			assert(false);
 		} else if (isMapping) {
 			auto idx = findPair(index);
-			if (idx >= 0) {
-				return value_.get!(const Pair[])[idx].value;
-			}
+			enforce!NodeException(idx >= 0, "Mapping index not found" ~ (isSomeString!T ? ": " ~ to!string(index) : ""));
 
-			throw new NodeException("Mapping index not found" ~ (isSomeString!T ? ": " ~ to!string(index) : ""), startMark_);
+			return value_.get!(const Pair[])[idx].value;
 		}
-		throw new NodeException("Trying to index a " ~ nodeTypeString ~ " node", startMark_);
+		throw new NodeException("Trying to index a " ~ nodeTypeString ~ " node");
 	}
 }
 
