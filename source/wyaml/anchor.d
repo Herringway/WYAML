@@ -15,7 +15,7 @@ struct Anchor {
 	string data;
 	alias get this;
 	this(string input) {
-		enforce(input.filter!(x => !x.isAlphaNum && !x.among('-', '_')).empty, new Exception("Invalid character in anchor"));
+		enforce(input.filter!(x => !x.isAlphaNum && !x.among('-', '_')).empty, "Invalid character in anchor");
 		data = input;
 	}
 	auto get() const @safe nothrow pure @nogc {
