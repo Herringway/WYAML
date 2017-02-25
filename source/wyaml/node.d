@@ -1179,10 +1179,11 @@ unittest {
 }
 
 unittest {
-	with (Node([1, 2, 3])) {
-		assert(!isScalar() && isSequence && !isMapping && !isUserType);
-		assert(length == 3);
-		assert(opIndex(2).to!int == 3);
+	{
+		auto node = Node([1, 2, 3]);
+		assert(!node.isScalar() && node.isSequence && !node.isMapping && !node.isUserType);
+		assert(node.length == 3);
+		assert(node[2].to!int == 3);
 	}
 
 	// Will be emitted as a sequence (default for arrays)
@@ -1195,10 +1196,11 @@ unittest {
 	int[string] aa;
 	aa["1"] = 1;
 	aa["2"] = 2;
-	with (Node(aa)) {
-		assert(!isScalar() && !isSequence && isMapping && !isUserType);
-		assert(length == 2);
-		assert(opIndex("2").to!int == 2);
+	{
+		auto node = Node(aa);
+		assert(!node.isScalar && !node.isSequence && node.isMapping && !node.isUserType);
+		assert(node.length == 2);
+		assert(node["2"].to!int == 2);
 	}
 
 	// Will be emitted as an unordered mapping (default for mappings)
@@ -1216,10 +1218,11 @@ unittest {
 }
 
 unittest {
-	with (Node(["1", "2"], [1, 2])) {
-		assert(!isScalar() && !isSequence && isMapping && !isUserType);
-		assert(length == 2);
-		assert(opIndex("2").to!int == 2);
+	{
+		auto node = Node(["1", "2"], [1, 2]);
+		assert(!node.isScalar && !node.isSequence && node.isMapping && !node.isUserType);
+		assert(node.length == 2);
+		assert(node["2"].to!int == 2);
 	}
 	//TODO: implement slicing
 	//assert(Node(["1", "2"])[0..$] == ["1", "2"]);
@@ -1343,29 +1346,31 @@ unittest {
 }
 
 unittest {
-	with (Node([1, 2, 3, 4, 3])) {
-		opIndexAssign(42, 3);
-		assert(length == 5);
-		assert(opIndex(3).to!int == 42);
+	{
+		auto node = Node([1, 2, 3, 4, 3]);
+		node[3] = 42;
+		assert(node.length == 5);
+		assert(node[3].to!int == 42);
 
-		opIndexAssign(YAMLNull(), 0);
-		assert(opIndex(0) == YAMLNull());
+		node[0] = YAMLNull();
+		assert(node[0] == YAMLNull());
 	}
-	with (Node(["1", "2", "3"], [4, 5, 6])) {
-		opIndexAssign(42, "3");
-		opIndexAssign(123, 456);
-		assert(length == 4);
-		assert(opIndex("3").to!int == 42);
-		assert(opIndex(456).to!int == 123);
+	{
+		auto node = Node(["1", "2", "3"], [4, 5, 6]);
+		node["3"] = 42;
+		node[456] = 123;
+		assert(node.length == 4);
+		assert(node["3"].to!int == 42);
+		assert(node[456].to!int == 123);
 
-		opIndexAssign(43, 3);
+		node[3] = 43;
 		//3 and "3" should be different
-		assert(length == 5);
-		assert(opIndex("3").to!int == 42);
-		assert(opIndex(3).to!int == 43);
+		assert(node.length == 5);
+		assert(node["3"].to!int == 42);
+		assert(node[3].to!int == 43);
 
-		opIndexAssign(YAMLNull(), "2");
-		assert(opIndex("2") == YAMLNull());
+		node["2"] = YAMLNull();
+		assert(node["2"] == YAMLNull());
 	}
 }
 
@@ -1431,19 +1436,16 @@ unittest {
 		}
 	}
 }
-
 unittest {
-	with (Node([1, 2, 3, 4])) {
-		add(5.0f);
-		assert(cast(float) opIndex(4) == 5.0f);
-	}
+	auto node = Node([1, 2, 3, 4]);
+	node.add(5.0f);
+	assert(cast(float)node[4] == 5.0f);
 }
 
 unittest {
-	with (Node([1, 2], [3, 4])) {
-		add(5, "6");
-		assert(cast(string) opIndex(5) == "6");
-	}
+	auto node = Node([1, 2], [3, 4]);
+	node.add(5, "6");
+	assert(cast(string)node[5] == "6");
 }
 
 unittest {
@@ -1459,44 +1461,48 @@ unittest {
 }
 
 unittest {
-	with (Node([1, 2, 3, 4, 3])) {
-		remove(3);
-		assert(length == 4);
-		assert(opIndex(2).to!int == 4);
-		assert(opIndex(3).to!int == 3);
+	{
+		auto node = Node([1, 2, 3, 4, 3]);
+		node.remove(3);
+		assert(node.length == 4);
+		assert(node[2].to!int == 4);
+		assert(node[3].to!int == 3);
 
-		add(YAMLNull());
-		assert(length == 5);
-		remove(YAMLNull());
-		assert(length == 4);
+		node.add(YAMLNull());
+		assert(node.length == 5);
+		node.remove(YAMLNull());
+		assert(node.length == 4);
 	}
-	with (Node(["1", "2", "3"], [4, 5, 6])) {
-		remove(4);
-		assert(length == 2);
-		add("nullkey", YAMLNull());
-		assert(length == 3);
-		remove(YAMLNull());
-		assert(length == 2);
+	{
+		auto node = Node(["1", "2", "3"], [4, 5, 6]);
+		node.remove(4);
+		assert(node.length == 2);
+		node.add("nullkey", YAMLNull());
+		assert(node.length == 3);
+		node.remove(YAMLNull());
+		assert(node.length == 2);
 	}
 }
 
 unittest {
-	with (Node([1, 2, 3, 4, 3])) {
-		removeAt(3);
-		assertThrown!NodeException(removeAt("3"));
-		assert(length == 4);
-		assert(opIndex(3).to!int == 3);
+	{
+		auto node = Node([1, 2, 3, 4, 3]);
+		node.removeAt(3);
+		assertThrown!NodeException(node.removeAt("3"));
+		assert(node.length == 4);
+		assert(node[3].to!int == 3);
 	}
-	with (Node(["1", "2", "3"], [4, 5, 6])) {
+	{
+		auto node = Node(["1", "2", "3"], [4, 5, 6]);
 		// no integer 2 key, so don't remove anything
-		removeAt(2);
-		assert(length == 3);
-		removeAt("2");
-		assert(length == 2);
-		add(YAMLNull(), "nullval");
-		assert(length == 3);
-		removeAt(YAMLNull());
-		assert(length == 2);
+		node.removeAt(2);
+		assert(node.length == 3);
+		node.removeAt("2");
+		assert(node.length == 2);
+		node.add(YAMLNull(), "nullval");
+		assert(node.length == 3);
+		node.removeAt(YAMLNull());
+		assert(node.length == 2);
 	}
 }
 
