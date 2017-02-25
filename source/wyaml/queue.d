@@ -29,12 +29,8 @@ package struct Queue(T) {
 		list = list ~ val;
 	}
 
-	bool empty() {
+	bool empty() const {
 		return list.empty;
-	}
-
-	size_t length() {
-		return list.length;
 	}
 
 	size_t length() const {
@@ -42,6 +38,17 @@ package struct Queue(T) {
 	}
 
 	int opApply(int delegate(ref T) nothrow dg) nothrow {
+		int result;
+		foreach (item; list) {
+			result = dg(item);
+			if (result) {
+				return result;
+			}
+		}
+		return result;
+	}
+
+	int opApply(int delegate(ref const T) nothrow dg) nothrow const {
 		int result;
 		foreach (item; list) {
 			result = dg(item);
