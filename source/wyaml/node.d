@@ -486,8 +486,9 @@ struct Node {
 			const temp = value_.get!(const long);
 			enforce(temp >= T.min && temp <= T.max, new NodeException("Integer value of type " ~ typeid(T).text ~ " out of range. Value: " ~ to!string(temp), startMark_));
 			return temp.to!T;
-		} else
-			assert(0, "Cannot cast to this type");
+		} else {
+			assert(0, "Cannot cast this node to "~T.stringof);
+		}
 	}
 
 	public T toString(T = string, Flag!"stringConversion" stringConversion = Yes.stringConversion)() const if (isSomeString!T) {
