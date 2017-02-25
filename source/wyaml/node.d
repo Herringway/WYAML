@@ -64,8 +64,7 @@ package interface YAMLObject {
 }
 
 // Stores a user defined YAML data type.
-package final class YAMLContainer(T) if (!Node.allowed!T)
-	 : YAMLObject {
+package final class YAMLContainer(T) if (!Node.allowed!T) : YAMLObject {
 	// Stored value.
 	private T value_;
 
