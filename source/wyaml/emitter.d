@@ -74,6 +74,9 @@ package alias specialCharSeq = AliasSeq!('#', ',', '[', ']', '{', '}', '&', '*',
 
 //Emits YAML events into a file/stream.
 package struct Emitter(T) {
+	invariant() {
+		assert(bestIndent_ > 0 && bestIndent_ < 10, "Emitter bestIndent must be 1 to 9 for one-character indent hint");
+	}
 	private alias TagDirective = wyaml.tagdirective.TagDirective;
 
 	///Default tag handle shortcuts and replacements.
@@ -1005,9 +1008,6 @@ package struct Emitter(T) {
 
 ///RAII struct used to write out scalar values.
 private struct ScalarWriter(T) {
-	invariant() {
-		assert(emitter_.bestIndent_ > 0 && emitter_.bestIndent_ < 10, "Emitter bestIndent must be 1 to 9 for one-character indent hint");
-	}
 
 	@disable int opCmp(ref Emitter!T) const;
 	@disable bool opEquals(ref Emitter!T) const;
