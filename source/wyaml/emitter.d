@@ -213,7 +213,7 @@ package struct Emitter(T) {
 
 	///Write a string to the file/stream.
 	private void writeString(const string str) {
-		stream_.put(str);
+		put(stream_, str);
 	}
 
 	///In some cases, we wait for a few next events before emitting.
@@ -708,7 +708,7 @@ package struct Emitter(T) {
 		}
 		if (preparedAnchor_ !is null && preparedAnchor_ != "") {
 			writeIndicator(indicator, Yes.needWhitespace);
-			stream_.put(preparedAnchor_);
+			put(stream_, preparedAnchor_);
 		}
 		preparedAnchor_ = null;
 	}
@@ -951,9 +951,9 @@ package struct Emitter(T) {
 		column_ += indicator.length;
 		if (prefixSpace) {
 			++column_;
-			stream_.put(" ");
+			put(stream_, " ");
 		}
-		stream_.put(indicator);
+		put(stream_, indicator);
 	}
 
 	///Write indentation.
@@ -966,15 +966,8 @@ package struct Emitter(T) {
 		if (column_ < indent) {
 			whitespace_ = true;
 
-			//Used to avoid allocation of arbitrary length strings.
-			static immutable spaces = "    ";
-			size_t numSpaces = indent - column_;
+			put(stream_, " ".repeat(indent - column_));
 			column_ = indent;
-			while (numSpaces >= spaces.length) {
-				stream_.put(spaces);
-				numSpaces -= spaces.length;
-			}
-			stream_.put(spaces[0 .. numSpaces]);
 		}
 	}
 
@@ -983,7 +976,7 @@ package struct Emitter(T) {
 		whitespace_ = indentation_ = true;
 		++line_;
 		column_ = 0;
-		stream_.put(data is null ? lineBreak(bestLineBreak_) : data);
+		put(stream_, data is null ? lineBreak(bestLineBreak_) : data);
 	}
 
 	///Write a YAML version directive.
@@ -1091,8 +1084,8 @@ private struct ScalarWriter(T) {
 				if (c != dcharNone) {
 					auto appender = appender!string();
 					if ((c in wyaml.escapes.toEscapes) !is null) {
-						appender.put('\\');
-						appender.put(wyaml.escapes.toEscapes[c]);
+						put(appender, '\\');
+						put(appender, wyaml.escapes.toEscapes[c]);
 					} else {
 						//Write an escaped Unicode character.
 						const format = c <= 0xFF ? "\\x%02X" : c <= 0xFFFF ? "\\u%04X" : "\\U%08X";
