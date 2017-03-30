@@ -79,9 +79,6 @@ package struct Emitter(T) {
 	}
 	private alias TagDirective = wyaml.tagdirective.TagDirective;
 
-	///Default tag handle shortcuts and replacements.
-	private static TagDirective[] defaultTagDirectives_ = [defaultTagDirectives];
-
 	///Stream to write to.
 	private T stream_;
 
@@ -323,7 +320,7 @@ package struct Emitter(T) {
 			}
 
 			//Add any default tag directives that have not been overriden.
-			foreach (ref def; defaultTagDirectives_) {
+			foreach (def; defaultTagDirectives) {
 				if (!tagDirectives_.canFind(def)) {
 					tagDirectives_ ~= def;
 				}
