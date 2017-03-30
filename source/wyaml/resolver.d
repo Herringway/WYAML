@@ -211,9 +211,9 @@ final class Resolver {
 	auto resolver = new Resolver();
 
 	bool tagMatch(string tag, string[] values) {
-		Tag expected = Tag(tag);
+		immutable expected = Tag(tag);
 		foreach (value; values) {
-			Tag resolved = resolver.resolve(NodeID.Scalar, Tag(), value, true);
+			immutable resolved = resolver.resolve(NodeID.Scalar, Tag(), value, true);
 			if (expected != resolved) {
 				return false;
 			}
