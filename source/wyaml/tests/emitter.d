@@ -15,7 +15,7 @@ unittest {
 
 	import wyaml.constructor : Constructor;
 	import wyaml.dumper : Dumper;
-	import wyaml.event : Event, EventID, mappingStartEvent, scalarEvent, sequenceStartEvent;
+	import wyaml.event : collectionStartEvent, Event, EventID, scalarEvent;
 	import wyaml.loader : Loader, Mark;
 	import wyaml.resolver : Resolver;
 	import wyaml.tests.common : run2, writeComparison;
@@ -127,9 +127,9 @@ unittest {
 					if (event.id == EventID.Scalar) {
 						event = scalarEvent(Mark(), Mark(), event.anchor, event.tag, tuple(event.implicit, event.implicit_2), event.value, style);
 					} else if (event.id == EventID.SequenceStart) {
-						event = sequenceStartEvent(Mark(), Mark(), event.anchor, event.tag, event.implicit, flowStyle);
+						event = collectionStartEvent(EventID.SequenceStart, Mark(), Mark(), event.anchor, event.tag, event.implicit, flowStyle);
 					} else if (event.id == EventID.MappingStart) {
-						event = mappingStartEvent(Mark(), Mark(), event.anchor, event.tag, event.implicit, flowStyle);
+						event = collectionStartEvent(EventID.MappingStart, Mark(), Mark(), event.anchor, event.tag, event.implicit, flowStyle);
 					}
 					styledEvents ~= event;
 				}

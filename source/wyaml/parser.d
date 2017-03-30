@@ -127,6 +127,7 @@ package final class Parser {
 	public this(Scanner scanner) @trusted {
 		state_ = &parseStreamStart;
 		scanner_ = scanner;
+		currentEvent_ = Event(EventID.Invalid, Mark(), Mark());
 	}
 
 	/**
@@ -222,7 +223,7 @@ package final class Parser {
 	private Event parseStreamStart() {
 		const token = scanner_.getToken();
 		state_ = &parseImplicitDocumentStart;
-		return streamStartEvent(token.startMark, token.endMark);
+		return Event(EventID.StreamStart, token.startMark, token.endMark);
 	}
 
 	/// Parse implicit document start, unless explicit detected: if so, parse explicit.
@@ -264,7 +265,7 @@ package final class Parser {
 			assert(states_.length == 0);
 			assert(marks_.length == 0);
 			state_ = null;
-			return streamEndEvent(token.startMark, token.endMark);
+			return Event(EventID.StreamEnd, token.startMark, token.endMark);
 		}
 	}
 
@@ -358,7 +359,7 @@ package final class Parser {
 		if (scanner_.checkToken(TokenID.Alias)) {
 			const token = scanner_.getToken();
 			state_ = popState();
-			return aliasEvent(token.startMark, token.endMark, Anchor(cast(string) token.value));
+			return Event(EventID.Alias, token.startMark, token.endMark, Anchor(cast(string) token.value));
 		}
 
 		string anchor = null;
@@ -406,7 +407,7 @@ package final class Parser {
 
 		if (indentlessSequence && scanner_.checkToken(TokenID.BlockEntry)) {
 			state_ = &parseIndentlessSequenceEntry;
-			return sequenceStartEvent(startMark, scanner_.peekToken().endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Block);
+			return collectionStartEvent(EventID.SequenceStart, startMark, scanner_.peekToken().endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Block);
 		}
 
 		if (scanner_.checkToken(TokenID.Scalar)) {
@@ -422,25 +423,25 @@ package final class Parser {
 		if (scanner_.checkToken(TokenID.FlowSequenceStart)) {
 			endMark = scanner_.peekToken().endMark;
 			state_ = &parseFlowSequenceEntry!(Yes.first);
-			return sequenceStartEvent(startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Flow);
+			return collectionStartEvent(EventID.SequenceStart, startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Flow);
 		}
 
 		if (scanner_.checkToken(TokenID.FlowMappingStart)) {
 			endMark = scanner_.peekToken().endMark;
 			state_ = &parseFlowMappingKey!(Yes.first);
-			return mappingStartEvent(startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Flow);
+			return collectionStartEvent(EventID.MappingStart, startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Flow);
 		}
 
 		if (block && scanner_.checkToken(TokenID.BlockSequenceStart)) {
 			endMark = scanner_.peekToken().endMark;
 			state_ = &parseBlockSequenceEntry!(Yes.first);
-			return sequenceStartEvent(startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Block);
+			return collectionStartEvent(EventID.SequenceStart, startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Block);
 		}
 
 		if (block && scanner_.checkToken(TokenID.BlockMappingStart)) {
 			endMark = scanner_.peekToken().endMark;
 			state_ = &parseBlockMappingKey!(Yes.first);
-			return mappingStartEvent(startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Block);
+			return collectionStartEvent(EventID.MappingStart, startMark, endMark, Anchor(anchor), Tag(tag), implicit, CollectionStyle.Block);
 		}
 
 		if (anchor != null || tag !is null) {
@@ -601,7 +602,7 @@ package final class Parser {
 		state_ = popState();
 		popMark();
 		const token = scanner_.getToken();
-		return sequenceEndEvent(token.startMark, token.endMark);
+		return Event(EventID.SequenceEnd, token.startMark, token.endMark);
 	}
 
 	///indentless_sequence ::= (BLOCK-ENTRY block_node?)+
@@ -622,7 +623,7 @@ package final class Parser {
 
 		state_ = popState();
 		const token = scanner_.peekToken();
-		return sequenceEndEvent(token.startMark, token.endMark);
+		return Event(EventID.SequenceEnd, token.startMark, token.endMark);
 	}
 
 	/**
@@ -658,7 +659,7 @@ package final class Parser {
 		state_ = popState();
 		popMark();
 		const token = scanner_.getToken();
-		return mappingEndEvent(token.startMark, token.endMark);
+		return Event(EventID.MappingEnd, token.startMark, token.endMark);
 	}
 
 	///Parse a value in a block mapping.
@@ -711,7 +712,7 @@ package final class Parser {
 			if (scanner_.checkToken(TokenID.Key)) {
 				const token = scanner_.peekToken();
 				state_ = &parseFlowSequenceEntryMappingKey;
-				return mappingStartEvent(token.startMark, token.endMark, Anchor(), Tag(), true, CollectionStyle.Flow);
+				return collectionStartEvent(EventID.MappingStart, token.startMark, token.endMark, Anchor(), Tag(), true, CollectionStyle.Flow);
 			} else if (!scanner_.checkToken(TokenID.FlowSequenceEnd)) {
 				states_ ~= &parseFlowSequenceEntry!(No.first);
 				return parseFlowNode();
@@ -721,7 +722,7 @@ package final class Parser {
 		const token = scanner_.getToken();
 		state_ = popState();
 		popMark();
-		return sequenceEndEvent(token.startMark, token.endMark);
+		return Event(EventID.SequenceEnd, token.startMark, token.endMark);
 	}
 
 	///Parse a key in flow context.
@@ -768,7 +769,7 @@ package final class Parser {
 	private Event parseFlowSequenceEntryMappingEnd() {
 		state_ = &parseFlowSequenceEntry!(No.first);
 		const token = scanner_.peekToken();
-		return mappingEndEvent(token.startMark, token.startMark);
+		return Event(EventID.MappingEnd, token.startMark, token.startMark);
 	}
 
 	/**
@@ -808,7 +809,7 @@ package final class Parser {
 		const token = scanner_.getToken();
 		state_ = popState();
 		popMark();
-		return mappingEndEvent(token.startMark, token.endMark);
+		return Event(EventID.MappingEnd, token.startMark, token.endMark);
 	}
 
 	///Parse a value in a flow mapping.

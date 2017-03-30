@@ -51,13 +51,12 @@ package struct Event {
 	union {
 		struct {
 			///Anchor of the event, if any.
-			Anchor anchor;
+			private Anchor anchor_;
 			///Tag of the event, if any.
-			Tag tag;
+			private Tag tag_;
 		}
 		///Tag directives, if this is a DocumentStart.
-		//TagDirectives tagDirectives;
-		TagDirective[] tagDirectives;
+		private TagDirective[] tagDirectives_;
 	}
 	///Event type.
 	EventID id = EventID.Invalid;
@@ -77,35 +76,59 @@ package struct Event {
 	CollectionStyle collectionStyle = CollectionStyle.Invalid;
 
 	///Is this a null (uninitialized) event?
-	@property bool isNull() const pure @safe nothrow @nogc {
+	bool isNull() const pure @safe nothrow @nogc {
 		return id == EventID.Invalid;
 	}
 
 	///Get string representation of the token ID.
-	@property string idString() const @safe {
+	string idString() const @safe {
 		return to!string(id);
+	}
+	auto tag() const {
+		return tag_;
+	}
+	auto anchor() const {
+		return anchor_;
+	}
+	auto tagDirectives() const {
+		assert(id == EventID.DocumentStart, "Cannot retrieve tag directives for non-document start events");
+		return tagDirectives_;
+	}
+	//Uninitialized Events are invalid. Disabling default constructors allows us to avoid that.
+	@disable this();
+
+	this(EventID id, Mark start, Mark end, Anchor anchor, Tag tag) @trusted pure nothrow @nogc {
+		this(id, start, end, anchor);
+		tag_ = tag;
+	}
+	this(EventID id, Mark start, Mark end, Anchor anchor) @trusted pure nothrow @nogc {
+		this(id, start, end);
+		anchor_ = anchor;
+	}
+	this(Mark start, Mark end, TagDirective[] directives) @safe pure nothrow @nogc {
+		this(directives);
+		startMark = start;
+		endMark = end;
+	}
+	this(TagDirective[] directives) @trusted pure nothrow @nogc {
+		this(EventID.DocumentStart);
+		tagDirectives_ = directives;
+	}
+	this(EventID id, Mark start, Mark end) @safe pure nothrow @nogc {
+		this(id);
+		startMark = start;
+		endMark = end;
+	}
+	this(EventID id) @safe pure nothrow @nogc {
+		this.id = id;
+	}
+	this(EventID id, Anchor anchor) @trusted pure nothrow @nogc {
+		assert(id != EventID.DocumentStart);
+		this(id);
+		anchor_ = anchor;
 	}
 }
 
-/**
- * Construct a simple event.
- *
- * Params:  start    = Start position of the event in the file/stream.
- *          end      = End position of the event in the file/stream.
- *          anchor   = Anchor, if this is an alias event.
- */
-package Event event(EventID id)(const Mark start, const Mark end, const Anchor anchor = Anchor()) {
-	Event result;
-	result.startMark = start;
-	result.endMark = end;
-	result.anchor = anchor;
-	result.id = id;
-	return result;
-}
-
-pure @safe nothrow unittest {
-	cast(void) event!(EventID.SequenceStart)(Mark(), Mark(), Anchor());
-}
 /**
  * Construct a collection (mapping or sequence) start event.
  *
@@ -116,32 +139,16 @@ pure @safe nothrow unittest {
  *          implicit = Should the tag be implicitly resolved?
  *          style    = Whether to use block style or flow style
  */
-package Event collectionStartEvent(EventID id)(const Mark start, const Mark end, const Anchor anchor, const Tag tag, const bool implicit, const CollectionStyle style)
+package Event collectionStartEvent(EventID id, const Mark start, const Mark end, const Anchor anchor, const Tag tag, const bool implicit, const CollectionStyle style) @safe @nogc pure nothrow
 in {
-	static assert(id.among(EventID.SequenceStart, EventID.SequenceEnd, EventID.MappingStart, EventID.MappingEnd));
+	assert(id.among(EventID.SequenceStart, EventID.MappingStart));
 }
 body {
-	Event result = event!id(start, end, anchor);
-	result.tag = tag;
-	result.implicit = implicit;
-	result.collectionStyle = style;
-	return result;
+	auto event = Event(id, start, end, anchor, tag);
+	event.implicit = implicit;
+	event.collectionStyle = style;
+	return event;
 }
-
-pure @safe nothrow unittest {
-	cast(void) collectionStartEvent!(EventID.SequenceStart)(Mark(), Mark(), Anchor(), Tag(), false, CollectionStyle.Invalid);
-}
-
-///Aliases for simple events.
-package alias streamEndEvent = event!(EventID.StreamEnd);
-package alias aliasEvent = event!(EventID.Alias);
-package alias sequenceEndEvent = event!(EventID.SequenceEnd);
-package alias mappingEndEvent = event!(EventID.MappingEnd);
-package alias streamStartEvent = event!(EventID.StreamStart);
-
-///Aliases for collection start events.
-package alias sequenceStartEvent = collectionStartEvent!(EventID.SequenceStart);
-package alias mappingStartEvent = collectionStartEvent!(EventID.MappingStart);
 
 /**
  * Construct a document start event.
@@ -152,16 +159,36 @@ package alias mappingStartEvent = collectionStartEvent!(EventID.MappingStart);
  *          YAMLVersion   = YAML version string of the document.
  *          tagDirectives = Tag directives of the document.
  */
-package Event documentStartEvent(const Mark start, const Mark end, const bool explicit, string YAMLVersion, TagDirective[] tagDirectives) pure nothrow {
-	Event result = event!(EventID.DocumentStart)(start, end);
+package Event documentStartEvent(const Mark start, const Mark end, const bool explicit, string YAMLVersion, TagDirective[] tagDirectives) @safe @nogc pure nothrow {
+	Event result = Event(start, end, tagDirectives);
 	result.value = YAMLVersion;
 	result.explicitDocument = explicit;
-	result.tagDirectives = tagDirectives;
 	return result;
 }
-
-pure nothrow unittest {
-	cast(void) documentStartEvent(Mark(), Mark(), false, "", []);
+/**
+ * Construct a document start event.
+ *
+ * Params:
+ *          explicit      = Is this an explicit document start?
+ *          YAMLVersion   = YAML version string of the document.
+ *          tagDirectives = Tag directives of the document.
+ */
+package Event documentStartEvent(const bool explicit, string YAMLVersion, TagDirective[] tagDirectives) @safe @nogc pure nothrow {
+	Event result = Event(tagDirectives);
+	result.value = YAMLVersion;
+	result.explicitDocument = explicit;
+	return result;
+}
+/**
+ * Construct a document end event.
+ *
+ * Params:
+ *   explicit = Is this an explicit document end?
+ */
+package Event documentEndEvent(const bool explicit) pure @safe nothrow {
+	Event result = Event(EventID.DocumentEnd);
+	result.explicitDocument = explicit;
+	return result;
 }
 /**
  * Construct a document end event.
@@ -170,14 +197,10 @@ pure nothrow unittest {
  *          end      = End position of the event in the file/stream.
  *          explicit = Is this an explicit document end?
  */
-package Event documentEndEvent(const Mark start, const Mark end, const bool explicit) pure @safe nothrow {
-	Event result = event!(EventID.DocumentEnd)(start, end);
+package Event documentEndEvent(const Mark start, const Mark end, const bool explicit) @safe @nogc pure nothrow {
+	Event result = Event(EventID.DocumentEnd, start, end);
 	result.explicitDocument = explicit;
 	return result;
-}
-
-pure @safe nothrow unittest {
-	cast(void) documentEndEvent(Mark(), Mark(), false);
 }
 /// Construct a scalar event.
 ///
@@ -188,16 +211,11 @@ pure @safe nothrow unittest {
 ///          implicit = Should the tag be implicitly resolved?
 ///          value    = String value of the scalar.
 ///          style    = Scalar style.
-package Event scalarEvent(const Mark start, const Mark end, const Anchor anchor, const Tag tag, const Tuple!(bool, bool) implicit, const string value, const ScalarStyle style = ScalarStyle.Invalid) @safe pure nothrow @nogc {
-	Event result = event!(EventID.Scalar)(start, end, anchor);
+package Event scalarEvent(const Mark start, const Mark end, const Anchor anchor, const Tag tag, const Tuple!(bool, bool) implicit, const string value, const ScalarStyle style = ScalarStyle.Invalid) @safe @nogc pure nothrow {
+	Event result = Event(EventID.Scalar, start, end, anchor, tag);
 	result.value = value;
-	result.tag = tag;
 	result.scalarStyle = style;
 	result.implicit = implicit[0];
 	result.implicit_2 = implicit[1];
 	return result;
-}
-
-pure @safe nothrow unittest {
-	cast(void) scalarEvent(Mark(), Mark(), Anchor(), Tag(), tuple(false, false), "");
 }

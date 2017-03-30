@@ -68,20 +68,20 @@ package struct Serializer(T) {
 		yamlVersion_ = YAMLVersion;
 		tagDirectives_ = tagDirectives;
 
-		emitter_.emit(streamStartEvent(Mark(), Mark()));
+		emitter_.emit(Event(EventID.StreamStart));
 	}
 
 	///Destroy the Serializer.
 	public ~this() {
-		emitter_.emit(streamEndEvent(Mark(), Mark()));
+		emitter_.emit(Event(EventID.StreamEnd));
 	}
 
 	///Serialize a node, emitting it in the process.
 	public void serialize(ref Node node) {
-		emitter_.emit(documentStartEvent(Mark(), Mark(), explicitStart_, yamlVersion_, tagDirectives_));
+		emitter_.emit(documentStartEvent(explicitStart_, yamlVersion_, tagDirectives_));
 		anchorNode(node);
 		serializeNode(node);
-		emitter_.emit(documentEndEvent(Mark(), Mark(), explicitEnd_));
+		emitter_.emit(documentEndEvent(explicitEnd_));
 		serializedNodes_.clear();
 		anchors_.clear();
 		lastAnchorID_ = 0;
@@ -147,7 +147,7 @@ package struct Serializer(T) {
 		if (anchorable(node) && (node in anchors_) !is null) {
 			aliased = anchors_[node];
 			if ((node in serializedNodes_) !is null) {
-				emitter_.emit(aliasEvent(Mark(), Mark(), aliased));
+				emitter_.emit(Event(EventID.Alias, aliased));
 				return;
 			}
 			serializedNodes_[node] = true;
@@ -167,22 +167,22 @@ package struct Serializer(T) {
 		if (node.isSequence) {
 			const defaultTag = resolver_.defaultSequenceTag;
 			const implicit = node.tag_ == defaultTag;
-			emitter_.emit(sequenceStartEvent(Mark(), Mark(), aliased, node.tag_, implicit, node.collectionStyle));
+			emitter_.emit(collectionStartEvent(EventID.SequenceStart, Mark(), Mark(), aliased, node.tag_, implicit, node.collectionStyle));
 			foreach (ref Node item; node) {
 				serializeNode(item);
 			}
-			emitter_.emit(sequenceEndEvent(Mark(), Mark()));
+			emitter_.emit(Event(EventID.SequenceEnd));
 			return;
 		}
 		if (node.isMapping) {
 			const defaultTag = resolver_.defaultMappingTag;
 			const implicit = node.tag_ == defaultTag;
-			emitter_.emit(mappingStartEvent(Mark(), Mark(), aliased, node.tag_, implicit, node.collectionStyle));
+			emitter_.emit(collectionStartEvent(EventID.MappingStart, Mark(), Mark(), aliased, node.tag_, implicit, node.collectionStyle));
 			foreach (ref Node key, ref Node value; node) {
 				serializeNode(key);
 				serializeNode(value);
 			}
-			emitter_.emit(mappingEndEvent(Mark(), Mark()));
+			emitter_.emit(Event(EventID.MappingEnd));
 			return;
 		}
 		assert(false, "This code should never be reached");
