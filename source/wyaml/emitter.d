@@ -981,17 +981,17 @@ package struct Emitter(T) {
 
 	///Write a YAML version directive.
 	private void writeVersionDirective(const YAMLVersion versionText) nothrow {
-		stream_.put("%YAML ");
-		stream_.put(versionText);
+		put(stream_, "%YAML ");
+		put(stream_, cast(string)versionText);
 		writeLineBreak();
 	}
 
 	///Write a tag directive.
 	private void writeTagDirective(const TagDirective directive) nothrow {
-		stream_.put("%TAG ");
-		stream_.put(directive.handle);
-		stream_.put(" ");
-		stream_.put(directive.prefix);
+		put(stream_, "%TAG ");
+		put(stream_, directive.handle.data);
+		put(stream_, " ");
+		put(stream_, directive.prefix.data);
 		writeLineBreak();
 	}
 }
