@@ -668,23 +668,23 @@ package struct Emitter(T) {
 		//    writeIndent();
 		//}
 		try {
-			with (ScalarWriter!T(this, analysis_.scalar, context_ != Context.MappingSimpleKey)) final switch (style_) {
+			with (ScalarWriter(analysis_.scalar, context_ != Context.MappingSimpleKey)) final switch (style_) {
 				case ScalarStyle.Invalid:
 					assert(false);
 				case ScalarStyle.DoubleQuoted:
-					writeDoubleQuoted();
+					writeDoubleQuoted(this);
 					break;
 				case ScalarStyle.SingleQuoted:
-					writeSingleQuoted();
+					writeSingleQuoted(this);
 					break;
 				case ScalarStyle.Folded:
-					writeFolded();
+					writeFolded(this);
 					break;
 				case ScalarStyle.Literal:
-					writeLiteral();
+					writeLiteral(this);
 					break;
 				case ScalarStyle.Plain:
-					writePlain();
+					writePlain(this);
 					break;
 			}
 		} catch (Exception) {
@@ -995,17 +995,9 @@ package struct Emitter(T) {
 }
 
 ///RAII struct used to write out scalar values.
-private struct ScalarWriter(T) {
-
-	@disable int opCmp(ref Emitter!T) const;
-	@disable bool opEquals(ref Emitter!T) const;
-	@disable size_t toHash() nothrow @safe;
-
+private struct ScalarWriter {
 	///Used as "null" UTF-32 character.
 	private static immutable dcharNone = dchar.max;
-
-	///Emitter used to emit the scalar.
-	private Emitter!T* emitter_;
 
 	///UTF-8 encoded text of the scalar to write.
 	private string text_;
@@ -1025,59 +1017,61 @@ private struct ScalarWriter(T) {
 	private long startChar_, endChar_;
 
 	///Construct a ScalarWriter using emitter to output text.
-	public this(ref Emitter!T emitter, string text, const bool split = true) {
-		emitter_ = &emitter;
+	public this(string text, const bool split = true) {
 		text_ = text;
 		split_ = split;
 	}
 
 	///Write text as single quoted scalar.
-	public void writeSingleQuoted() {
-		emitter_.writeIndicator("\'", Yes.needWhitespace);
+	public void writeSingleQuoted(T)(ref Emitter!T emitter) {
+		emitter.writeIndicator("\'", Yes.needWhitespace);
 		spaces_ = breaks_ = false;
 		resetTextPosition();
-
+		long startChar, endChar;
 		do {
+			endChar++;
 			const dchar c = nextChar();
 			if (spaces_) {
-				if (c != ' ' && tooWide() && split_ && startByte_ != 0 && endByte_ != text_.length) {
-					writeIndent(Flag!"ResetSpace".no);
+				if (c != ' ' && tooWide(emitter) && split_ && startByte_ != 0 && endByte_ != text_.length) {
+					writeIndent(emitter, Flag!"ResetSpace".no);
 					updateRangeStart();
 				} else if (c != ' ') {
-					writeCurrentRange(Flag!"UpdateColumn".yes);
+					writeCurrentRange(emitter, Flag!"UpdateColumn".yes);
 				}
 			} else if (breaks_) {
 				if (!c.among(newLines)) {
-					writeStartLineBreak();
-					writeLineBreaks();
-					emitter_.writeIndent();
+					writeStartLineBreak(emitter);
+					writeLineBreaks(emitter);
+					emitter.writeIndent();
 				}
-			} else if (c.among(newLines, ' ', '\'', dcharNone) && startChar_ < endChar_) {
-				writeCurrentRange(Flag!"UpdateColumn".yes);
+			} else if (c.among(newLines, ' ', '\'', dcharNone) && startChar < endChar) {
+				writeCurrentRange(emitter, Flag!"UpdateColumn".yes);
 			}
 			if (c == '\'') {
-				emitter_.column_ += 2;
-				emitter_.writeString("\'\'");
+				emitter.column_ += 2;
+				emitter.writeString("\'\'");
 				startByte_ = endByte_ + 1;
-				startChar_ = endChar_ + 1;
+				startChar = endChar + 1;
 			}
 			updateBreaks(c, Flag!"UpdateSpaces".yes);
 		}
 		while (endByte_ < text_.length);
 
-		emitter_.writeIndicator("\'", No.needWhitespace);
+		emitter.writeIndicator("\'", No.needWhitespace);
 	}
 
 	///Write text as double quoted scalar.
-	public void writeDoubleQuoted() {
+	public void writeDoubleQuoted(T)(ref Emitter!T emitter) {
+		long startChar, endChar;
 		resetTextPosition();
-		emitter_.writeIndicator("\"", Yes.needWhitespace);
+		emitter.writeIndicator("\"", Yes.needWhitespace);
 		do {
+			endChar++;
 			const dchar c = nextChar();
 			//handle special characters
 			if (c.among(dcharNone, '"', '\\', unicodeNewLines, '\uFEFF') || !((c >= '\x20' && c <= '\x7E') || ((c >= '\xA0' && c <= '\uD7FF') || (c >= '\uE000' && c <= '\uFFFD')))) {
-				if (startChar_ < endChar_) {
-					writeCurrentRange(Flag!"UpdateColumn".yes);
+				if (startChar < endChar) {
+					writeCurrentRange(emitter, Flag!"UpdateColumn".yes);
 				}
 				if (c != dcharNone) {
 					auto appender = appender!string();
@@ -1090,63 +1084,65 @@ private struct ScalarWriter(T) {
 						formattedWrite(appender, format, cast(uint) c);
 					}
 
-					emitter_.column_ += appender.data.length;
-					emitter_.writeString(appender.data);
-					startChar_ = endChar_ + 1;
+					emitter.column_ += appender.data.length;
+					emitter.writeString(appender.data);
+					startChar = endChar + 1;
 					startByte_ = nextEndByte_;
 				}
 			}
-			if ((endByte_ > 0 && endByte_ < text_.length - strideBack(text_, text_.length)) && (c == ' ' || startChar_ >= endChar_) && (emitter_.column_ + endChar_ - startChar_ > emitter_.bestWidth_) && split_) {
+			if ((endByte_ > 0 && endByte_ < text_.length - strideBack(text_, text_.length)) && (c == ' ' || startChar >= endChar) && (emitter.column_ + endChar - startChar > emitter.bestWidth_) && split_) {
 				//text_[2:1] is ok in Python but not in D, so we have to use min()
-				emitter_.writeString(text_[min(startByte_, endByte_) .. endByte_]);
-				emitter_.writeString("\\");
-				emitter_.column_ += startChar_ - endChar_ + 1;
+				emitter.writeString(text_[min(startByte_, endByte_) .. endByte_]);
+				emitter.writeString("\\");
+				emitter.column_ += startChar_ - endChar_ + 1;
 				startChar_ = max(startChar_, endChar_);
 				startByte_ = max(startByte_, endByte_);
 
-				writeIndent(Flag!"ResetSpace".yes);
+				writeIndent(emitter, Flag!"ResetSpace".yes);
 				if (charAtStart() == ' ') {
-					emitter_.writeString("\\");
-					++emitter_.column_;
+					emitter.writeString("\\");
+					++emitter.column_;
 				}
 			}
 		}
 		while (endByte_ < text_.length);
-		emitter_.writeIndicator("\"", No.needWhitespace);
+		emitter.writeIndicator("\"", No.needWhitespace);
 	}
 
 	///Write text as folded block scalar.
-	public void writeFolded() {
-		initBlock('>');
+	public void writeFolded(T)(ref Emitter!T emitter) {
+		long startChar, endChar;
+		initBlock(emitter, '>');
 		bool leadingSpace = true;
 		spaces_ = false;
 		breaks_ = true;
 		resetTextPosition();
 
 		do {
+			endChar++;
 			const dchar c = nextChar();
 			if (breaks_) {
 				if (!c.among(newLines)) {
 					if (!leadingSpace && c != dcharNone && c != ' ') {
-						writeStartLineBreak();
+						writeStartLineBreak(emitter);
 					}
 					leadingSpace = (c == ' ');
-					writeLineBreaks();
+					writeLineBreaks(emitter);
 					if (c != dcharNone) {
-						emitter_.writeIndent();
+						emitter.writeIndent();
 					}
 				}
 			} else if (spaces_) {
-				if (c != ' ' && tooWide()) {
-					writeIndent(Flag!"ResetSpace".no);
+				if (c != ' ' && tooWide(emitter)) {
+					writeIndent(emitter, Flag!"ResetSpace".no);
 					updateRangeStart();
 				} else if (c != ' ') {
-					writeCurrentRange(Flag!"UpdateColumn".yes);
+					writeCurrentRange(emitter, Flag!"UpdateColumn".yes);
 				}
 			} else if (c.among(newLines, dcharNone, ' ')) {
-				writeCurrentRange(Flag!"UpdateColumn".yes);
+				writeCurrentRange(emitter, Flag!"UpdateColumn".yes);
 				if (c == dcharNone) {
-					emitter_.writeLineBreak();
+					emitter.writeLineBreak();
 				}
 			}
 			updateBreaks(c, Flag!"UpdateSpaces".yes);
@@ -1155,8 +1151,8 @@ private struct ScalarWriter(T) {
 	}
 
 	///Write text as literal block scalar.
-	public void writeLiteral() {
-		initBlock('|');
+	public void writeLiteral(T)(ref Emitter!T emitter) {
+		initBlock(emitter, '|');
 		breaks_ = true;
 		resetTextPosition();
 
@@ -1164,15 +1160,15 @@ private struct ScalarWriter(T) {
 			const dchar c = nextChar();
 			if (breaks_) {
 				if (!c.among(newLines)) {
-					writeLineBreaks();
+					writeLineBreaks(emitter);
 					if (c != dcharNone) {
-						emitter_.writeIndent();
+						emitter.writeIndent();
 					}
 				}
 			} else if (c.among(dcharNone, newLines)) {
-				writeCurrentRange(Flag!"UpdateColumn".no);
+				writeCurrentRange(emitter, Flag!"UpdateColumn".no);
 				if (c == dcharNone) {
-					emitter_.writeLineBreak();
+					emitter.writeLineBreak();
 				}
 			}
 			updateBreaks(c, Flag!"UpdateSpaces".no);
@@ -1181,38 +1177,38 @@ private struct ScalarWriter(T) {
 	}
 
 	///Write text as plain scalar.
-	public void writePlain() {
-		if (emitter_.context_ == Emitter!T.Context.Root) {
-			emitter_.openEnded_ = true;
+	public void writePlain(T)(ref Emitter!T emitter) {
+		if (emitter.context_ == Emitter!T.Context.Root) {
+			emitter.openEnded_ = true;
 		}
 		if (text_ == "") {
 			return;
 		}
-		if (!emitter_.whitespace_) {
-			++emitter_.column_;
-			emitter_.writeString(" ");
+		if (!emitter.whitespace_) {
+			++emitter.column_;
+			emitter.writeString(" ");
 		}
-		emitter_.whitespace_ = emitter_.indentation_ = false;
+		emitter.whitespace_ = emitter.indentation_ = false;
 		spaces_ = breaks_ = false;
 		resetTextPosition();
 
 		do {
 			const dchar c = nextChar();
 			if (spaces_) {
-				if (c != ' ' && tooWide() && split_) {
-					writeIndent(Flag!"ResetSpace".yes);
+				if (c != ' ' && tooWide(emitter) && split_) {
+					writeIndent(emitter, Flag!"ResetSpace".yes);
 					updateRangeStart();
 				} else if (c != ' ') {
-					writeCurrentRange(Flag!"UpdateColumn".yes);
+					writeCurrentRange(emitter, Flag!"UpdateColumn".yes);
 				}
 			} else if (breaks_) {
 				if (!c.among(newLines)) {
-					writeStartLineBreak();
-					writeLineBreaks();
-					writeIndent(Flag!"ResetSpace".yes);
+					writeStartLineBreak(emitter);
+					writeLineBreaks(emitter);
+					writeIndent(emitter, Flag!"ResetSpace".yes);
 				}
 			} else if (c.among(dcharNone, newLines, ' ')) {
-				writeCurrentRange(Flag!"UpdateColumn".yes);
+				writeCurrentRange(emitter, Flag!"UpdateColumn".yes);
 			}
 			updateBreaks(c, Flag!"UpdateSpaces".yes);
 		}
@@ -1231,13 +1227,12 @@ private struct ScalarWriter(T) {
 
 	///Get character at start of the text range.
 	private dchar charAtStart() const {
-		size_t idx = startByte_;
-		return decode(text_, idx);
+		return text_[startByte_];
 	}
 
 	///Is the current line too wide?
-	private bool tooWide() const {
-		return startChar_ + 1 == endChar_ && emitter_.column_ > emitter_.bestWidth_;
+	private bool tooWide(T)(ref Emitter!T emitter) const {
+		return startChar_ + 1 == endChar_ && emitter.column_ > emitter.bestWidth_;
 	}
 
 	///Determine hints (indicators) for block scalar.
@@ -1268,52 +1263,53 @@ private struct ScalarWriter(T) {
 	}
 
 	///Initialize for block scalar writing with specified indicator.
-	private void initBlock(const char indicator) {
+	private void initBlock(T)(ref Emitter!T emitter, const char indicator) {
 		char[4] hints;
 		hints[0] = indicator;
-		const hintsLength = 1 + determineBlockHints(hints[1 .. $], emitter_.bestIndent_);
-		emitter_.writeIndicator(cast(string) hints[0 .. hintsLength], Yes.needWhitespace);
+		const hintsLength = 1 + determineBlockHints(hints[1 .. $], emitter.bestIndent_);
+		emitter.writeIndicator(cast(string) hints[0 .. hintsLength], Yes.needWhitespace);
 		if (hints.length > 0 && hints[$ - 1] == '+') {
-			emitter_.openEnded_ = true;
+			emitter.openEnded_ = true;
 		}
-		emitter_.writeLineBreak();
+		emitter.writeLineBreak();
 	}
 
 	///Write out the current text range.
-	private void writeCurrentRange(const Flag!"UpdateColumn" updateColumn) {
-		emitter_.writeString(text_[startByte_ .. endByte_]);
+	private void writeCurrentRange(T)(ref Emitter!T emitter, const Flag!"UpdateColumn" updateColumn) {
+		emitter.writeString(text_[startByte_ .. endByte_]);
 		if (updateColumn) {
-			emitter_.column_ += endChar_ - startChar_;
+			emitter.column_ += endChar_ - startChar_;
 		}
 		updateRangeStart();
 	}
 
 	///Write line breaks in the text range.
-	private void writeLineBreaks() {
+	private void writeLineBreaks(T)(ref Emitter!T emitter) {
 		foreach (const dchar br; text_[startByte_ .. endByte_]) {
 			if (br == '\n') {
-				emitter_.writeLineBreak();
+				emitter.writeLineBreak();
 			} else {
-				char[4] brString;
-				const bytes = encode(brString, br);
-				emitter_.writeLineBreak(cast(string) brString[0 .. bytes]);
+				char[] brString;
+				brString.reserve(4);
+				encode(brString, br);
+				emitter.writeLineBreak(cast(string) brString);
 			}
 		}
 		updateRangeStart();
 	}
 
 	///Write line break if start of the text range is a newline.
-	private void writeStartLineBreak() {
+	private void writeStartLineBreak(T)(ref Emitter!T emitter) {
 		if (charAtStart == '\n') {
-			emitter_.writeLineBreak();
+			emitter.writeLineBreak();
 		}
 	}
 
 	///Write indentation, optionally resetting whitespace/indentation flags.
-	private void writeIndent(const Flag!"ResetSpace" resetSpace) {
-		emitter_.writeIndent();
+	private void writeIndent(T)(ref Emitter!T emitter, const Flag!"ResetSpace" resetSpace) {
+		emitter.writeIndent();
 		if (resetSpace) {
-			emitter_.whitespace_ = emitter_.indentation_ = false;
+			emitter.whitespace_ = emitter.indentation_ = false;
 		}
 	}
 
