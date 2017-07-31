@@ -176,15 +176,8 @@ final class Resolver {
 		enum nullRegex = `^$|^(?:~|null|Null|NULL)$`;
 		enum timestampRegex = `^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]|[0-9][0-9][0-9][0-9]-[0-9][0-9]?-[0-9][0-9]?[Tt]|[ \t]+[0-9][0-9]?:[0-9][0-9]:[0-9][0-9](?:\\.[0-9]*)?(?:[ \t]*Z|[-+][0-9][0-9]?(?::[0-9][0-9])?)?$`;
 		enum valueRegex = `^=$`;
-		version (release) {
-			enum compiledBoolRegex = ctRegex!boolRegex;
-			enum compiledFloatRegex = ctRegex!floatRegex;
-			enum compiledIntRegex = ctRegex!intRegex;
-			enum compiledMergeRegex = ctRegex!mergeRegex;
-			enum compiledNullRegex = ctRegex!nullRegex;
-			enum compiledTimestampRegex = ctRegex!timestampRegex;
-			enum compiledValueRegex = ctRegex!valueRegex;
-		} else {
+		enum illegalRegex = `^(?:!|&|\*)$`;
+		version (unittest) { //Combination of unit tests + ctRegex currently causes compiler to run out of memory
 			enum compiledBoolRegex = regex(boolRegex);
 			enum compiledFloatRegex = regex(floatRegex);
 			enum compiledIntRegex = regex(intRegex);
@@ -192,6 +185,16 @@ final class Resolver {
 			enum compiledNullRegex = regex(nullRegex);
 			enum compiledTimestampRegex = regex(timestampRegex);
 			enum compiledValueRegex = regex(valueRegex);
+			enum compiledIllegalRegex = regex(illegalRegex);
+		} else {
+			enum compiledBoolRegex = ctRegex!boolRegex;
+			enum compiledFloatRegex = ctRegex!floatRegex;
+			enum compiledIntRegex = ctRegex!intRegex;
+			enum compiledMergeRegex = ctRegex!mergeRegex;
+			enum compiledNullRegex = ctRegex!nullRegex;
+			enum compiledTimestampRegex = ctRegex!timestampRegex;
+			enum compiledValueRegex = ctRegex!valueRegex;
+			enum compiledIllegalRegex = ctRegex!illegalRegex;
 		}
 		addImplicitResolver("tag:yaml.org,2002:bool", compiledBoolRegex, "yYnNtTfFoO");
 		addImplicitResolver("tag:yaml.org,2002:float", compiledFloatRegex, "-+0123456789.");
@@ -203,7 +206,7 @@ final class Resolver {
 
 		//The following resolver is only for documentation purposes. It cannot work
 		//because plain scalars cannot start with '!', '&', or '*'.
-		addImplicitResolver("tag:yaml.org,2002:yaml", ctRegex!(`^(?:!|&|\*)$`), "!&*");
+		addImplicitResolver("tag:yaml.org,2002:yaml", compiledIllegalRegex, "!&*");
 	}
 }
 
