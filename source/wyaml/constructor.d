@@ -468,7 +468,7 @@ ubyte[] constructBinary(ref Node node) {
 	// For an unknown reason, this must be nested to work (compiler bug?).
 	try {
 		try {
-			return Base64.decode(value.removechars("\n"));
+			return Base64.decode(value.filter!(x => x != '\n').array);
 		}
 		catch (Exception e) {
 			throw new Exception("Unable to decode base64 value: " ~ e.msg);
