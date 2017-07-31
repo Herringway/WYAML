@@ -83,16 +83,14 @@ package struct Emitter(T) {
 	private T stream_;
 
 	///Stack of states.
-	private bool delegate() nothrow[] states_;
+	private bool delegate()[] states_;
 	///Current state.
-	private bool delegate() nothrow state_;
+	private bool delegate() state_;
 
 	///Event queue.
 	private Queue!Event events_;
 	///Event we're currently emitting.
-	private auto event_() const pure nothrow @safe @nogc out(result) {
-		assert(!result.isNull);
-	} body {
+	private auto event_() const pure nothrow @safe @nogc {
 		return events_.peek();
 	}
 
@@ -196,7 +194,7 @@ package struct Emitter(T) {
 	}
 
 	///Pop and return the newest state in states_.
-	private bool delegate() nothrow popState() nothrow {
+	private bool delegate() popState() @safe pure nothrow @nogc {
 		assert(states_.length > 0, "Emitter: Need to pop a state but there are no states left");
 		const result = states_.back;
 		states_.popBack();
@@ -204,7 +202,7 @@ package struct Emitter(T) {
 	}
 
 	///Pop and return the newest indent in indents_.
-	private int popIndent() nothrow {
+	private int popIndent() @safe pure nothrow @nogc {
 		assert(indents_.length > 0, "Emitter: Need to pop an indent level but there are no indent levels left");
 		const result = indents_.back;
 		indents_.popBack();
@@ -217,7 +215,7 @@ package struct Emitter(T) {
 	}
 
 	///In some cases, we wait for a few next events before emitting.
-	private bool needMoreEvents() nothrow {
+	private bool needMoreEvents() nothrow const {
 		if (events_.empty) {
 			return true;
 		}
@@ -235,7 +233,7 @@ package struct Emitter(T) {
 	}
 
 	///Determines if we need specified number of more events.
-	private bool needEvents(in uint count) nothrow {
+	private bool needEvents(in uint count) nothrow const {
 		int level = 0;
 		foreach (event; events_) {
 			switch (event.id) {
@@ -290,7 +288,7 @@ package struct Emitter(T) {
 	//Document handlers.
 
 	///Handle start of a document.
-	private bool expectDocumentStart(Flag!"first" first)() nothrow {
+	private bool expectDocumentStart(Flag!"first" first)() {
 		if (!event_.id.among(EventID.DocumentStart, EventID.StreamEnd)) {
 			return false;
 		}
@@ -346,7 +344,7 @@ package struct Emitter(T) {
 	}
 
 	///Handle end of a document.
-	private bool expectDocumentEnd() nothrow {
+	private bool expectDocumentEnd() {
 		if (event_.id != EventID.DocumentEnd) {
 			return false;
 		}
@@ -361,7 +359,7 @@ package struct Emitter(T) {
 	}
 
 	///Handle the root node of a document.
-	private bool expectRootNode() nothrow {
+	private bool expectRootNode() {
 		states_ ~= &expectDocumentEnd;
 		return expectNode(Context.Root);
 	}
@@ -369,17 +367,17 @@ package struct Emitter(T) {
 	///Handle a mapping node.
 	//
 	//Params: simpleKey = Are we in a simple key?
-	private bool expectMappingNode(const bool simpleKey = false) nothrow {
+	private bool expectMappingNode(const bool simpleKey = false) {
 		return expectNode(simpleKey ? Context.MappingSimpleKey : Context.MappingNoSimpleKey);
 	}
 
 	///Handle a sequence node.
-	private bool expectSequenceNode() nothrow {
+	private bool expectSequenceNode() {
 		return expectNode(Context.Sequence);
 	}
 
 	///Handle a new node. Context specifies where in the document we are.
-	private bool expectNode(const Context context) nothrow {
+	private bool expectNode(const Context context) {
 		context_ = context;
 
 		const flowCollection = event_.collectionStyle == CollectionStyle.Flow;
@@ -417,7 +415,7 @@ package struct Emitter(T) {
 		return true;
 	}
 	///Handle an alias.
-	private bool expectAlias() nothrow {
+	private bool expectAlias() {
 		if (event_.anchor.isNull()) {
 			return false;
 		}
@@ -427,7 +425,7 @@ package struct Emitter(T) {
 	}
 
 	///Handle a scalar.
-	private void expectScalar() nothrow {
+	private void expectScalar() {
 		increaseIndent(Yes.flow);
 		processScalar();
 		indent_ = popIndent();
@@ -437,7 +435,7 @@ package struct Emitter(T) {
 	//Flow sequence handlers.
 
 	///Handle a flow sequence.
-	private void expectFlowSequence() nothrow {
+	private void expectFlowSequence() {
 		writeIndicator("[", Yes.needWhitespace, Yes.whitespace);
 		++flowLevel_;
 		increaseIndent(Yes.flow);
@@ -445,7 +443,7 @@ package struct Emitter(T) {
 	}
 
 	///Handle a flow sequence item.
-	private bool expectFlowSequenceItem(Flag!"first" first)() nothrow {
+	private bool expectFlowSequenceItem(Flag!"first" first)() {
 		if (event_.id == EventID.SequenceEnd) {
 			indent_ = popIndent();
 			--flowLevel_;
@@ -471,7 +469,7 @@ package struct Emitter(T) {
 	//Flow mapping handlers.
 
 	///Handle a flow mapping.
-	private bool expectFlowMapping() nothrow {
+	private bool expectFlowMapping() {
 		writeIndicator("{", Yes.needWhitespace, Yes.whitespace);
 		++flowLevel_;
 		increaseIndent(Yes.flow);
@@ -480,7 +478,7 @@ package struct Emitter(T) {
 	}
 
 	///Handle a key in a flow mapping.
-	private bool expectFlowMappingKey(Flag!"first" first)() nothrow {
+	private bool expectFlowMappingKey(Flag!"first" first)() {
 		if (event_.id == EventID.MappingEnd) {
 			indent_ = popIndent();
 			--flowLevel_;
@@ -511,14 +509,14 @@ package struct Emitter(T) {
 	}
 
 	///Handle a simple value in a flow mapping.
-	private bool expectFlowMappingSimpleValue() nothrow {
+	private bool expectFlowMappingSimpleValue() {
 		writeIndicator(":", No.needWhitespace);
 		states_ ~= &expectFlowMappingKey!(No.first);
 		return expectMappingNode();
 	}
 
 	///Handle a complex value in a flow mapping.
-	private bool expectFlowMappingValue() nothrow {
+	private bool expectFlowMappingValue() {
 		if (canonical_ || column_ > bestWidth_) {
 			writeIndent();
 		}
@@ -530,7 +528,7 @@ package struct Emitter(T) {
 	//Block sequence handlers.
 
 	///Handle a block sequence.
-	private bool expectBlockSequence() nothrow {
+	private bool expectBlockSequence() {
 		const indentless = (context_ == Context.MappingNoSimpleKey || context_ == Context.MappingSimpleKey) && !indentation_;
 		increaseIndent(No.flow, indentless);
 		state_ = &expectBlockSequenceItem!(Yes.first);
@@ -538,7 +536,7 @@ package struct Emitter(T) {
 	}
 
 	///Handle a block sequence item.
-	private bool expectBlockSequenceItem(Flag!"first" first)() nothrow {
+	private bool expectBlockSequenceItem(Flag!"first" first)() {
 		static if (!first)
 			if (event_.id == EventID.SequenceEnd) {
 				indent_ = popIndent();
@@ -555,14 +553,14 @@ package struct Emitter(T) {
 	//Block mapping handlers.
 
 	///Handle a block mapping.
-	private bool expectBlockMapping() nothrow {
+	private bool expectBlockMapping() {
 		increaseIndent(No.flow);
 		state_ = &expectBlockMappingKey!(Yes.first);
 		return true;
 	}
 
 	///Handle a key in a block mapping.
-	private bool expectBlockMappingKey(Flag!"first" first)() nothrow {
+	private bool expectBlockMappingKey(Flag!"first" first)() {
 		static if (!first)
 			if (event_.id == EventID.MappingEnd) {
 				indent_ = popIndent();
@@ -582,14 +580,14 @@ package struct Emitter(T) {
 	}
 
 	///Handle a simple value in a block mapping.
-	private bool expectBlockMappingSimpleValue() nothrow {
+	private bool expectBlockMappingSimpleValue() {
 		writeIndicator(":", No.needWhitespace);
 		states_ ~= &expectBlockMappingKey!(No.first);
 		return expectMappingNode();
 	}
 
 	///Handle a complex value in a block mapping.
-	private bool expectBlockMappingValue() nothrow {
+	private bool expectBlockMappingValue() {
 		writeIndent();
 		writeIndicator(":", Yes.needWhitespace, No.whitespace, Yes.indentation);
 		states_ ~= &expectBlockMappingKey!(No.first);
@@ -655,7 +653,7 @@ package struct Emitter(T) {
 	}
 
 	///Process and write a scalar.
-	private bool processScalar() nothrow {
+	private bool processScalar() {
 		if (analysis_.flags & ScalarFlags.isNull) {
 			analysis_ = analyzeScalar(event_.value);
 		}
@@ -698,7 +696,7 @@ package struct Emitter(T) {
 	}
 
 	///Process and write an anchor/alias.
-	private void processAnchor(const string indicator) nothrow {
+	private void processAnchor(const string indicator) {
 		if (event_.anchor.isNull()) {
 			preparedAnchor_ = null;
 			return;
@@ -714,7 +712,7 @@ package struct Emitter(T) {
 	}
 
 	///Process and write a tag.
-	private void processTag() nothrow {
+	private void processTag() {
 		Tag tag = event_.tag;
 		enum defaultTag = Tag("!");
 
@@ -943,7 +941,7 @@ package struct Emitter(T) {
 	//Writers.
 
 	///Write an indicator (e.g. ":", "[", ">", etc.).
-	private void writeIndicator(const string indicator, const Flag!"needWhitespace" needWhitespace, const Flag!"whitespace" whitespace = No.whitespace, const Flag!"indentation" indentation = No.indentation) nothrow {
+	private void writeIndicator(const string indicator, const Flag!"needWhitespace" needWhitespace, const Flag!"whitespace" whitespace = No.whitespace, const Flag!"indentation" indentation = No.indentation) {
 		const bool prefixSpace = !whitespace_ && needWhitespace;
 		whitespace_ = whitespace;
 		indentation_ = indentation_ && indentation;
@@ -957,7 +955,7 @@ package struct Emitter(T) {
 	}
 
 	///Write indentation.
-	private void writeIndent() nothrow {
+	private void writeIndent() {
 		const indent = indent_ == -1 ? 0 : indent_;
 
 		if (!indentation_ || column_ > indent || (column_ == indent && !whitespace_)) {
@@ -972,7 +970,7 @@ package struct Emitter(T) {
 	}
 
 	///Start new line.
-	private void writeLineBreak(const string data = null) nothrow {
+	private void writeLineBreak(const string data = null) {
 		whitespace_ = indentation_ = true;
 		++line_;
 		column_ = 0;
@@ -980,14 +978,14 @@ package struct Emitter(T) {
 	}
 
 	///Write a YAML version directive.
-	private void writeVersionDirective(const YAMLVersion versionText) nothrow {
+	private void writeVersionDirective(immutable YAMLVersion versionText) {
 		put(stream_, "%YAML ");
 		put(stream_, cast(string)versionText);
 		writeLineBreak();
 	}
 
 	///Write a tag directive.
-	private void writeTagDirective(const TagDirective directive) nothrow {
+	private void writeTagDirective(const TagDirective directive) {
 		put(stream_, "%TAG ");
 		put(stream_, directive.handle.data);
 		put(stream_, " ");
